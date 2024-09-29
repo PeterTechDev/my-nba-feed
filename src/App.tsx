@@ -1,16 +1,14 @@
-// import { GlobalStyle } from "./globalStyles";
-import { ThemeProvider } from "styled-components";
-
-import { defaultTheme } from "./styles/themes/default";
-import { BasicButton } from "./components/Button/BasicButton";
+import { Header } from "./components/Header";
+import { ThemeProviderWrapper } from "./styles/ThemeProviderWrapper";
+import { GlobalStyle } from "./styles/globalStyles";
 
 function App() {
   return (
-    <ThemeProvider theme={defaultTheme}>
-      <h1>Hello, world!</h1>
-      <BasicButton />
-      <p>World champions of what ?</p>
-    </ThemeProvider>
+    <ThemeProviderWrapper initialTheme="celtics">
+      <GlobalStyle />
+      <Header />
+      {/* Future components */}
+    </ThemeProviderWrapper>
   );
 }
 
