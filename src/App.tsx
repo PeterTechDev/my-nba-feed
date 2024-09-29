@@ -1,5 +1,17 @@
+// import { GlobalStyle } from "./globalStyles";
+import { ThemeProvider } from "styled-components";
+
+import { defaultTheme } from "./styles/themes/default";
+import { BasicButton } from "./components/Button/BasicButton";
+
 function App() {
-  return <h1>TEstings</h1>;
+  return (
+    <ThemeProvider theme={defaultTheme}>
+      <h1>Hello, world!</h1>
+      <BasicButton />
+      <p>World champions of what ?</p>
+    </ThemeProvider>
+  );
 }
 
 export default App;
