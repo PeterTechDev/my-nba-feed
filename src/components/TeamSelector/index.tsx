@@ -1,26 +1,48 @@
 import { useState } from "react";
-import { TeamSelectorContainer, Select } from "./TeamSelector.styles";
+import {
+  SelectorWrapper,
+  SelectorButton,
+  ModalOverlay,
+  ModalContent,
+} from "./TeamSelector.styles";
+import { UserSwitch } from "phosphor-react";
 import { ThemeNames } from "../../styles/nbaThemes";
 import { useTheme } from "../../context/useTheme";
 
 export function TeamSelector() {
-  const [selectedTeam, setSelectedTeam] = useState<ThemeNames>("celtics");
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { changeTheme } = useTheme();
 
-  const handleTeamChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const team = event.target.value as ThemeNames;
-    setSelectedTeam(team);
+  const handleTeamChange = (team: ThemeNames) => {
     changeTheme(team);
+    setIsModalOpen(false); // Close modal after selection
   };
 
   return (
-    <TeamSelectorContainer>
-      <label htmlFor="team-select">Select Team:</label>
-      <Select id="team-select" value={selectedTeam} onChange={handleTeamChange}>
-        <option value="celtics">Celtics</option>
-        <option value="lakers">Lakers</option>
-        {/* Additional teams can be added here */}
-      </Select>
-    </TeamSelectorContainer>
+    <>
+      <SelectorWrapper>
+        <SelectorButton onClick={() => setIsModalOpen(true)}>
+          <UserSwitch size={24} />
+          Change Team
+        </SelectorButton>
+      </SelectorWrapper>
+
+      {isModalOpen && (
+        <ModalOverlay onClick={() => setIsModalOpen(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <h2>Select Your Team</h2>
+            <ul>
+              <li onClick={() => handleTeamChange("celtics")}>
+                Boston Celtics
+              </li>
+              <li onClick={() => handleTeamChange("lakers")}>
+                Los Angeles Lakers
+              </li>
+              {/* Add more teams as needed */}
+            </ul>
+          </ModalContent>
+        </ModalOverlay>
+      )}
+    </>
   );
 }

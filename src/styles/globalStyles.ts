@@ -4,13 +4,13 @@ import { createGlobalStyle } from "styled-components";
 export const GlobalStyle = createGlobalStyle`
   :root {
     /* Grayscale */
-    --gray-100: #f2f2f2;
-    --gray-200: #cccccc;
-    --gray-300: #a6a6a6;
-    --gray-400: #333333;
-    --gray-500: #262626;
-    --gray-600: #1a1a1a;
-    --gray-700: #0d0d0d;
+  --gray-100: #e1e1e6;
+  --gray-300: #c4c4cc;
+  --gray-400: #8d8d99;
+  --gray-600: #323238;
+  --gray-700: #29292e;
+  --gray-800: #202024;
+  --gray-900: #121214;
 
     /* Font sizes */
     --font-size-base: 1rem; /* 16px */
@@ -32,8 +32,8 @@ export const GlobalStyle = createGlobalStyle`
   }
 
   body {
-    background-color: ${({ theme }) => theme.colors.background};
-    color: ${({ theme }) => theme.colors.text};
+    background-color: var(--gray-900);
+    color: var(--gray-300);
     font-family: var(--font-base);
     font-size: var(--font-size-base);
     line-height: 1.5;
