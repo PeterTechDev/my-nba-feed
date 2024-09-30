@@ -8,6 +8,7 @@ export const StyledAvatar = styled.img<{ rounded?: boolean }>`
   outline: 2px solid ${({ theme }) => theme.colors.primary};
   display: block;
   margin-top: calc(0px - 1.5rem - 6px);
+  object-fit: contain;
 
   /* If rounded prop is true, make the avatar a circle */
   ${({ rounded }) =>
