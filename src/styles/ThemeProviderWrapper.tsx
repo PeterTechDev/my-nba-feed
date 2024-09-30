@@ -8,7 +8,7 @@ interface ThemeProps {
 }
 
 export function ThemeProviderWrapper({ children, initialTheme }: ThemeProps) {
-  const [currentTheme, setCurrentTheme] = useState(themes[initialTheme]);
+  const [currentTheme] = useState(themes[initialTheme]);
 
   return <ThemeProvider theme={currentTheme}>{children}</ThemeProvider>;
 }
