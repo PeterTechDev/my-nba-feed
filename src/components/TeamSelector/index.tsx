@@ -8,13 +8,17 @@ import {
 import { UserSwitch } from "phosphor-react";
 import { ThemeNames } from "../../styles/nbaThemes";
 import { useTheme } from "../../context/useTheme";
+import { useTeam } from "../../context/TeamContext/useTeam";
 
 export function TeamSelector() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { changeTheme } = useTheme();
+  const { changeTeam } = useTeam();
 
   const handleTeamChange = (team: ThemeNames) => {
     changeTheme(team);
+    changeTeam(team);
+
     setIsModalOpen(false); // Close modal after selection
   };
 

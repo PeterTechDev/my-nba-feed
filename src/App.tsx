@@ -4,16 +4,19 @@ import { MainContent } from "./components/MainContent";
 import { ThemeContextProvider } from "./context/ThemeProvider";
 import { GlobalStyle } from "./styles/globalStyles";
 import { ContentWrapper } from "./styles/ContentWrapper";
+import { TeamProvider } from "./context/TeamContext/TeamProvider";
 
 function App() {
   return (
     <ThemeContextProvider initialTheme="celtics">
-      <GlobalStyle />
-      <Header />
-      <ContentWrapper>
-        <Sidebar />
-        <MainContent />
-      </ContentWrapper>
+      <TeamProvider initialTeam="celtics">
+        <GlobalStyle />
+        <Header />
+        <ContentWrapper>
+          <Sidebar />
+          <MainContent />
+        </ContentWrapper>
+      </TeamProvider>
     </ThemeContextProvider>
   );
 }

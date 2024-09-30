@@ -7,15 +7,17 @@ import {
   NextGameContainer,
   Footer,
 } from "./Sidebar.styles";
-import { mockData } from "../../mock-data/index";
 import { format } from "date-fns";
 import { TeamSelector } from "../TeamSelector";
-import Avatar from "./Avatar";
+import { useTeam } from "../../context/TeamContext/useTeam";
+import Avatar from "../Avatar/Avatar";
 
 export function Sidebar() {
+  const { teamData } = useTeam();
+
   // Format the next game date
   const formattedDate = format(
-    new Date(mockData.nextGame.date),
+    new Date(teamData.nextGame.date),
     "MMMM do, h:mm a"
   );
 
@@ -23,18 +25,18 @@ export function Sidebar() {
     <SidebarContainer>
       <CoverImage />
       <Profile>
-        <Avatar src={mockData.teamInfo.teamLogo} alt={mockData.teamInfo.name} />
-        <TeamName>{mockData.teamInfo.name}</TeamName>
+        <Avatar src={teamData.teamInfo.teamLogo} alt={teamData.teamInfo.name} />
+        <TeamName>{teamData.teamInfo.name}</TeamName>
         <ConferencePosition>
-          #{mockData.rankings.conferencePosition} conference position
+          #{teamData.rankings.conferencePosition} conference position
         </ConferencePosition>
       </Profile>
 
       <NextGameContainer>
         <h3>Next game:</h3>
         <div>{formattedDate}</div>
-        <div>vs. {mockData.nextGame.opponent}</div>
-        <div>at {mockData.nextGame.location}</div>
+        <div>vs. {teamData.nextGame.opponent}</div>
+        <div>at {teamData.nextGame.location}</div>
       </NextGameContainer>
 
       <Footer>

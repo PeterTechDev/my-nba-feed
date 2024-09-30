@@ -16,7 +16,7 @@ export const SidebarContainer = styled.aside`
 
 export const CoverImage = styled.div`
   width: 100%;
-  height: 80px;
+  height: 60px;
   background-color: ${({ theme }) => theme.colors.primary};
 `;
 
@@ -32,7 +32,7 @@ export const Profile = styled.div`
 export const TeamName = styled.strong`
   margin-top: 0.5rem;
   color: var(--gray-100);
-  line-height: 1.6;
+  line-height: 1;
   text-align: center;
   font-size: 2rem;
 
@@ -46,7 +46,7 @@ export const ConferencePosition = styled.span`
   color: var(--gray-400);
   line-height: 1.6;
   text-align: center;
-  margin-top: -0.5rem;
+  margin-top: 0.5rem;
 
   @media (min-width: 768px) {
   }
