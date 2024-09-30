@@ -41,4 +41,64 @@ export const teamsData: Record<string, MockData> = {
       losses: 0,
     },
   },
+  magic: {
+    teamInfo: {
+      id: "3",
+      name: "Orlando Magic",
+      bannerImg:
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Amway_Center.jpg/1200px-Amway_Center.jpg",
+      teamLogo:
+        "https://upload.wikimedia.org/wikipedia/en/thumb/1/10/Orlando_Magic_logo.svg/800px-Orlando_Magic_logo.svg.png",
+    },
+    nextGame: {
+      date: "2021-10-25T23:00:00.000Z",
+      opponent: "Miami Heat",
+      location: "Amway Center",
+    },
+    rankings: {
+      conferencePosition: 8,
+      wins: 0,
+      losses: 0,
+    },
+  },
+  warriors: {
+    teamInfo: {
+      id: "4",
+      name: "Golden State Warriors",
+      bannerImg:
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Chase_Center_Warriors.jpg/1200px-Chase_Center_Warriors.jpg",
+      teamLogo:
+        "https://upload.wikimedia.org/wikipedia/en/thumb/0/01/Golden_State_Warriors_logo.svg/800px-Golden_State_Warriors_logo.svg.png",
+    },
+    nextGame: {
+      date: "2021-10-24T23:00:00.000Z",
+      opponent: "Phoenix Suns",
+      location: "Chase Center",
+    },
+    rankings: {
+      conferencePosition: 3,
+      wins: 0,
+      losses: 0,
+    },
+  },
+  bulls: {
+    teamInfo: {
+      id: "5",
+      name: "Chicago Bulls",
+      bannerImg:
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/United_Center.jpg/1200px-United_Center.jpg",
+      teamLogo:
+        "https://upload.wikimedia.org/wikipedia/en/thumb/6/67/Chicago_Bulls_logo.svg/800px-Chicago_Bulls_logo.svg.png",
+    },
+    nextGame: {
+      date: "2021-10-26T23:00:00.000Z",
+      opponent: "Milwaukee Bucks",
+      location: "United Center",
+    },
+    rankings: {
+      conferencePosition: 6,
+      wins: 0,
+      losses: 0,
+    },
+  },
 };

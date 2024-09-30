@@ -43,10 +43,13 @@ export const TeamName = styled.strong`
 
 export const ConferencePosition = styled.span`
   font-size: 0.875rem;
-  color: var(--gray-400);
+  color: ${({ theme }) => theme.colors.secondary};
   line-height: 1.6;
   text-align: center;
   margin-top: 0.5rem;
+  border-radius: 8px;
+  background: var(--gray-600);
+  padding: 0.2rem 0.5rem;
 
   @media (min-width: 768px) {
   }
@@ -83,8 +86,8 @@ export const Footer = styled.footer`
 
 export const FooterLink = styled.a`
   background: transparent;
-  color: var(--team-color-primary);
-  border: 1px solid var(--team-color-primary);
+  color: ${({ theme }) => theme.colors.primary};
+  border: 1px solid ${({ theme }) => theme.colors.primary};
   border-radius: 8px;
   height: 50px;
   padding: 0 1.5rem;
@@ -97,7 +100,7 @@ export const FooterLink = styled.a`
   width: 100%;
 
   &:hover {
-    background: var(--team-color-primary);
+    background: ${({ theme }) => theme.colors.primary};
     color: var(--gray-100);
     transition: background-color 0.1s;
   }

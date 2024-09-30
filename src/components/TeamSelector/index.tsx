@@ -9,6 +9,7 @@ import { UserSwitch } from "phosphor-react";
 import { ThemeNames } from "../../styles/nbaThemes";
 import { useTheme } from "../../context/useTheme";
 import { useTeam } from "../../context/TeamContext/useTeam";
+import { teamsData } from "../../mock-data/index"; // Import the teamsData
 
 export function TeamSelector() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,7 +19,6 @@ export function TeamSelector() {
   const handleTeamChange = (team: ThemeNames) => {
     changeTheme(team);
     changeTeam(team);
-
     setIsModalOpen(false); // Close modal after selection
   };
 
@@ -36,13 +36,14 @@ export function TeamSelector() {
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <h2>Select Your Team</h2>
             <ul>
-              <li onClick={() => handleTeamChange("celtics")}>
-                Boston Celtics
-              </li>
-              <li onClick={() => handleTeamChange("lakers")}>
-                Los Angeles Lakers
-              </li>
-              {/* Add more teams as needed */}
+              {Object.keys(teamsData).map((teamKey) => (
+                <li
+                  key={teamKey}
+                  onClick={() => handleTeamChange(teamKey as ThemeNames)}
+                >
+                  {teamsData[teamKey].teamInfo.name}
+                </li>
+              ))}
             </ul>
           </ModalContent>
         </ModalOverlay>

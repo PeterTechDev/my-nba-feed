@@ -15,7 +15,30 @@ export const themes = {
       text: "#000000",
     },
   },
-  // New themes can be added here in the future
+  magic: {
+    colors: {
+      primary: "#0077C0",
+      secondary: "#C4CED4",
+      background: "#ffffff",
+      text: "#000000",
+    },
+  },
+  warriors: {
+    colors: {
+      primary: "#1D428A",
+      secondary: "#FFC72C",
+      background: "#ffffff",
+      text: "#000000",
+    },
+  },
+  bulls: {
+    colors: {
+      primary: "#CE1141",
+      secondary: "#000000",
+      background: "#ffffff",
+      text: "#000000",
+    },
+  },
 };
 
 export type ThemeNames = keyof typeof themes;
