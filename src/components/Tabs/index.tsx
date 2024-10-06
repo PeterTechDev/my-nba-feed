@@ -1,7 +1,7 @@
-import { TabsProvider } from "./TabsContext";
-import { useRef, useState, useEffect } from "react";
-import { TabsContainer, StyledScrollButton } from "./styles/Tabs.styles";
 import { ArrowLeft, ArrowRight } from "phosphor-react";
+import { useEffect, useRef, useState } from "react";
+import { StyledScrollButton, TabsContainer } from "./styles/Tabs.styles";
+import { TabsProvider } from "./TabsContext";
 import { TabContent } from "./TabsElements/TabContent";
 import { TabMenu } from "./TabsElements/TabMenu";
 

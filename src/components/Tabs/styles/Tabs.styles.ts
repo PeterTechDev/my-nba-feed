@@ -90,4 +90,40 @@ export const StyledTabItem = styled.li<{ isActive: boolean }>`
 export const StyledTabContent = styled.div`
   padding: 1rem;
   color: var(--gray-100);
+
+  h3 {
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+  }
+
+  p,
+  small {
+    margin: 0.5rem 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+  }
+
+  th,
+  td {
+    border: 1px solid var(--gray-400);
+    padding: 0.5rem;
+    text-align: left;
+  }
+
+  th {
+    background-color: var(--gray-600);
+  }
+
+  a {
+    color: ${({ theme }) => theme.colors.primary};
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
 `;
