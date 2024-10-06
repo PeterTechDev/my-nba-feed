@@ -44,27 +44,21 @@ export const articles = [
 
 // Last Game Mock Data
 export const lastGame = {
-  date: "2023-10-15",
-  opponent: "Golden State Warriors",
+  date: "October 5, 2024",
+  opponent: "Denver Nuggets",
   stats: {
-    teamPoints: 102,
-    opponentPoints: 99,
+    teamPoints: 130,
+    opponentPoints: 107,
     topScorer: {
-      name: "LeBron James",
+      name: "Jaylen Brown",
       points: 34,
     },
   },
   highlights: [
     {
       id: 1,
-      title: "LeBron's Game-Winning Shot",
-      url: "https://youtube.com/...",
+      title: "Game Highlights",
+      url: "https://www.youtube.com/watch?v=MkZo-WyHZ1c&ab_channel=HooperHighlights",
     },
-    {
-      id: 2,
-      title: "Top Plays of the Game",
-      url: "https://youtube.com/...",
-    },
-    // Add more highlights...
   ],
 };
