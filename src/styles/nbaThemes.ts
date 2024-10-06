@@ -15,10 +15,10 @@ export const themes = {
       text: "#000000",
     },
   },
-  magic: {
+  sixers: {
     colors: {
-      primary: "#0077C0",
-      secondary: "#C4CED4",
+      primary: "#006BB6",
+      secondary: "#ED174C",
       background: "#ffffff",
       text: "#000000",
     },

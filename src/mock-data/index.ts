@@ -41,19 +41,19 @@ export const teamsData: Record<string, MockData> = {
       losses: 0,
     },
   },
-  magic: {
+  sixers: {
     teamInfo: {
       id: "3",
-      name: "Orlando Magic",
+      name: "Philadelphia 76ers",
       bannerImg:
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Amway_Center.jpg/1200px-Amway_Center.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Wells_Fargo_Center.jpg/1200px-Wells_Fargo_Center.jpg",
       teamLogo:
-        "https://upload.wikimedia.org/wikipedia/en/thumb/1/10/Orlando_Magic_logo.svg/800px-Orlando_Magic_logo.svg.png",
+        "https://upload.wikimedia.org/wikipedia/en/0/0e/Philadelphia_76ers_logo.svg",
     },
     nextGame: {
       date: "2021-10-25T23:00:00.000Z",
       opponent: "Miami Heat",
-      location: "Amway Center",
+      location: "Wells Fargo Center",
     },
     rankings: {
       conferencePosition: 8,
