@@ -2,6 +2,7 @@ import { createContext, useContext, useState, ReactNode } from "react";
 
 // Define the possible tabs as an enum
 export enum TabNames {
+  LAST_GAME = "Last Game", // Moved to the first position
   SOCIAL = "Social Media",
   STANDINGS = "Standings",
   TOP_10 = "Top 10",

@@ -41,3 +41,30 @@ export const articles = [
   },
   // Add more articles...
 ];
+
+// Last Game Mock Data
+export const lastGame = {
+  date: "2023-10-15",
+  opponent: "Golden State Warriors",
+  stats: {
+    teamPoints: 102,
+    opponentPoints: 99,
+    topScorer: {
+      name: "LeBron James",
+      points: 34,
+    },
+  },
+  highlights: [
+    {
+      id: 1,
+      title: "LeBron's Game-Winning Shot",
+      url: "https://youtube.com/...",
+    },
+    {
+      id: 2,
+      title: "Top Plays of the Game",
+      url: "https://youtube.com/...",
+    },
+    // Add more highlights...
+  ],
+};

@@ -4,6 +4,7 @@ import { SocialMediaTab } from "./SocialMediaTab";
 import { StandingsTab } from "./StandingsTab";
 import { Top10VideosTab } from "./Top10VideosTab";
 import { ArticlesTab } from "./ArticlesTab";
+import { LastGameTab } from "./LastGameTab";
 
 export const TabContent = () => {
   const { activeTab } = useTabs();
@@ -18,6 +19,8 @@ export const TabContent = () => {
         return <Top10VideosTab />;
       case TabNames.ARTICLES:
         return <ArticlesTab />;
+      case TabNames.LAST_GAME:
+        return <LastGameTab />;
       default:
         return null;
     }
