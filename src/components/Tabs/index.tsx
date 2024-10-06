@@ -1,45 +1,78 @@
-import { useState } from "react";
-import { TabsContainer, TabMenu, TabItem, TabContent } from "./Tabs.styles";
+import { TabsProvider } from "./TabsContext";
+import { useRef, useState, useEffect } from "react";
+import { TabsContainer, StyledScrollButton } from "./styles/Tabs.styles";
+import { ArrowLeft, ArrowRight } from "phosphor-react";
+import { TabContent } from "./TabsElements/TabContent";
+import { TabMenu } from "./TabsElements/TabMenu";
 
-enum TabNames {
-  SOCIAL = "Social Media",
-  STANDINGS = "Standings",
-  TOP_10 = "Top 10",
-}
+export const Tabs = () => {
+  const tabMenuRef = useRef<HTMLUListElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
-export function Tabs() {
-  const [activeTab, setActiveTab] = useState<TabNames>(TabNames.SOCIAL);
+  // Check if the tab menu can be scrolled left or right
+  useEffect(() => {
+    const tabMenu = tabMenuRef.current;
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case TabNames.SOCIAL:
-        return <div>Social Media feed goes here...</div>;
-      case TabNames.STANDINGS:
-        return <div>Standings Content goes here...</div>;
-      case TabNames.TOP_10:
-        return <div>Youtube Top 10 NBA</div>;
-      default:
-        return null;
+    const handleScroll = () => {
+      if (tabMenu) {
+        setCanScrollLeft(tabMenu.scrollLeft > 0);
+
+        setCanScrollRight(
+          tabMenu.scrollLeft + tabMenu.clientWidth < tabMenu.scrollWidth - 1
+        );
+      }
+    };
+
+    handleScroll(); // Initial check
+    window.addEventListener("resize", handleScroll); // Listen for resize events
+    if (tabMenu) {
+      tabMenu.addEventListener("scroll", handleScroll); // Listen for scroll events
+    }
+
+    return () => {
+      window.removeEventListener("resize", handleScroll); // Cleanup resize listener
+      if (tabMenu) {
+        tabMenu.removeEventListener("scroll", handleScroll); // Cleanup scroll listener
+      }
+    };
+  }, []);
+
+  const scrollLeft = () => {
+    if (tabMenuRef.current) {
+      tabMenuRef.current.scrollBy({ left: -100, behavior: "smooth" });
+    }
+  };
+
+  const scrollRight = () => {
+    if (tabMenuRef.current) {
+      tabMenuRef.current.scrollBy({ left: 100, behavior: "smooth" });
     }
   };
 
   return (
-    <TabsContainer>
-      {/* Tab Menu */}
-      <TabMenu>
-        {Object.values(TabNames).map((tab) => (
-          <TabItem
-            key={tab}
-            isActive={activeTab === tab}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab}
-          </TabItem>
-        ))}
-      </TabMenu>
+    <TabsProvider>
+      <TabsContainer>
+        {/* Left Scroll Button */}
+        {canScrollLeft && (
+          <StyledScrollButton onClick={scrollLeft} className="left">
+            <ArrowLeft size={24} />
+          </StyledScrollButton>
+        )}
 
-      {/* Tab Content */}
-      <TabContent>{renderContent()}</TabContent>
-    </TabsContainer>
+        {/* Tab Menu */}
+        <TabMenu ref={tabMenuRef} />
+
+        {/* Right Scroll Button */}
+        {canScrollRight && (
+          <StyledScrollButton onClick={scrollRight} className="right">
+            <ArrowRight size={24} />
+          </StyledScrollButton>
+        )}
+
+        {/* Tab Content */}
+      </TabsContainer>
+      <TabContent />
+    </TabsProvider>
   );
-}
+};
