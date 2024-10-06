@@ -27,11 +27,14 @@ export const StyledTabMenu = styled.ul`
   list-style: none;
   padding: 0;
   margin: 0;
-  border-bottom: 2px solid var(--gray-600);
+  border-bottom: 2px solid ${({ theme }) => theme.colors.primary};
   overflow-x: auto;
   white-space: nowrap;
   max-width: 90vw;
   flex: 1; /* Allow the tab menu to take all available space */
+  scrollbar-width: none; /* Firefox scrollbar */
+  -ms-overflow-style: none; /* IE scrollbar */
+  border-radius: 6px;
 
   &::-webkit-scrollbar {
     display: none;
@@ -70,15 +73,23 @@ export const StyledScrollButton = styled.button`
 
 // Individual tab item styles remain the same
 export const StyledTabItem = styled.li<{ isActive: boolean }>`
-  padding: 1rem 1.5rem;
+  padding: 0.5rem 1.5rem;
   cursor: pointer;
   font-weight: bold;
-  border-bottom: 4px solid
+  border-radius: 6px;
+  border-top: 4px solid
     ${({ isActive, theme }) =>
       isActive ? theme.colors.primary : "transparent"};
   color: ${({ isActive }) =>
     isActive ? "var(--gray-100)" : "var(--gray-400)"};
   transition: all 0.2s;
+
+  background-color: ${({ isActive }) =>
+    isActive ? "var(--gray-700)" : "transparent"};
+
+  width: 8rem;
+  display: flex;
+  justify-content: center;
 
   &:hover {
     color: var(--gray-100);
