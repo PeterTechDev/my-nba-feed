@@ -3,6 +3,7 @@ import { StyledTabContent } from "../styles/Tabs.styles";
 import { SocialMediaTab } from "./SocialMediaTab";
 import { StandingsTab } from "./StandingsTab";
 import { Top10VideosTab } from "./Top10VideosTab";
+import { ArticlesTab } from "./ArticlesTab";
 
 export const TabContent = () => {
   const { activeTab } = useTabs();
@@ -15,7 +16,8 @@ export const TabContent = () => {
         return <StandingsTab />;
       case TabNames.TOP_10:
         return <Top10VideosTab />;
-      // Add other cases for different tabs
+      case TabNames.ARTICLES:
+        return <ArticlesTab />;
       default:
         return null;
     }
