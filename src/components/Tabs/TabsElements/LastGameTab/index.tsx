@@ -1,50 +1,41 @@
-import { lastGame } from "../../../../mock-data/tab-content";
-import {
-  StyledLastGameTab,
-  StatsContainer,
-  HighlightVideo,
-  VideoEmbed,
-} from "./LastGameTab.styles";
+import { useState, useEffect } from "react";
+import { fetchAllTeams } from "../../../../services/nbaService";
+import { StyledLastGameTab } from "./LastGameTab.styles";
 
 export const LastGameTab = () => {
+  const [teams, setTeams] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const getTeams = async () => {
+      try {
+        const allTeams = await fetchAllTeams();
+        setTeams(allTeams);
+        setLoading(false);
+      } catch (err) {
+        setError(err);
+        setLoading(false);
+      }
+    };
+
+    getTeams();
+  }, []);
+
+  // Render loading, error, or teams data
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error loading teams: {error.message}</div>;
+
   return (
     <StyledLastGameTab>
-      <h3>Last Game vs. {lastGame.opponent}</h3>
-      <p>Date: {lastGame.date}</p>
-
-      {/* Game Stats */}
-      <StatsContainer>
-        <div>
-          <strong>Final Score:</strong> {lastGame.stats.teamPoints} -{" "}
-          {lastGame.stats.opponentPoints}
-        </div>
-        <div>
-          <strong>Top Scorer:</strong> {lastGame.stats.topScorer.name} (
-          {lastGame.stats.topScorer.points} points)
-        </div>
-      </StatsContainer>
-
-      {/* Highlights Videos */}
-      <h4>Highlights</h4>
+      <h3>NBA Teams</h3>
       <ul>
-        {lastGame.highlights.map((video) => (
-          <HighlightVideo key={video.id}>
-            <VideoEmbed
-              src={`https://www.youtube.com/embed/${getYoutubeVideoId(
-                video.url
-              )}`}
-              title={video.title}
-              allowFullScreen
-            />
-          </HighlightVideo>
+        {teams.map((team) => (
+          <li key={team.id}>
+            {team.full_name} ({team.abbreviation})
+          </li>
         ))}
       </ul>
     </StyledLastGameTab>
   );
 };
-
-// Helper function to extract video ID from YouTube URL
-function getYoutubeVideoId(url: string) {
-  const urlObj = new URL(url);
-  return urlObj.searchParams.get("v");
-}
