@@ -10,20 +10,14 @@ export const StyledSocialMediaTab = styled.div`
   }
 `;
 
-export const PostContainer = styled.div`
-  margin-bottom: 1rem;
-  padding: 0.75rem;
-  background-color: var(--gray-700);
-  border-radius: 8px;
+export const LoadingMessage = styled.div`
+  padding: 1rem;
+  font-size: 1.2rem;
+  color: var(--gray-400);
+`;
 
-  p {
-    margin: 0;
-    font-size: 1rem;
-  }
-
-  small {
-    display: block;
-    margin-top: 0.5rem;
-    color: var(--gray-400);
-  }
+export const ErrorMessage = styled.div`
+  padding: 1rem;
+  font-size: 1.2rem;
+  color: var(--danger);
 `;

@@ -5,6 +5,9 @@ import { ThemeContextProvider } from "./context/ThemeProvider";
 import { GlobalStyle } from "./styles/globalStyles";
 import { ContentWrapper } from "./styles/ContentWrapper";
 import { TeamProvider } from "./context/TeamContext/TeamProvider";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const queryClient = new QueryClient();
 
 function App() {
   return (
@@ -14,7 +17,9 @@ function App() {
         <Header />
         <ContentWrapper>
           <Sidebar />
-          <MainContent />
+          <QueryClientProvider client={queryClient}>
+            <MainContent />
+          </QueryClientProvider>
         </ContentWrapper>
       </TeamProvider>
     </ThemeContextProvider>
