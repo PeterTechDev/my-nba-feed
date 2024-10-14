@@ -10,6 +10,7 @@ import { useTeam } from "../../../../context/TeamContext/useTeam";
 export const SocialMediaTab = () => {
   const { teamTwitterHandle } = useTeam();
   const { data: tweetIds, isLoading, error } = useTweets(teamTwitterHandle);
+  const { selectedTeam } = useTeam();
 
   if (isLoading) return <LoadingMessage>Loading tweets...</LoadingMessage>;
   if (error)
@@ -17,7 +18,7 @@ export const SocialMediaTab = () => {
 
   return (
     <StyledSocialMediaTab>
-      <h3>Latest Tweets from Celtics</h3>
+      <h3>Latest Tweets from {selectedTeam}</h3>
       {tweetIds.map((id: string) => (
         <Tweet key={id} id={id} />
       ))}
