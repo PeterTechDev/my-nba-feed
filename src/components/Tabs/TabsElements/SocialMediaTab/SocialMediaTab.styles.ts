@@ -4,6 +4,9 @@ export const StyledSocialMediaTab = styled.div`
   padding: 1rem;
   color: var(--gray-100);
 
+  padding: 0;
+  margin: 0 auto;
+
   h3 {
     margin-bottom: 1rem;
     font-size: 1.5rem;
