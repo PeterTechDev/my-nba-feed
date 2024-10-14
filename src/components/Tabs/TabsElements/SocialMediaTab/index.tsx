@@ -5,9 +5,11 @@ import {
   LoadingMessage,
   ErrorMessage,
 } from "./SocialMediaTab.styles";
+import { useTeam } from "../../../../context/TeamContext/useTeam";
 
 export const SocialMediaTab = () => {
-  const { data: tweetIds, isLoading, error } = useTweets("celtics");
+  const { teamTwitterHandle } = useTeam();
+  const { data: tweetIds, isLoading, error } = useTweets(teamTwitterHandle);
 
   if (isLoading) return <LoadingMessage>Loading tweets...</LoadingMessage>;
   if (error)

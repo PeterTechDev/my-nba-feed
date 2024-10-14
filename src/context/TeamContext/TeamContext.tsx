@@ -6,6 +6,7 @@ interface TeamContextProps {
   selectedTeam: keyof typeof teamsData;
   changeTeam: (team: keyof typeof teamsData) => void;
   teamData: (typeof teamsData)[keyof typeof teamsData];
+  teamTwitterHandle: string;
 }
 
 // Create the context with an initial empty value

@@ -18,8 +18,12 @@ export function TeamProvider({ children, initialTeam }: TeamProviderProps) {
   // Retrieve data for the currently selected team
   const teamData = teamsData[selectedTeam];
 
+  const teamTwitterHandle = teamData.teamInfo.twitterHandle;
+
   return (
-    <TeamContext.Provider value={{ selectedTeam, changeTeam, teamData }}>
+    <TeamContext.Provider
+      value={{ selectedTeam, changeTeam, teamData, teamTwitterHandle }}
+    >
       {children}
     </TeamContext.Provider>
   );

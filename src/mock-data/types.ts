@@ -3,6 +3,7 @@ interface TeamInfo {
   name: string;
   bannerImg: string;
   teamLogo: string;
+  twitterHandle: string;
 }
 
 export interface NextGameProps {
