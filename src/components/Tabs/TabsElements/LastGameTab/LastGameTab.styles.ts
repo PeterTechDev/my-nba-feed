@@ -2,7 +2,7 @@ import styled from "styled-components";
 
 export const StyledLastGameTab = styled.div`
   padding: 1rem;
-  color: var(--gray-100);
+  color: ${({ theme }) => theme.colors.text};
 
   h3 {
     margin-bottom: 0.5rem;
@@ -17,15 +17,21 @@ export const StyledLastGameTab = styled.div`
   }
 `;
 
-export const StatsContainer = styled.div`
-  background-color: var(--gray-700);
+export const RecapContainer = styled.div`
+  margin-top: 1.5rem;
   padding: 1rem;
+  background-color: ${({ theme }) => theme.colors.secondary};
   border-radius: 8px;
-  margin-top: 1rem;
 
-  div {
-    font-size: 1rem;
+  h4 {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+    color: ${({ theme }) => theme.colors.primary};
+  }
+
+  p {
     color: var(--gray-100);
+    font-size: 1.1rem;
   }
 `;
 
