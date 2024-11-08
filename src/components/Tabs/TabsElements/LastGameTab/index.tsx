@@ -34,14 +34,13 @@ export const LastGameTab = ({ teamId }: LastGameTabProps) => {
     };
 
     getGameData();
-  }, [teamId]); // Trigger effect whenever teamId changes
+  }, [teamId]);
 
   if (loading) return <LastGameSkeleton />;
   if (error) return <div>Error loading data: {error}</div>;
 
   return (
     <StyledLastGameTab>
-      {/* Last Game Section */}
       {lastGameData && (
         <>
           <h3>
@@ -57,7 +56,6 @@ export const LastGameTab = ({ teamId }: LastGameTabProps) => {
         </>
       )}
 
-      {/* Highlight Video Section */}
       {videoData && (
         <VideoEmbedContainer>
           <h4>Highlights</h4>
