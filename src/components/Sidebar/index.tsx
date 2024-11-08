@@ -1,26 +1,42 @@
-import {
-  SidebarContainer,
-  CoverImage,
-  Profile,
-  TeamName,
-  ConferencePosition,
-  NextGameContainer,
-  Footer,
-} from "./Sidebar.styles";
-import { format } from "date-fns";
-import { TeamSelector } from "../TeamSelector";
+import { useEffect, useState } from "react";
 import { useTeam } from "../../context/TeamContext/useTeam";
+import { fetchNextGameData } from "../../services/nbaService";
 import Avatar from "../Avatar/Avatar";
+import { TeamSelector } from "../TeamSelector";
+import {
+  ConferencePosition,
+  CoverImage,
+  Footer,
+  NextGameContainer,
+  Profile,
+  SidebarContainer,
+  TeamName,
+} from "./Sidebar.styles";
 
 export function Sidebar() {
   const { teamData } = useTeam();
+  const [nextGame, setNextGame] = useState<any | null>(null);
 
-  // Format the next game date
-  const formattedDate = format(
-    new Date(teamData.nextGame.date),
-    "MMMM do, h:mm a"
-  );
+  useEffect(() => {
+    const getNextGame = async () => {
+      if (teamData?.teamInfo?.id) {
+        const gameData = await fetchNextGameData(teamData.teamInfo.id);
+        setNextGame(gameData);
+      }
+    };
 
+    getNextGame();
+  }, [teamData]);
+
+  // Determine the opponent team
+  const opponent_team = nextGame
+    ? nextGame.home_team.full_name === teamData.teamInfo.full_name
+      ? nextGame.visitor_team.full_name
+      : nextGame.home_team.full_name
+    : "";
+  if (!teamData) {
+    return <div>Loading team data...</div>;
+  }
   return (
     <SidebarContainer>
       <CoverImage />
@@ -28,15 +44,26 @@ export function Sidebar() {
         <Avatar src={teamData.teamInfo.teamLogo} alt={teamData.teamInfo.name} />
         <TeamName>{teamData.teamInfo.name}</TeamName>
         <ConferencePosition>
-          #{teamData.rankings.conferencePosition} conference position
+          {teamData.teamInfo.conference} Conference -{" "}
+          {teamData.teamInfo.division} Division
         </ConferencePosition>
       </Profile>
 
       <NextGameContainer>
         <h3>Next game:</h3>
-        <div>{formattedDate}</div>
-        <div>vs. {teamData.nextGame.opponent}</div>
-        <div>at {teamData.nextGame.location}</div>
+        {nextGame ? (
+          <>
+            <div>{nextGame.date}</div>
+            <div>vs. {opponent_team}</div>
+            <div>
+              {nextGame.home_team.full_name === teamData.teamInfo.full_name
+                ? nextGame.home_team_city
+                : nextGame.visitor_team_city}
+            </div>
+          </>
+        ) : (
+          <div>Loading next game...</div>
+        )}
       </NextGameContainer>
 
       <Footer>

@@ -1,8 +1,6 @@
-// src/services/youtubeService.ts
-
 import axios from "axios";
 
-const API_KEY = "AIzaSyD70a-GCHov2z7jSC2t8ivF0_drRNVbv84"; // Replace with your actual API key
+const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 const BASE_URL = "https://www.googleapis.com/youtube/v3";
 
 interface VideoSearchResponse {
@@ -44,5 +42,29 @@ export async function fetchVideoEmbed(
   } catch (error) {
     console.error("Error fetching video data:", error);
     return null;
+  }
+}
+
+export async function fetchTop10Videos(): Promise<VideoSearchResponse[]> {
+  try {
+    const response = await axios.get(`${BASE_URL}/search`, {
+      params: {
+        part: "snippet",
+        q: "NBA Top 10 Plays of the Night",
+        type: "video",
+        maxResults: 10,
+        key: API_KEY,
+        order: "date",
+      },
+    });
+
+    return response.data.items.map((item: any) => ({
+      videoId: item.id.videoId,
+      title: item.snippet.title,
+      embedUrl: `https://www.youtube.com/embed/${item.id.videoId}`,
+    }));
+  } catch (error) {
+    console.error("Error fetching Top 10 videos:", error);
+    return [];
   }
 }

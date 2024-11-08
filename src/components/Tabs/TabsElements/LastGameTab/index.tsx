@@ -2,18 +2,17 @@ import { useEffect, useState } from "react";
 import { fetchLastGameData } from "../../../../services/nbaService";
 import { fetchVideoEmbed } from "../../../../services/youtubeService";
 import { LastGameSkeleton } from "./LastGameSkeleton";
-import {
-  RecapContainer,
-  StyledLastGameTab,
-  VideoEmbedContainer,
-} from "./LastGameTab.styles";
+import { StyledLastGameTab, VideoEmbedContainer } from "./LastGameTab.styles";
 
-export const LastGameTab = () => {
+interface LastGameTabProps {
+  teamId: number;
+}
+
+export const LastGameTab = ({ teamId }: LastGameTabProps) => {
   const [lastGameData, setLastGameData] = useState<any | null>(null);
   const [videoData, setVideoData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const teamId = 2; // Celtics team ID
 
   useEffect(() => {
     const getGameData = async () => {
@@ -35,28 +34,10 @@ export const LastGameTab = () => {
     };
 
     getGameData();
-  }, []);
+  }, [teamId]); // Trigger effect whenever teamId changes
 
   if (loading) return <LastGameSkeleton />;
   if (error) return <div>Error loading data: {error}</div>;
-
-  // Function to generate a simple game recap // Think a a better way to generate the recap
-  const generateRecap = () => {
-    if (!lastGameData) return "";
-    const homeScore = lastGameData.home_team_score;
-    const visitorScore = lastGameData.visitor_team_score;
-    const winningTeam =
-      homeScore > visitorScore
-        ? lastGameData.home_team.full_name
-        : lastGameData.visitor_team.full_name;
-    const losingTeam =
-      homeScore > visitorScore
-        ? lastGameData.visitor_team.full_name
-        : lastGameData.home_team.full_name;
-    const scoreDifference = Math.abs(homeScore - visitorScore);
-
-    return `${winningTeam} defeated ${losingTeam} by ${scoreDifference} points in a thrilling matchup.`;
-  };
 
   return (
     <StyledLastGameTab>
@@ -67,13 +48,7 @@ export const LastGameTab = () => {
             {lastGameData.home_team.full_name} vs.{" "}
             {lastGameData.visitor_team.full_name}
           </h3>
-          <p>
-            {new Date(lastGameData.date).toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "long",
-              year: "numeric",
-            })}
-          </p>
+          <p>{lastGameData.date}</p>
           <p>
             {lastGameData.home_team.full_name} {lastGameData.home_team_score} -{" "}
             {lastGameData.visitor_team.full_name}{" "}
@@ -81,12 +56,6 @@ export const LastGameTab = () => {
           </p>
         </>
       )}
-
-      {/* Game Recap */}
-      <RecapContainer>
-        <h4>Game Recap</h4>
-        <p>{generateRecap()}</p>
-      </RecapContainer>
 
       {/* Highlight Video Section */}
       {videoData && (

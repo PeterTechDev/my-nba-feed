@@ -1,25 +1,16 @@
 interface TeamInfo {
-  id: string;
+  id: number;
   name: string;
   bannerImg: string;
   teamLogo: string;
   twitterHandle: string;
-}
-
-export interface NextGameProps {
-  date: string;
-  opponent: string;
-  location: string;
-}
-
-interface Rankings {
-  conferencePosition: number;
-  wins: number;
-  losses: number;
+  full_name: string;
+  city: string;
+  conference: string;
+  division: string;
+  abbreviation: string;
 }
 
 export interface MockData {
   teamInfo: TeamInfo;
-  nextGame: NextGameProps;
-  rankings: Rankings;
 }

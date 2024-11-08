@@ -1,12 +1,12 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, ReactNode, useContext, useState } from "react";
 
 // Define the possible tabs as an enum
 export enum TabNames {
   LAST_GAME = "Last Game", // Moved to the first position
   SOCIAL = "Social Media",
-  STANDINGS = "Standings",
+  // STANDINGS = "Standings",
   TOP_10 = "Top 10",
-  ARTICLES = "Articles",
+  // ARTICLES = "Articles",
 }
 
 interface TabsContextProps {
@@ -17,7 +17,7 @@ interface TabsContextProps {
 const TabsContext = createContext<TabsContextProps | undefined>(undefined);
 
 export const TabsProvider = ({ children }: { children: ReactNode }) => {
-  const [activeTab, setActiveTab] = useState<TabNames>(TabNames.SOCIAL);
+  const [activeTab, setActiveTab] = useState<TabNames>(TabNames.LAST_GAME);
 
   return (
     <TabsContext.Provider value={{ activeTab, setActiveTab }}>
