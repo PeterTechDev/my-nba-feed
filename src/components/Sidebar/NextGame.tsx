@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { NextGameProps } from "../../mock-data/types";
+import { NextGameProps } from "./types/NextGamesProps";
 
 export function NextGame({ date, opponent, location }: NextGameProps) {
   const formattedDate = format(new Date(date), "MMMM do, yyyy, h:mm a");
