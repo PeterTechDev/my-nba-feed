@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { fetchLastGameData } from "../../../../services/nbaService";
 import { fetchVideoEmbed } from "../../../../services/youtubeService";
 import { LastGameSkeleton } from "./LastGameSkeleton";
-import { StyledLastGameTab, VideoEmbedContainer } from "./LastGameTab.styles";
+import {
+  StyledLastGameTab,
+  VideoEmbedContainer,
+  ToggleButton,
+} from "./LastGameTab.styles";
+import { formatDate } from "../../../../utils/formatDate";
 
 interface LastGameTabProps {
   teamId: number;
@@ -11,6 +16,7 @@ interface LastGameTabProps {
 export const LastGameTab = ({ teamId }: LastGameTabProps) => {
   const [lastGameData, setLastGameData] = useState<any | null>(null);
   const [videoData, setVideoData] = useState<any | null>(null);
+  const [showResult, setShowResult] = useState(false); // State to toggle result visibility
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +27,6 @@ export const LastGameTab = ({ teamId }: LastGameTabProps) => {
         setLastGameData(lastGame);
         setLoading(false);
 
-        // Fetch YouTube video after last game data is set
         if (lastGame) {
           const query = `${lastGame.home_team.full_name} vs. ${lastGame.visitor_team.full_name} highlights`;
           const video = await fetchVideoEmbed(query);
@@ -47,12 +52,20 @@ export const LastGameTab = ({ teamId }: LastGameTabProps) => {
             {lastGameData.home_team.full_name} vs.{" "}
             {lastGameData.visitor_team.full_name}
           </h3>
-          <p>{lastGameData.date}</p>
-          <p>
-            {lastGameData.home_team.full_name} {lastGameData.home_team_score} -{" "}
-            {lastGameData.visitor_team.full_name}{" "}
-            {lastGameData.visitor_team_score}
-          </p>
+          <p>{formatDate(lastGameData.date)}</p>
+
+          {/* Toggle Button for Game Result */}
+          <ToggleButton onClick={() => setShowResult(!showResult)}>
+            {showResult ? "Hide Result" : "Show Result"}
+          </ToggleButton>
+
+          {showResult && (
+            <p>
+              {lastGameData.home_team.full_name} {lastGameData.home_team_score}{" "}
+              - {lastGameData.visitor_team.full_name}{" "}
+              {lastGameData.visitor_team_score}
+            </p>
+          )}
         </>
       )}
 

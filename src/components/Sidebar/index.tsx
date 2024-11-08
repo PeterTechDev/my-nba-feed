@@ -12,6 +12,7 @@ import {
   SidebarContainer,
   TeamName,
 } from "./Sidebar.styles";
+import { formatDate } from "../../utils/formatDate";
 
 export function Sidebar() {
   const { teamData } = useTeam();
@@ -37,6 +38,7 @@ export function Sidebar() {
   if (!teamData) {
     return <div>Loading team data...</div>;
   }
+
   return (
     <SidebarContainer>
       <CoverImage />
@@ -53,7 +55,7 @@ export function Sidebar() {
         <h3>Next game:</h3>
         {nextGame ? (
           <>
-            <div>{nextGame.date}</div>
+            <div>{formatDate(nextGame.date)}</div>
             <div>vs. {opponent_team}</div>
             <div>
               {nextGame.home_team.full_name === teamData.teamInfo.full_name
