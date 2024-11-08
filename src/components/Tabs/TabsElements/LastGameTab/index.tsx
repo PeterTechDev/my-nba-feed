@@ -16,7 +16,7 @@ interface LastGameTabProps {
 export const LastGameTab = ({ teamId }: LastGameTabProps) => {
   const [lastGameData, setLastGameData] = useState<any | null>(null);
   const [videoData, setVideoData] = useState<any | null>(null);
-  const [showResult, setShowResult] = useState(false); // State to toggle result visibility
+  const [showResult, setShowResult] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,9 +27,10 @@ export const LastGameTab = ({ teamId }: LastGameTabProps) => {
         setLastGameData(lastGame);
         setLoading(false);
 
+        // Fetch YouTube video for the specific team’s last game
         if (lastGame) {
           const query = `${lastGame.home_team.full_name} vs. ${lastGame.visitor_team.full_name} highlights`;
-          const video = await fetchVideoEmbed(query);
+          const video = await fetchVideoEmbed(query, teamId); // Pass teamId to cache properly
           setVideoData(video);
         }
       } catch (err: any) {
@@ -54,7 +55,6 @@ export const LastGameTab = ({ teamId }: LastGameTabProps) => {
           </h3>
           <p>{formatDate(lastGameData.date)}</p>
 
-          {/* Toggle Button for Game Result */}
           <ToggleButton onClick={() => setShowResult(!showResult)}>
             {showResult ? "Hide Result" : "Show Result"}
           </ToggleButton>

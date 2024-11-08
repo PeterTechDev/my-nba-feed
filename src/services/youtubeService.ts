@@ -9,35 +9,32 @@ interface VideoSearchResponse {
   embedUrl: string;
 }
 
-const VIDEO_CACHE_KEY = "lastGameHighlightVideo";
-
 /**
  * Function to search for videos on YouTube and return the embed URL, with caching.
  * @param query - The search term for the video.
+ * @param teamId - The ID of the team to differentiate caches for different teams.
  * @returns A promise with video data including the embed URL.
  */
 export async function fetchVideoEmbed(
-  query: string
+  query: string,
+  teamId: number
 ): Promise<VideoSearchResponse | null> {
-  const today = new Date().toISOString().split("T")[0]; // Get the current date in YYYY-MM-DD format
+  const today = new Date().toISOString().split("T")[0]; // Today's date
+  const cacheKey = `lastGameHighlightVideo_${teamId}_${today}`; // Unique cache key per team and day
 
   // Check local storage for cached video data
-  const cachedData = localStorage.getItem(VIDEO_CACHE_KEY);
+  const cachedData = localStorage.getItem(cacheKey);
   if (cachedData) {
-    const { date, videoData } = JSON.parse(cachedData);
-
-    // If the cached data is from today, use it instead of making an API call
-    if (date === today) {
-      return videoData;
-    }
+    const videoData = JSON.parse(cachedData);
+    return videoData;
   }
 
-  // If no cached data is found or data is outdated, make a new API request
+  // Fetch data if no cache is found
   try {
     const response = await axios.get(`${BASE_URL}/search`, {
       params: {
         part: "snippet",
-        q: query,
+        q: `${query} `, // Include team name for a more specific query
         type: "video",
         maxResults: 1,
         key: API_KEY,
@@ -56,10 +53,7 @@ export async function fetchVideoEmbed(
     };
 
     // Cache the video data with today's date
-    localStorage.setItem(
-      VIDEO_CACHE_KEY,
-      JSON.stringify({ date: today, videoData })
-    );
+    localStorage.setItem(cacheKey, JSON.stringify(videoData));
 
     return videoData;
   } catch (error) {
