@@ -37,7 +37,11 @@ export const fetchLastGameData = async (teamId: number) => {
     console.log(response.data.data[0]);
     return response.data.data[0]; // Return the most recent game data
   } catch (error) {
-    throw new Error(`Failed to fetch last game data: ${error.message}`);
+    if (error instanceof Error) {
+      throw new Error(`Failed to fetch last game data: ${error.message}`);
+    } else {
+      throw new Error("Failed to fetch last game data: Unknown error");
+    }
   }
 };
 

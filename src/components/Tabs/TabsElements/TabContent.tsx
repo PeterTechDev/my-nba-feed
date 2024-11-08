@@ -1,11 +1,9 @@
-import { useTabs, TabNames } from "../TabsContext";
-import { StyledTabContent } from "../styles/Tabs.styles";
-import { SocialMediaTab } from "./SocialMediaTab";
-import { StandingsTab } from "./StandingsTab";
-import { Top10VideosTab } from "./Top10VideosTab";
-import { ArticlesTab } from "./ArticlesTab";
-import { LastGameTab } from "./LastGameTab";
 import { useTeam } from "../../../context/TeamContext/useTeam";
+import { TabNames, useTabs } from "../TabsContext";
+import { StyledTabContent } from "../styles/Tabs.styles";
+import { LastGameTab } from "./LastGameTab";
+import { SocialMediaTab } from "./SocialMediaTab";
+import { Top10VideosTab } from "./Top10VideosTab";
 
 export const TabContent = () => {
   const { activeTab } = useTabs();
