@@ -5,8 +5,9 @@ import { getHighlightUrl, getOpponent, getTeamScore, getOpponentScore } from "@/
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-[#2a2a2a] bg-[#161616] p-5">
-      {children}
+    <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
+      <div className="h-0.5" style={{ background: "linear-gradient(90deg, var(--team-primary), transparent)" }} />
+      <div className="p-5">{children}</div>
     </div>
   );
 }
