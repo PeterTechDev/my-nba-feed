@@ -24,10 +24,17 @@ export default function NewsFeed() {
   }, [selectedTeam.name]);
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-5">
-      <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-4">News</h3>
+    <div className="rounded-xl border border-[#2a2a2a] bg-[#161616] p-5">
+      <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest mb-4">News</h3>
       {loading ? (
-        <p className="text-white/40">Loading news...</p>
+        <div className="space-y-4 animate-pulse">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-4 w-full bg-white/10 rounded" />
+              <div className="h-3 w-24 bg-white/10 rounded" />
+            </div>
+          ))}
+        </div>
       ) : news.length === 0 ? (
         <p className="text-white/40">No news found</p>
       ) : (
