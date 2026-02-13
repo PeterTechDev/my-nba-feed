@@ -1,6 +1,7 @@
 "use client";
 import { useTeam } from "@/hooks/useTeam";
 import TeamSelector from "./TeamSelector";
+import RecordBadge from "./RecordBadge";
 
 export default function TeamHeader() {
   const { selectedTeam: team } = useTeam();
@@ -24,7 +25,10 @@ export default function TeamHeader() {
       <div className="flex-1 relative z-10">
         <p className="text-sm text-white/50 font-medium">{team.city}</p>
         <h1 className="text-3xl sm:text-4xl font-bold">{team.name}</h1>
-        <p className="text-sm text-white/40 mt-1">{team.conference}ern Conference · {team.division}</p>
+        <div className="flex items-center gap-2 mt-1 justify-center sm:justify-start">
+          <p className="text-sm text-white/40">{team.conference}ern Conference · {team.division}</p>
+          <RecordBadge />
+        </div>
       </div>
       <div className="relative z-10 w-full sm:w-auto">
         <TeamSelector />
