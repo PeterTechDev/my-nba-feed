@@ -16,7 +16,7 @@ interface CompareData {
   headToHead: { team1Wins: number; team2Wins: number };
 }
 
-function StatBar({ label, val1, val2, higher1Better }: { label: string; val1: number; val2: number; higher1Better?: boolean }) {
+function StatBar({ label, val1, val2, color1, color2, higher1Better }: { label: string; val1: number; val2: number; color1: string; color2: string; higher1Better?: boolean }) {
   const max = Math.max(val1, val2, 1);
   const pct1 = (val1 / max) * 100;
   const pct2 = (val2 / max) * 100;
@@ -34,13 +34,13 @@ function StatBar({ label, val1, val2, higher1Better }: { label: string; val1: nu
         <div className="flex-1 flex justify-end">
           <div
             className="h-full rounded-l transition-all"
-            style={{ width: `${pct1}%`, background: best1 ? "var(--team-primary)" : "#333" }}
+            style={{ width: `${pct1}%`, background: best1 ? color1 : "#333" }}
           />
         </div>
         <div className="flex-1">
           <div
             className="h-full rounded-r transition-all"
-            style={{ width: `${pct2}%`, background: best2 ? "var(--team-primary)" : "#333" }}
+            style={{ width: `${pct2}%`, background: best2 ? color2 : "#333" }}
           />
         </div>
       </div>
@@ -126,13 +126,15 @@ export default function ComparePage() {
             </div>
 
             {/* Stats bars */}
-            <StatBar label="Wins" val1={data.team1.wins} val2={data.team2.wins} />
-            <StatBar label="PPG" val1={parseFloat(data.team1.ppg)} val2={parseFloat(data.team2.ppg)} />
-            <StatBar label="OPP PPG" val1={parseFloat(data.team1.oppg)} val2={parseFloat(data.team2.oppg)} higher1Better={false} />
+            <StatBar label="Wins" val1={data.team1.wins} val2={data.team2.wins} color1={team1.primaryColor} color2={team2.primaryColor} />
+            <StatBar label="PPG" val1={parseFloat(data.team1.ppg)} val2={parseFloat(data.team2.ppg)} color1={team1.primaryColor} color2={team2.primaryColor} />
+            <StatBar label="OPP PPG" val1={parseFloat(data.team1.oppg)} val2={parseFloat(data.team2.oppg)} color1={team1.primaryColor} color2={team2.primaryColor} higher1Better={false} />
             <StatBar
               label="WIN %"
               val1={data.team1.wins / (data.team1.wins + data.team1.losses || 1)}
               val2={data.team2.wins / (data.team2.wins + data.team2.losses || 1)}
+              color1={team1.primaryColor}
+              color2={team2.primaryColor}
             />
           </div>
         </div>

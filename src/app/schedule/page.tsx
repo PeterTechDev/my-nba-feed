@@ -73,7 +73,8 @@ export default function SchedulePage() {
         </button>
       </div>
 
-      <div className="rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
+      {/* Desktop: Calendar grid */}
+      <div className="hidden sm:block rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
         <div className="h-0.5" style={{ background: `linear-gradient(90deg, var(--team-primary), transparent)` }} />
         <div className="grid grid-cols-7 text-center text-xs text-white/40 font-medium border-b border-white/5">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
@@ -133,6 +134,64 @@ export default function SchedulePage() {
             })}
           </div>
         )}
+      </div>
+
+      {/* Mobile: List view */}
+      <div className="sm:hidden rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
+        <div className="h-0.5" style={{ background: `linear-gradient(90deg, var(--team-primary), transparent)` }} />
+        {loading ? (
+          <div className="h-64 flex items-center justify-center">
+            <div className="text-white/20 animate-pulse">Loading...</div>
+          </div>
+        ) : (() => {
+          const gamesThisMonth = [...Array(daysInMonth)].map((_, i) => {
+            const day = i + 1;
+            const game = getGameForDay(day);
+            if (!game) return null;
+            const isHome = game.homeTeam.id === selectedTeam.id;
+            const opponent = isHome ? game.awayTeam : game.homeTeam;
+            const isFinal = game.status === "Final";
+            let won = false;
+            if (isFinal) {
+              const teamScore = isHome ? game.homeScore : game.awayScore;
+              const oppScore = isHome ? game.awayScore : game.homeScore;
+              won = teamScore > oppScore;
+            }
+            const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
+            return { day, game, isHome, opponent, isFinal, won, isToday };
+          }).filter(Boolean) as { day: number; game: ScheduleGame; isHome: boolean; opponent: { id: number; name: string; abbreviation: string }; isFinal: boolean; won: boolean; isToday: boolean }[];
+
+          return gamesThisMonth.length === 0 ? (
+            <p className="text-white/40 text-center py-8 text-sm">No games this month</p>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {gamesThisMonth.map(({ day, game, isHome, opponent, isFinal, won, isToday }) => (
+                <div key={day} className={`flex items-center justify-between px-4 py-3 ${isToday ? "bg-white/5" : ""}`}>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-sm font-mono w-6 text-center ${isToday ? "text-white font-bold" : "text-white/40"}`}>
+                      {day}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {isHome ? "vs" : "@"} {opponent.name}
+                      </p>
+                      <p className="text-xs text-white/40">
+                        {new Date(year, month, day).toLocaleDateString("en-US", { weekday: "short" })}
+                      </p>
+                    </div>
+                  </div>
+                  {isFinal ? (
+                    <span className={`text-sm font-bold ${won ? "text-emerald-400" : "text-red-400"}`}>
+                      {won ? "W" : "L"} {isHome ? game.homeScore : game.awayScore}-{isHome ? game.awayScore : game.homeScore}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-white/30">Scheduled</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </main>
   );
