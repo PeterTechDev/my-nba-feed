@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import TeamThemeProvider from "@/components/TeamThemeProvider";
 import NavBar from "@/components/NavBar";
+import { SpoilerModeProvider } from "@/components/SpoilerModeProvider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -16,8 +17,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-sans antialiased bg-[#0a0a0a] text-white`}>
         <TeamThemeProvider>
-          <NavBar />
-          {children}
+          <SpoilerModeProvider>
+            <NavBar />
+            {children}
+          </SpoilerModeProvider>
         </TeamThemeProvider>
       </body>
     </html>

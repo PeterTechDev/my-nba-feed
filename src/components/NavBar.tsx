@@ -1,19 +1,22 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Home, Users, BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff } from "lucide-react";
+import { useSpoilerContext } from "./SpoilerModeProvider";
 
 const links = [
-  { href: "/", label: "Home", icon: "🏀" },
-  { href: "/players", label: "Players", icon: "👤" },
-  { href: "/standings", label: "Standings", icon: "📊" },
-  { href: "/schedule", label: "Schedule", icon: "📅" },
-  { href: "/highlights", label: "Highlights", icon: "🎬" },
-  { href: "/compare", label: "Compare", icon: "⚔️" },
-  { href: "/social", label: "Social", icon: "💬" },
+  { href: "/", label: "Home", icon: Home },
+  { href: "/players", label: "Players", icon: Users },
+  { href: "/standings", label: "Standings", icon: BarChart3 },
+  { href: "/schedule", label: "Schedule", icon: Calendar },
+  { href: "/highlights", label: "Highlights", icon: Play },
+  { href: "/compare", label: "Compare", icon: ArrowLeftRight },
+  { href: "/social", label: "Social", icon: MessageCircle },
 ];
 
 export default function NavBar() {
   const pathname = usePathname();
+  const { spoilerFree, toggleSpoiler } = useSpoilerContext();
 
   return (
     <nav className="sticky top-0 z-40 bg-[#0a0a0a]/90 backdrop-blur-md border-b border-white/5">
@@ -24,6 +27,7 @@ export default function NavBar() {
           </Link>
           {links.map((link) => {
             const active = pathname === link.href;
+            const Icon = link.icon;
             return (
               <Link
                 key={link.href}
@@ -34,11 +38,23 @@ export default function NavBar() {
                     : "text-white/50 hover:text-white/80 hover:bg-white/5"
                 }`}
               >
-                <span className="text-xs">{link.icon}</span>
+                <Icon className="w-3.5 h-3.5" />
                 {link.label}
               </Link>
             );
           })}
+          <button
+            onClick={toggleSpoiler}
+            className={`ml-auto shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+              spoilerFree
+                ? "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25"
+                : "text-white/50 hover:text-white/80 hover:bg-white/5"
+            }`}
+            title={spoilerFree ? "Spoiler-free mode ON" : "Spoiler-free mode OFF"}
+          >
+            {spoilerFree ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            <span className="hidden sm:inline">{spoilerFree ? "Spoiler-free" : "Scores visible"}</span>
+          </button>
         </div>
       </div>
     </nav>

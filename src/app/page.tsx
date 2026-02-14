@@ -7,12 +7,12 @@ import LiveScores from "@/components/LiveScores";
 
 export default function Home() {
   return (
-    <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto space-y-6">
+    <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto space-y-8">
       <GameDataProvider>
         <TeamHeader />
         <LiveScores />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-8">
             <LastGameCard />
             <NextGameCard />
           </div>

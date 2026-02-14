@@ -23,9 +23,11 @@ export default function NewsFeed() {
     getNews(selectedTeam.name).then((n) => { setNews(n); setLoading(false); });
   }, [selectedTeam.name]);
 
+  const displayNews = news.slice(0, 5);
+  const hasMore = news.length > 5;
+
   return (
     <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
-      <div className="h-0.5" style={{ background: "linear-gradient(90deg, var(--team-primary), transparent)" }} />
       <div className="p-5">
         <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest mb-4">News</h3>
         {loading ? (
@@ -43,25 +45,39 @@ export default function NewsFeed() {
             <p className="text-white/20 text-xs mt-1">Check back later</p>
           </div>
         ) : (
-          <ul className="divide-y divide-white/5">
-            {news.map((item, i) => (
-              <li key={i} className="group py-3 -mx-2 px-2 rounded-lg hover:bg-white/5 transition-colors first:pt-0">
+          <>
+            <ul className="divide-y divide-white/5">
+              {displayNews.map((item, i) => (
+                <li key={i} className="group py-3 -mx-2 px-2 rounded-lg hover:bg-white/5 transition-colors first:pt-0">
+                  <a
+                    href={item.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium group-hover:text-white transition-colors line-clamp-2"
+                  >
+                    {item.title}
+                  </a>
+                  <p className="text-xs text-white/40 mt-1">
+                    {item.source && <span className="text-white/50">{item.source}</span>}
+                    {item.source && item.pubDate && <span> · </span>}
+                    {item.pubDate && relativeTime(item.pubDate)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            {hasMore && (
+              <div className="mt-3 pt-3 border-t border-white/5">
                 <a
-                  href={item.link}
+                  href={`https://www.google.com/search?q=${encodeURIComponent(selectedTeam.name + " NBA news")}&tbm=nws`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm font-medium group-hover:text-white transition-colors line-clamp-2"
+                  className="text-sm text-white/50 hover:text-white/80 transition-colors"
                 >
-                  {item.title}
+                  View all →
                 </a>
-                <p className="text-xs text-white/40 mt-1">
-                  {item.source && <span className="text-white/50">{item.source}</span>}
-                  {item.source && item.pubDate && <span> · </span>}
-                  {item.pubDate && relativeTime(item.pubDate)}
-                </p>
-              </li>
-            ))}
-          </ul>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

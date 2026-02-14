@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useSpoilerContext } from "./SpoilerModeProvider";
 
 interface LiveGame {
   id: number;
@@ -15,6 +16,7 @@ interface LiveGame {
 export default function LiveScores() {
   const [games, setGames] = useState<LiveGame[]>([]);
   const [loading, setLoading] = useState(true);
+  const { spoilerFree } = useSpoilerContext();
 
   const fetchLive = async () => {
     try {
@@ -36,49 +38,49 @@ export default function LiveScores() {
   }, []);
 
   if (loading) return null;
-  if (games.length === 0) return null;
 
   const liveGames = games.filter((g) => g.status !== "Final" && g.status !== "" && g.homeScore + g.awayScore > 0);
-  const finalGames = games.filter((g) => g.status === "Final");
   const scheduledGames = games.filter((g) => g.status !== "Final" && (g.homeScore + g.awayScore === 0));
+
+  // Only show if there are live or scheduled games — hide if all are Final
+  if (liveGames.length === 0 && scheduledGames.length === 0) return null;
+
+  const displayGames = [...liveGames, ...scheduledGames];
 
   return (
     <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
-      <div className="h-0.5 bg-gradient-to-r from-red-500 to-orange-500" />
-      <div className="p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest">Today&apos;s Games</h3>
+      <div className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest">Live Games</h3>
           {liveGames.length > 0 && (
             <span className="flex items-center gap-1 text-xs text-red-400 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              LIVE
+              {liveGames.length} LIVE
             </span>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[...liveGames, ...finalGames, ...scheduledGames].map((game) => {
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+          {displayGames.map((game) => {
             const isLive = game.status !== "Final" && game.homeScore + game.awayScore > 0;
-            const isFinal = game.status === "Final";
             return (
               <div
                 key={game.id}
-                className={`rounded-lg p-3 border ${isLive ? "border-red-500/30 bg-red-500/5" : "border-white/5 bg-white/[0.02]"}`}
+                className={`shrink-0 rounded-lg px-3 py-2 border text-sm font-medium ${
+                  isLive ? "border-red-500/30 bg-red-500/5" : "border-white/5 bg-white/[0.02]"
+                }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isLive ? "text-red-400" : isFinal ? "text-white/40" : "text-emerald-400"}`}>
-                    {isLive ? `Q${game.period} ${game.time || ""}` : isFinal ? "Final" : game.status || "Scheduled"}
+                {spoilerFree ? (
+                  <span className="text-white/60">
+                    {game.awayTeam.abbreviation} vs {game.homeTeam.abbreviation}
                   </span>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{game.awayTeam.abbreviation}</span>
-                    <span className="text-sm font-bold tabular-nums">{game.awayScore}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{game.homeTeam.abbreviation}</span>
-                    <span className="text-sm font-bold tabular-nums">{game.homeScore}</span>
-                  </div>
-                </div>
+                ) : (
+                  <span className="tabular-nums">
+                    {game.awayTeam.abbreviation} {game.awayScore} - {game.homeTeam.abbreviation} {game.homeScore}
+                  </span>
+                )}
+                {isLive && (
+                  <span className="ml-2 text-[10px] text-red-400 font-bold">Q{game.period}</span>
+                )}
               </div>
             );
           })}

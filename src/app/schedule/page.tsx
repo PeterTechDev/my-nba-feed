@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
+import { useSpoilerContext } from "@/components/SpoilerModeProvider";
 
 interface ScheduleGame {
   id: number;
@@ -22,6 +23,7 @@ function getFirstDayOfWeek(year: number, month: number) {
 
 export default function SchedulePage() {
   const { selectedTeam } = useTeam();
+  const { spoilerFree } = useSpoilerContext();
   const [games, setGames] = useState<ScheduleGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -65,17 +67,16 @@ export default function SchedulePage() {
 
       <div className="flex items-center justify-between mb-4">
         <button onClick={prevMonth} className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm">
-          ← Prev
+          Prev
         </button>
         <h2 className="text-lg font-bold">{monthLabel}</h2>
         <button onClick={nextMonth} className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm">
-          Next →
+          Next
         </button>
       </div>
 
       {/* Desktop: Calendar grid */}
       <div className="hidden sm:block rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
-        <div className="h-0.5" style={{ background: `linear-gradient(90deg, var(--team-primary), transparent)` }} />
         <div className="grid grid-cols-7 text-center text-xs text-white/40 font-medium border-b border-white/5">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
             <div key={d} className="py-2">{d}</div>
@@ -113,7 +114,7 @@ export default function SchedulePage() {
                   <span className={`text-xs ${isToday ? "text-white font-bold" : "text-white/30"}`}>{day}</span>
                   {game && opponent && (
                     <div className={`mt-1 rounded p-1 text-[10px] ${
-                      isFinal
+                      isFinal && !spoilerFree
                         ? won
                           ? "bg-emerald-500/10 text-emerald-400"
                           : "bg-red-500/10 text-red-400"
@@ -122,10 +123,13 @@ export default function SchedulePage() {
                       <div className="font-medium">
                         {isHome ? "vs" : "@"} {opponent.abbreviation}
                       </div>
-                      {isFinal && (
+                      {isFinal && !spoilerFree && (
                         <div className="font-bold">
                           {won ? "W" : "L"} {isHome ? game.homeScore : game.awayScore}-{isHome ? game.awayScore : game.homeScore}
                         </div>
+                      )}
+                      {isFinal && spoilerFree && (
+                        <div className="text-white/30">Final</div>
                       )}
                     </div>
                   )}
@@ -138,7 +142,6 @@ export default function SchedulePage() {
 
       {/* Mobile: List view */}
       <div className="sm:hidden rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
-        <div className="h-0.5" style={{ background: `linear-gradient(90deg, var(--team-primary), transparent)` }} />
         {loading ? (
           <div className="h-64 flex items-center justify-center">
             <div className="text-white/20 animate-pulse">Loading...</div>
@@ -181,9 +184,13 @@ export default function SchedulePage() {
                     </div>
                   </div>
                   {isFinal ? (
-                    <span className={`text-sm font-bold ${won ? "text-emerald-400" : "text-red-400"}`}>
-                      {won ? "W" : "L"} {isHome ? game.homeScore : game.awayScore}-{isHome ? game.awayScore : game.homeScore}
-                    </span>
+                    spoilerFree ? (
+                      <span className="text-xs text-white/30">Final</span>
+                    ) : (
+                      <span className={`text-sm font-bold ${won ? "text-emerald-400" : "text-red-400"}`}>
+                        {won ? "W" : "L"} {isHome ? game.homeScore : game.awayScore}-{isHome ? game.awayScore : game.homeScore}
+                      </span>
+                    )
                   ) : (
                     <span className="text-xs text-white/30">Scheduled</span>
                   )}

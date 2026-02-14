@@ -1,13 +1,13 @@
 "use client";
 import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
+import { useSpoilerContext } from "./SpoilerModeProvider";
 import { getHighlightUrl, getOpponent, getTeamScore, getOpponentScore } from "@/lib/api";
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
-      <div className="h-0.5" style={{ background: "linear-gradient(90deg, var(--team-primary), transparent)" }} />
-      <div className="p-5">{children}</div>
+      <div className="p-6">{children}</div>
     </div>
   );
 }
@@ -30,8 +30,7 @@ function ErrorCard({ label, error }: { label: string; error: string }) {
     <Card>
       <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest mb-3">{label}</h3>
       <div className="flex items-center gap-2 text-red-400 text-sm">
-        <span>⚠️</span>
-        <span>{error}</span>
+        <span>Error: {error}</span>
       </div>
     </Card>
   );
@@ -50,6 +49,7 @@ function timeUntil(dateStr: string): string {
 export function LastGameCard() {
   const { selectedTeam } = useTeam();
   const { lastGame, loading, error } = useGameData();
+  const { spoilerFree } = useSpoilerContext();
 
   if (loading) return <SkeletonCard label="Last Game" />;
   if (error) return <ErrorCard label="Last Game" error={error} />;
@@ -68,17 +68,28 @@ export function LastGameCard() {
 
   return (
     <Card>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest">Last Game</h3>
-        <span className={`text-sm font-bold px-2 py-0.5 rounded ${won ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
-          {won ? "W" : "L"}
-        </span>
+        {!spoilerFree && (
+          <span className={`text-sm font-bold px-2 py-0.5 rounded ${won ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+            {won ? "W" : "L"}
+          </span>
+        )}
       </div>
-      <p className="text-4xl font-extrabold tabular-nums tracking-tight">
-        {teamScore} – {oppScore}
-      </p>
+      {spoilerFree ? (
+        <>
+          <p className="text-lg font-semibold text-white/80">
+            vs {opponent.name} · {date}
+          </p>
+          <p className="text-xs text-white/40 mt-2">Score hidden — spoiler-free mode</p>
+        </>
+      ) : (
+        <p className="text-2xl font-extrabold tabular-nums tracking-tight">
+          {teamScore} – {oppScore}
+        </p>
+      )}
       <p className="text-white/60 text-sm mt-1">
-        vs {opponent.name} · {date}
+        {!spoilerFree && <>vs {opponent.name} · {date}</>}
       </p>
       <a
         href={getHighlightUrl(selectedTeam.name, opponent.name, date)}

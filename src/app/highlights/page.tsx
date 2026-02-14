@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
+import { useSpoilerContext } from "@/components/SpoilerModeProvider";
 
 interface HighlightGame {
   id: number;
@@ -16,6 +17,7 @@ interface HighlightGame {
 
 export default function HighlightsPage() {
   const { selectedTeam } = useTeam();
+  const { spoilerFree } = useSpoilerContext();
   const [highlights, setHighlights] = useState<HighlightGame[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,13 +25,7 @@ export default function HighlightsPage() {
     setLoading(true);
     fetch(`/api/games?teamId=${selectedTeam.id}`)
       .then((r) => r.json())
-      .then((data) => {
-        // We'll use the games API to build highlight links
-        // Since we don't have YouTube API, we link to YouTube search
-        const games = [];
-        const allGames = data.lastGame ? [data.lastGame] : [];
-
-        // Fetch more games from schedule
+      .then(() => {
         const now = new Date();
         const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
         const start = thirtyDaysAgo.toISOString().slice(0, 10);
@@ -106,18 +102,18 @@ export default function HighlightsPage() {
                 rel="noopener noreferrer"
                 className="group rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden hover:border-white/20 transition"
               >
-                <div className="h-0.5" style={{ background: `linear-gradient(90deg, var(--team-primary), transparent)` }} />
                 <div className="aspect-video bg-gradient-to-br from-white/5 to-black flex items-center justify-center relative">
                   <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 group-hover:bg-white/20 transition">
                     <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
                     <span className="text-sm font-medium text-white/80">Watch on YouTube</span>
-                    <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" /></svg>
                   </div>
-                  <div className="absolute top-2 right-2">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${h.won ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
-                      {h.won ? "W" : "L"} {h.teamScore}-{h.oppScore}
-                    </span>
-                  </div>
+                  {!spoilerFree && (
+                    <div className="absolute top-2 right-2">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${h.won ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
+                        {h.won ? "W" : "L"} {h.teamScore}-{h.oppScore}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="p-4">
                   <p className="font-medium text-sm group-hover:text-white transition">
