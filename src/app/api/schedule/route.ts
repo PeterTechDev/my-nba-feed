@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
+function getCurrentSeason(): number {
+  const now = new Date();
+  return now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+}
+
+function formatDateYYYYMMDD(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
 export async function GET(req: NextRequest) {
   const teamId = req.nextUrl.searchParams.get("teamId");
   const startDate = req.nextUrl.searchParams.get("start");
@@ -13,14 +22,29 @@ export async function GET(req: NextRequest) {
   if (!key) return NextResponse.json({ games: [], error: "API key not configured" }, { status: 503 });
 
   try {
-    let url = `${BDL_BASE}/games?team_ids[]=${teamId}&per_page=100`;
-    if (startDate) url += `&start_date=${startDate}`;
-    if (endDate) url += `&end_date=${endDate}`;
+    const season = getCurrentSeason();
+    const defaultStart = `${season}-10-01`;
+    const defaultEnd = formatDateYYYYMMDD(new Date());
 
-    const res = await fetch(url, {
+    let url = `${BDL_BASE}/games?team_ids[]=${teamId}&per_page=100`;
+    url += `&start_date=${startDate || defaultStart}`;
+    url += `&end_date=${endDate || defaultEnd}`;
+
+    let res = await fetch(url, {
       headers: { Authorization: key },
       next: { revalidate: 300 },
     });
+
+    // smooth over BallDontLie burst limits
+    if (res.status === 429) {
+      const retryAfter = Number(res.headers.get("retry-after") || "0");
+      const delayMs = retryAfter > 0 ? retryAfter * 1000 : 1000;
+      await new Promise((r) => setTimeout(r, delayMs));
+      res = await fetch(url, {
+        headers: { Authorization: key },
+        next: { revalidate: 300 },
+      });
+    }
 
     if (!res.ok) return NextResponse.json({ games: [], error: `API ${res.status}` }, { status: 502 });
 

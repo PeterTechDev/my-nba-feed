@@ -7,6 +7,14 @@ function getCurrentSeason(): number {
   return now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function formatDateYYYYMMDD(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
 interface TeamRecord {
   id: number;
   name: string;
@@ -24,28 +32,57 @@ export async function GET() {
   const season = getCurrentSeason();
 
   try {
-    // Fetch all games for the season (paginated)
+    // Fetch all games for the season (paginated).
+    // NOTE: BallDontLie free tier can rate-limit (429) if we hammer it.
+    // We keep requests sequential + add retry/backoff on 429.
     const allGames: any[] = [];
     let cursor: string | null = null;
     let page = 0;
 
-    do {
-      const fetchUrl: string = cursor
-        ? `${BDL_BASE}/games?seasons[]=${season}&per_page=100&cursor=${cursor}`
-        : `${BDL_BASE}/games?seasons[]=${season}&per_page=100`;
+    const seasonStart = `${season}-10-01`;
+    const seasonEnd = formatDateYYYYMMDD(new Date());
 
-      const res = await fetch(fetchUrl, {
+    const fetchPage = async (url: string) => {
+      let attempt = 0;
+      // a few attempts is enough to smooth over burst limits
+      while (attempt < 4) {
+        const res = await fetch(url, {
+          headers: { Authorization: key },
+          next: { revalidate: 3600 },
+        });
+
+        if (res.status !== 429) return res;
+
+        const retryAfter = Number(res.headers.get("retry-after") || "0");
+        const delayMs = retryAfter > 0 ? retryAfter * 1000 : 750 * (attempt + 1);
+        await sleep(delayMs);
+        attempt++;
+      }
+
+      return fetch(url, {
         headers: { Authorization: key },
-        next: { revalidate: 600 },
+        next: { revalidate: 3600 },
       });
+    };
 
+    do {
+      const baseParams = `seasons[]=${season}&per_page=100&start_date=${seasonStart}&end_date=${seasonEnd}`;
+      const fetchUrl: string = cursor
+        ? `${BDL_BASE}/games?${baseParams}&cursor=${cursor}`
+        : `${BDL_BASE}/games?${baseParams}`;
+
+      const res = await fetchPage(fetchUrl);
       if (!res.ok) return NextResponse.json({ standings: [], error: `API ${res.status}` }, { status: 502 });
 
       const json = await res.json();
       allGames.push(...(json.data || []));
       cursor = json.meta?.next_cursor || null;
       page++;
-      if (page > 15) break; // safety limit
+
+      // small pacing to avoid burst limits even when not returning 429
+      await sleep(150);
+
+      if (page > 20) break; // safety limit
     } while (cursor);
 
     // Compute records
