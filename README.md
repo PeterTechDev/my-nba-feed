@@ -1,8 +1,22 @@
 # 🏀 NBA Feed
 
-A personal NBA dashboard built to follow your team — live scores, standings, schedule, news, and Reddit-powered social feed. Built with Next.js 14, TypeScript, and deployed on Vercel.
-
 **Live →** [my-nba-feed.vercel.app](https://my-nba-feed.vercel.app)
+
+---
+
+## Why I Built This
+
+I follow basketball closely — and every time I wanted to check on my team, I had to bounce between the NBA app for scores, Reddit for the community reaction, and Google for standings. None of them talked to each other, and most were bloated with ads and noise.
+
+So I built exactly what I wanted: one clean page, my team, everything relevant. No ads. No fluff. Spoiler-free by default so I can check the score on my own terms.
+
+It also became my sandbox for learning Next.js 14 App Router in a real project — data fetching, server-side API routes, dynamic theming, and state management without reaching for a heavy library.
+
+---
+
+## The Goal
+
+A focused, fast, personal NBA dashboard. Pick your team. See what matters. Everything else gets out of the way.
 
 ---
 
