@@ -1,11 +1,10 @@
 "use client";
 import TeamHeader from "@/components/TeamHeader";
 import GameDayHero from "@/components/GameDayHero";
-import TeamContextPanel from "@/components/TeamContextPanel";
 import { LastGameCard, NextGameCard } from "@/components/GameSection";
 import NewsFeed from "@/components/NewsFeed";
 import GameDataProvider from "@/components/GameDataProvider";
-import LiveScores from "@/components/LiveScores";
+import TopPlaysCard from "@/components/TopPlaysCard";
 
 export default function Home() {
   return (
@@ -13,14 +12,15 @@ export default function Home() {
       <GameDataProvider>
         <TeamHeader />
         <GameDayHero />
-        <TeamContextPanel />
-        <LiveScores />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-8">
-            <LastGameCard />
             <NextGameCard />
+            <LastGameCard />
           </div>
-          <NewsFeed />
+          <div className="space-y-8">
+            <TopPlaysCard />
+            <NewsFeed limit={2} />
+          </div>
         </div>
       </GameDataProvider>
     </main>
