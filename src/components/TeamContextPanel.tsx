@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTeam } from "@/hooks/useTeam";
+import { useGameData } from "@/hooks/useGameData";
 
 interface Standing {
   id: number;
@@ -26,8 +27,21 @@ interface ScheduleGame {
 interface ContextState {
   standings: Standing[];
   games: ScheduleGame[];
-  loading: boolean;
-  error: string | null;
+  standingsLoading: boolean;
+  gamesLoading: boolean;
+  gamesError: string | null;
+}
+
+async function fetchJsonWithTimeout(url: string, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    return response.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function formatDate(date: Date): string {
@@ -112,11 +126,13 @@ function StatTile({ label, value, tone = "default" }: { label: string; value: st
 
 export default function TeamContextPanel() {
   const { selectedTeam } = useTeam();
+  const { record } = useGameData();
   const [state, setState] = useState<ContextState>({
     standings: [],
     games: [],
-    loading: true,
-    error: null,
+    standingsLoading: true,
+    gamesLoading: true,
+    gamesError: null,
   });
 
   useEffect(() => {
@@ -126,31 +142,52 @@ export default function TeamContextPanel() {
     const horizon = new Date(today);
     horizon.setDate(horizon.getDate() + 21);
 
-    setState((current) => ({ ...current, loading: true, error: null }));
+    setState({
+      standings: [],
+      games: [],
+      standingsLoading: true,
+      gamesLoading: true,
+      gamesError: null,
+    });
 
-    Promise.all([
-      fetch("/api/standings").then((response) => response.json()),
-      fetch(
-        `/api/schedule?teamId=${selectedTeam.id}&start=${formatDate(seasonStart)}&end=${formatDate(horizon)}`
-      ).then((response) => response.json()),
-    ])
-      .then(([standingsData, scheduleData]) => {
+    fetch(
+      `/api/schedule?teamId=${selectedTeam.id}&start=${formatDate(seasonStart)}&end=${formatDate(horizon)}`
+    )
+      .then((response) => response.json())
+      .then((scheduleData) => {
         if (cancelled) return;
         setState({
-          standings: standingsData.standings || [],
+          standings: [],
           games: scheduleData.games || [],
-          loading: false,
-          error: standingsData.error || scheduleData.error || null,
+          standingsLoading: true,
+          gamesLoading: false,
+          gamesError: scheduleData.error || null,
         });
       })
       .catch(() => {
         if (cancelled) return;
-        setState({
-          standings: [],
-          games: [],
-          loading: false,
-          error: "Unable to load team context",
-        });
+        setState((current) => ({
+          ...current,
+          gamesLoading: false,
+          gamesError: "Unable to load team context",
+        }));
+      });
+
+    fetchJsonWithTimeout("/api/standings", 8000)
+      .then((standingsData) => {
+        if (cancelled) return;
+        setState((current) => ({
+          ...current,
+          standings: standingsData.standings || [],
+          standingsLoading: false,
+        }));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setState((current) => ({
+          ...current,
+          standingsLoading: false,
+        }));
       });
 
     return () => {
@@ -158,7 +195,7 @@ export default function TeamContextPanel() {
     };
   }, [selectedTeam.id]);
 
-  if (state.loading) {
+  if (state.gamesLoading) {
     return (
       <section className="rounded-2xl border border-[#2a2a2a] bg-[#161616] p-5 sm:p-6">
         <div className="mb-5 space-y-2 animate-pulse">
@@ -174,10 +211,10 @@ export default function TeamContextPanel() {
     );
   }
 
-  if (state.error) {
+  if (state.gamesError) {
     return (
       <section className="rounded-2xl border border-[#2a2a2a] bg-[#161616] p-5 sm:p-6">
-        <p className="text-sm text-red-400">{state.error}</p>
+        <p className="text-sm text-red-400">{state.gamesError}</p>
       </section>
     );
   }
@@ -202,11 +239,19 @@ export default function TeamContextPanel() {
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Conference rank" value={rank > 0 ? `#${rank}` : "—"} />
+        <StatTile
+          label="Conference rank"
+          value={state.standingsLoading ? "..." : rank > 0 ? `#${rank}` : "—"}
+        />
         <StatTile label="Streak" value={getStreak(completedGames, selectedTeam.id)} tone="accent" />
         <StatTile label="Last 10" value={getLastTen(completedGames, selectedTeam.id)} />
         <StatTile label="Back-to-back" value={hasBackToBack(nextFive) ? "Yes" : "No"} />
       </div>
+      {record.wins + record.losses > 0 && (
+        <p className="mt-3 text-sm text-white/35">
+          Current record: <span className="text-white/65 tabular-nums">{record.wins}-{record.losses}</span>
+        </p>
+      )}
 
       <div className="mt-6 rounded-xl border border-white/8 bg-black/20 p-4">
         <div className="flex items-center justify-between">
