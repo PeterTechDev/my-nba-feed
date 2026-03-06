@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getNBASeason } from "@/lib/nbaDate";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
-function getCurrentSeason(): number {
-  const now = new Date();
-  return now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+interface BDLTeam {
+  id: number;
+  name: string;
+  abbreviation: string;
 }
 
-function computeTeamStats(games: any[], teamId: number) {
+interface BDLGame {
+  status: string;
+  home_team: BDLTeam;
+  visitor_team: BDLTeam;
+  home_team_score: number;
+  visitor_team_score: number;
+}
+
+function computeTeamStats(games: BDLGame[], teamId: number) {
   let wins = 0, losses = 0, totalPF = 0, totalPA = 0, count = 0;
 
   for (const g of games) {
@@ -39,7 +49,7 @@ export async function GET(req: NextRequest) {
   const key = process.env.BALLDONTLIE_KEY || "";
   if (!key) return NextResponse.json({ error: "API key not configured" }, { status: 503 });
 
-  const season = getCurrentSeason();
+  const season = getNBASeason();
 
   try {
     // Fetch games for both teams
@@ -65,7 +75,7 @@ export async function GET(req: NextRequest) {
     const stats2 = computeTeamStats(games2, t2);
 
     // Head-to-head
-    const h2h = games1.filter((g: any) =>
+    const h2h = games1.filter((g: BDLGame) =>
       g.status === "Final" && (g.home_team.id === t2 || g.visitor_team.id === t2)
     );
 

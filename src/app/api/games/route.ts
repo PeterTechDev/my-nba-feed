@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getNBASeason } from "@/lib/nbaDate";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
@@ -10,12 +11,6 @@ interface BDLGame {
   visitor_team: { id: number; name: string; abbreviation: string };
   home_team_score: number;
   visitor_team_score: number;
-}
-
-function getCurrentSeason(): number {
-  const now = new Date();
-  // NBA season spans Oct-Jun. If before October, it's previous year's season
-  return now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
 }
 
 export async function GET(req: NextRequest) {
@@ -32,7 +27,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const season = getCurrentSeason();
+  const season = getNBASeason();
   const url = `${BDL_BASE}/games?team_ids[]=${teamId}&seasons[]=${season}&per_page=100`;
 
   try {
@@ -96,7 +91,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ lastGame, nextGame, record: { wins, losses }, error: null });
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch game data", lastGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
       { status: 500 }

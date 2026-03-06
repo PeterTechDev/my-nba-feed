@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
-function getCurrentSeason(): number {
-  const now = new Date();
-  return now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+interface BDLTeam {
+  id: number;
+  name: string;
+  abbreviation: string;
 }
 
-function formatDateYYYYMMDD(d: Date) {
-  return d.toISOString().slice(0, 10);
+interface BDLGame {
+  id: number;
+  date: string;
+  status: string;
+  home_team: BDLTeam;
+  visitor_team: BDLTeam;
+  home_team_score: number;
+  visitor_team_score: number;
 }
 
 export async function GET(req: NextRequest) {
@@ -22,9 +30,9 @@ export async function GET(req: NextRequest) {
   if (!key) return NextResponse.json({ games: [], error: "API key not configured" }, { status: 503 });
 
   try {
-    const season = getCurrentSeason();
+    const season = getNBASeason();
     const defaultStart = `${season}-10-01`;
-    const defaultEnd = formatDateYYYYMMDD(new Date());
+    const defaultEnd = formatNBADate();
 
     let url = `${BDL_BASE}/games?team_ids[]=${teamId}&per_page=100`;
     url += `&start_date=${startDate || defaultStart}`;
@@ -49,7 +57,7 @@ export async function GET(req: NextRequest) {
     if (!res.ok) return NextResponse.json({ games: [], error: `API ${res.status}` }, { status: 502 });
 
     const json = await res.json();
-    const games = (json.data || []).map((g: any) => ({
+    const games = ((json.data || []) as BDLGame[]).map((g) => ({
       id: g.id,
       date: g.date,
       status: g.status,

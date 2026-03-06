@@ -1,18 +1,10 @@
 import { NextResponse } from "next/server";
+import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
-function getCurrentSeason(): number {
-  const now = new Date();
-  return now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
-}
-
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-function formatDateYYYYMMDD(d: Date) {
-  return d.toISOString().slice(0, 10);
 }
 
 interface TeamRecord {
@@ -25,22 +17,46 @@ interface TeamRecord {
   losses: number;
 }
 
+interface BDLTeam {
+  id: number;
+  name: string;
+  full_name?: string;
+  abbreviation: string;
+  conference: string;
+  division: string;
+}
+
+interface BDLGame {
+  status: string;
+  home_team: BDLTeam;
+  visitor_team: BDLTeam;
+  home_team_score: number;
+  visitor_team_score: number;
+}
+
+interface BDLGamesResponse {
+  data?: BDLGame[];
+  meta?: {
+    next_cursor?: string | null;
+  };
+}
+
 export async function GET() {
   const key = process.env.BALLDONTLIE_KEY || "";
   if (!key) return NextResponse.json({ standings: [], error: "API key not configured" }, { status: 503 });
 
-  const season = getCurrentSeason();
+  const season = getNBASeason();
 
   try {
     // Fetch all games for the season (paginated).
     // NOTE: BallDontLie free tier can rate-limit (429) if we hammer it.
     // We keep requests sequential + add retry/backoff on 429.
-    const allGames: any[] = [];
+    const allGames: BDLGame[] = [];
     let cursor: string | null = null;
     let page = 0;
 
     const seasonStart = `${season}-10-01`;
-    const seasonEnd = formatDateYYYYMMDD(new Date());
+    const seasonEnd = formatNBADate();
 
     const fetchPage = async (url: string) => {
       let attempt = 0;
@@ -74,7 +90,7 @@ export async function GET() {
       const res = await fetchPage(fetchUrl);
       if (!res.ok) return NextResponse.json({ standings: [], error: `API ${res.status}` }, { status: 502 });
 
-      const json = await res.json();
+      const json: BDLGamesResponse = await res.json();
       allGames.push(...(json.data || []));
       cursor = json.meta?.next_cursor || null;
       page++;

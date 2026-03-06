@@ -13,6 +13,25 @@ interface LiveGame {
   awayScore: number;
 }
 
+function isFinalStatus(status: string): boolean {
+  return status.trim().toLowerCase().startsWith("final");
+}
+
+function isLiveStatus(game: LiveGame): boolean {
+  if (isFinalStatus(game.status)) return false;
+
+  const normalizedStatus = game.status.trim().toLowerCase();
+  if (!normalizedStatus) return false;
+
+  if (normalizedStatus === "scheduled" || normalizedStatus === "postponed") return false;
+  if (normalizedStatus === "halftime") return true;
+  if (normalizedStatus.includes("qtr") || normalizedStatus.startsWith("q") || normalizedStatus.includes("ot")) {
+    return true;
+  }
+
+  return game.homeScore + game.awayScore > 0;
+}
+
 export default function LiveScores() {
   const [games, setGames] = useState<LiveGame[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,8 +58,8 @@ export default function LiveScores() {
 
   if (loading) return null;
 
-  const liveGames = games.filter((g) => g.status !== "Final" && g.status !== "" && g.homeScore + g.awayScore > 0);
-  const scheduledGames = games.filter((g) => g.status !== "Final" && (g.homeScore + g.awayScore === 0));
+  const liveGames = games.filter(isLiveStatus);
+  const scheduledGames = games.filter((g) => !isFinalStatus(g.status) && !isLiveStatus(g));
 
   // Only show if there are live or scheduled games — hide if all are Final
   if (liveGames.length === 0 && scheduledGames.length === 0) return null;
@@ -61,7 +80,7 @@ export default function LiveScores() {
         </div>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
           {displayGames.map((game) => {
-            const isLive = game.status !== "Final" && game.homeScore + game.awayScore > 0;
+            const isLive = isLiveStatus(game);
             return (
               <div
                 key={game.id}

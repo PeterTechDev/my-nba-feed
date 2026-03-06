@@ -62,7 +62,6 @@ export default function StandingsPage() {
               <tbody>
                 {confTeams.map((team, i) => {
                   const pct = team.wins / (team.wins + team.losses || 1);
-                  const leaderPct = leaderWins / (leaderWins + leaderLosses || 1);
                   const gb = ((leaderWins - leaderLosses) - (team.wins - team.losses)) / 2;
                   const isPlayoff = i < 6;
                   const isPlayIn = i >= 6 && i < 10;

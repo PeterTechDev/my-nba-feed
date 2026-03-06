@@ -15,6 +15,16 @@ interface HighlightGame {
   youtubeUrl: string;
 }
 
+interface ScheduleGame {
+  id: number;
+  date: string;
+  status: string;
+  homeTeam: { id: number; name: string; abbreviation: string };
+  awayTeam: { id: number; name: string; abbreviation: string };
+  homeScore: number;
+  awayScore: number;
+}
+
 export default function HighlightsPage() {
   const { selectedTeam } = useTeam();
   const { spoilerFree } = useSpoilerContext();
@@ -34,12 +44,12 @@ export default function HighlightsPage() {
         fetch(`/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`)
           .then((r) => r.json())
           .then((d) => {
-            const finishedGames = (d.games || [])
-              .filter((g: any) => g.status === "Final")
-              .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            const finishedGames = ((d.games || []) as ScheduleGame[])
+              .filter((g) => g.status === "Final")
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .slice(0, 15);
 
-            const items = finishedGames.map((g: any) => {
+            const items = finishedGames.map((g) => {
               const isHome = g.homeTeam.id === selectedTeam.id;
               const opp = isHome ? g.awayTeam : g.homeTeam;
               const teamScore = isHome ? g.homeScore : g.awayScore;

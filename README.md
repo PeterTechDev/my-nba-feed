@@ -39,10 +39,10 @@ Just basketball, on your terms.
 
 | Layer | Tech |
 |---|---|
-| Framework | Next.js 14 (App Router) |
+| Framework | Next.js 16 (App Router) |
 | Language | TypeScript |
 | Styling | Tailwind CSS |
-| Data | balldontlie API + Reddit RSS |
+| Data | balldontlie API + Google News RSS + Reddit JSON |
 | Deployment | Vercel |
 
 ---
@@ -68,7 +68,7 @@ src/
 │   ├── TeamHeader.tsx        # Team banner with dynamic colors
 │   ├── GameSection.tsx       # Last game + next game cards
 │   ├── LiveScores.tsx        # Live scoreboard ticker
-│   ├── NewsFeed.tsx          # Reddit social feed
+│   ├── NewsFeed.tsx          # Team news feed
 │   ├── TeamSelector.tsx      # Team picker (all 30 teams)
 │   └── ...
 ├── hooks/
@@ -78,7 +78,8 @@ src/
 └── lib/
     ├── api.ts                # API client + TypeScript interfaces
     ├── teams.ts              # All 30 teams with IDs and colors
-    └── reddit.ts             # Reddit subreddit mappings per team
+    ├── reddit.ts             # Reddit subreddit mappings per team
+    └── nbaDate.ts            # NBA timezone-aware date helpers
 ```
 
 ---
@@ -99,7 +100,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-No API keys required — uses public data sources.
+Set `BALLDONTLIE_KEY` in your environment before starting the app.
 
 ---
 

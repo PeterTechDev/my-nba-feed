@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
+interface BDLPlayer {
+  id: number;
+  first_name: string;
+  last_name: string;
+  position: string;
+  jersey_number: string;
+  height: string;
+  weight: string;
+  college: string;
+  country: string;
+  draft_year: number;
+  draft_round: number;
+  draft_number: number;
+}
+
 export async function GET(req: NextRequest) {
   const teamId = req.nextUrl.searchParams.get("teamId");
   if (!teamId) return NextResponse.json({ players: [], error: "teamId required" }, { status: 400 });
@@ -19,7 +34,7 @@ export async function GET(req: NextRequest) {
     if (!res.ok) return NextResponse.json({ players: [], error: `API ${res.status}` }, { status: 502 });
 
     const json = await res.json();
-    const players = (json.data || []).map((p: any) => ({
+    const players = ((json.data || []) as BDLPlayer[]).map((p) => ({
       id: p.id,
       firstName: p.first_name,
       lastName: p.last_name,
