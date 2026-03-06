@@ -42,8 +42,8 @@ export default function NewsFeed() {
     getNews(selectedTeam.name).then((n) => { setNews(n); setLoading(false); });
   }, [selectedTeam.name]);
 
-  const displayNews = news.slice(0, 5);
-  const hasMore = news.length > 5;
+  const displayNews = news.slice(0, 3);
+  const hasMore = news.length > 3;
   const hiddenCount = displayNews.filter((item) => hideHeadlines && item.isSpoiler && !revealed).length;
 
   return (
@@ -70,7 +70,7 @@ export default function NewsFeed() {
         </div>
         {loading ? (
           <div className="space-y-4 animate-pulse">
-            {[...Array(5)].map((_, i) => (
+            {[...Array(3)].map((_, i) => (
               <div key={i} className="space-y-2">
                 <div className="h-4 w-full bg-white/10 rounded" />
                 <div className="h-3 w-24 bg-white/10 rounded" />

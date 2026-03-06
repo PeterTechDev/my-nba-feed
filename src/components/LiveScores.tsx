@@ -67,13 +67,13 @@ export default function LiveScores() {
   const displayGames = [...liveGames, ...scheduledGames];
 
   return (
-    <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
-      <div className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest">Live Games</h3>
+    <div className="rounded-xl overflow-hidden border border-white/5 bg-white/[0.02]">
+      <div className="p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="text-[11px] font-bold text-white/45 uppercase tracking-[0.18em]">League check-in</h3>
           {liveGames.length > 0 && (
-            <span className="flex items-center gap-1 text-xs text-red-400 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="flex items-center gap-1 text-[11px] text-red-300/85 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
               {liveGames.length} LIVE
             </span>
           )}
@@ -84,12 +84,12 @@ export default function LiveScores() {
             return (
               <div
                 key={game.id}
-                className={`shrink-0 rounded-lg px-3 py-2 border text-sm font-medium ${
-                  isLive ? "border-red-500/30 bg-red-500/5" : "border-white/5 bg-white/[0.02]"
+                className={`shrink-0 rounded-lg px-2.5 py-1.5 border text-xs font-medium ${
+                  isLive ? "border-red-400/20 bg-red-500/[0.04] text-white/80" : "border-white/5 bg-black/10 text-white/55"
                 }`}
               >
                 {hideScores ? (
-                  <span className="text-white/60">
+                  <span>
                     {game.awayTeam.abbreviation} vs {game.homeTeam.abbreviation}
                   </span>
                 ) : (
@@ -98,7 +98,7 @@ export default function LiveScores() {
                   </span>
                 )}
                 {isLive && (
-                  <span className="ml-2 text-[10px] text-red-400 font-bold">Q{game.period}</span>
+                  <span className="ml-2 text-[10px] text-red-300 font-bold">Q{game.period}</span>
                 )}
               </div>
             );
