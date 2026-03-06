@@ -58,7 +58,7 @@ function isSameLocalDay(dateStr: string, compareDate: Date = new Date()): boolea
 export function LastGameCard() {
   const { selectedTeam } = useTeam();
   const { lastGame, loading, error } = useGameData();
-  const { spoilerFree } = useSpoilerContext();
+  const { hideScores } = useSpoilerContext();
 
   if (loading) return <SkeletonCard label="Last Game" />;
   if (error) return <ErrorCard label="Last Game" error={error} />;
@@ -79,13 +79,13 @@ export function LastGameCard() {
     <Card>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest">Last Game</h3>
-        {!spoilerFree && (
+        {!hideScores && (
           <span className={`text-sm font-bold px-2 py-0.5 rounded ${won ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
             {won ? "W" : "L"}
           </span>
         )}
       </div>
-      {spoilerFree ? (
+      {hideScores ? (
         <>
           <p className="text-lg font-semibold text-white/80">
             vs {opponent.name} · {date}
@@ -98,7 +98,7 @@ export function LastGameCard() {
         </p>
       )}
       <p className="text-white/60 text-sm mt-1">
-        {!spoilerFree && <>vs {opponent.name} · {date}</>}
+        {!hideScores && <>vs {opponent.name} · {date}</>}
       </p>
       <a
         href={getHighlightUrl(selectedTeam.name, opponent.name, date)}

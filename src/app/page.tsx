@@ -1,6 +1,7 @@
 "use client";
 import TeamHeader from "@/components/TeamHeader";
 import GameDayHero from "@/components/GameDayHero";
+import TeamContextPanel from "@/components/TeamContextPanel";
 import { LastGameCard, NextGameCard } from "@/components/GameSection";
 import NewsFeed from "@/components/NewsFeed";
 import GameDataProvider from "@/components/GameDataProvider";
@@ -12,6 +13,7 @@ export default function Home() {
       <GameDataProvider>
         <TeamHeader />
         <GameDayHero />
+        <TeamContextPanel />
         <LiveScores />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-8">

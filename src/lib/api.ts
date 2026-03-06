@@ -30,6 +30,7 @@ export interface NewsItem {
   pubDate: string;
   source: string;
   isSpoiler: boolean;
+  category: "injury" | "lineup" | "transaction" | "analysis" | "recap" | "general";
 }
 
 // Single fetch for all game data — server-side via API route

@@ -36,7 +36,7 @@ function getCountdown(dateStr: string): string {
 export default function GameDayHero() {
   const { selectedTeam } = useTeam();
   const { currentGame, nextGame, loading, error } = useGameData();
-  const { spoilerFree } = useSpoilerContext();
+  const { hideScores } = useSpoilerContext();
 
   if (loading || error) return null;
 
@@ -81,7 +81,7 @@ export default function GameDayHero() {
             </span>
             {isLive ? (
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                {spoilerFree ? "Score hidden" : `${selectedTeam.abbreviation} ${teamScore} - ${opponent.abbreviation} ${opponentScore}`}
+                {hideScores ? "Score hidden" : `${selectedTeam.abbreviation} ${teamScore} - ${opponent.abbreviation} ${opponentScore}`}
               </span>
             ) : (
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">

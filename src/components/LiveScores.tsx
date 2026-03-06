@@ -35,7 +35,7 @@ function isLiveStatus(game: LiveGame): boolean {
 export default function LiveScores() {
   const [games, setGames] = useState<LiveGame[]>([]);
   const [loading, setLoading] = useState(true);
-  const { spoilerFree } = useSpoilerContext();
+  const { hideScores } = useSpoilerContext();
 
   const fetchLive = async () => {
     try {
@@ -88,7 +88,7 @@ export default function LiveScores() {
                   isLive ? "border-red-500/30 bg-red-500/5" : "border-white/5 bg-white/[0.02]"
                 }`}
               >
-                {spoilerFree ? (
+                {hideScores ? (
                   <span className="text-white/60">
                     {game.awayTeam.abbreviation} vs {game.homeTeam.abbreviation}
                   </span>

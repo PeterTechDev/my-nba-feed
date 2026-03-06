@@ -14,9 +14,24 @@ function relativeTime(dateStr: string): string {
   return `${days}d ago`;
 }
 
+function categoryLabel(category: NewsItem["category"]): string | null {
+  switch (category) {
+    case "injury":
+      return "Injury";
+    case "lineup":
+      return "Lineup";
+    case "transaction":
+      return "Transaction";
+    case "analysis":
+      return "Report";
+    default:
+      return null;
+  }
+}
+
 export default function NewsFeed() {
   const { selectedTeam } = useTeam();
-  const { spoilerFree } = useSpoilerContext();
+  const { hideHeadlines } = useSpoilerContext();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [revealed, setRevealed] = useState(false);
@@ -29,7 +44,7 @@ export default function NewsFeed() {
 
   const displayNews = news.slice(0, 5);
   const hasMore = news.length > 5;
-  const hiddenCount = displayNews.filter((item) => spoilerFree && item.isSpoiler && !revealed).length;
+  const hiddenCount = displayNews.filter((item) => hideHeadlines && item.isSpoiler && !revealed).length;
 
   return (
     <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
@@ -37,13 +52,13 @@ export default function NewsFeed() {
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest">News</h3>
-            {spoilerFree && hiddenCount > 0 && (
+            {hideHeadlines && hiddenCount > 0 && (
               <p className="text-[11px] text-amber-400/80 mt-1">
                 {hiddenCount} headline{hiddenCount > 1 ? "s" : ""} hidden to avoid spoilers
               </p>
             )}
           </div>
-          {spoilerFree && displayNews.some((item) => item.isSpoiler) && (
+          {hideHeadlines && displayNews.some((item) => item.isSpoiler) && (
             <button
               type="button"
               onClick={() => setRevealed((prev) => !prev)}
@@ -77,19 +92,25 @@ export default function NewsFeed() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`text-sm font-medium transition-colors line-clamp-2 ${
-                      spoilerFree && item.isSpoiler && !revealed
+                      hideHeadlines && item.isSpoiler && !revealed
                         ? "text-white/60 group-hover:text-white/75"
                         : "group-hover:text-white"
                     }`}
                   >
-                    {spoilerFree && item.isSpoiler && !revealed ? item.safeTitle : item.title}
+                    {hideHeadlines && item.isSpoiler && !revealed ? item.safeTitle : item.title}
                   </a>
                   <p className="text-xs text-white/40 mt-1">
+                    {categoryLabel(item.category) && (
+                      <>
+                        <span className="text-emerald-400/80">{categoryLabel(item.category)}</span>
+                        <span> · </span>
+                      </>
+                    )}
                     {item.source && <span className="text-white/50">{item.source}</span>}
                     {item.source && item.pubDate && <span> · </span>}
                     {item.pubDate && relativeTime(item.pubDate)}
                   </p>
-                  {spoilerFree && item.isSpoiler && !revealed && (
+                  {hideHeadlines && item.isSpoiler && !revealed && (
                     <p className="text-[11px] text-white/25 mt-1">Tap reveal to view the original headline</p>
                   )}
                 </li>

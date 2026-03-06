@@ -23,7 +23,7 @@ function getFirstDayOfWeek(year: number, month: number) {
 
 export default function SchedulePage() {
   const { selectedTeam } = useTeam();
-  const { spoilerFree } = useSpoilerContext();
+  const { hideScores } = useSpoilerContext();
   const [games, setGames] = useState<ScheduleGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -114,7 +114,7 @@ export default function SchedulePage() {
                   <span className={`text-xs ${isToday ? "text-white font-bold" : "text-white/30"}`}>{day}</span>
                   {game && opponent && (
                     <div className={`mt-1 rounded p-1 text-[10px] ${
-                      isFinal && !spoilerFree
+                      isFinal && !hideScores
                         ? won
                           ? "bg-emerald-500/10 text-emerald-400"
                           : "bg-red-500/10 text-red-400"
@@ -123,12 +123,12 @@ export default function SchedulePage() {
                       <div className="font-medium">
                         {isHome ? "vs" : "@"} {opponent.abbreviation}
                       </div>
-                      {isFinal && !spoilerFree && (
+                      {isFinal && !hideScores && (
                         <div className="font-bold">
                           {won ? "W" : "L"} {isHome ? game.homeScore : game.awayScore}-{isHome ? game.awayScore : game.homeScore}
                         </div>
                       )}
-                      {isFinal && spoilerFree && (
+                      {isFinal && hideScores && (
                         <div className="text-white/30">Final</div>
                       )}
                     </div>
@@ -184,7 +184,7 @@ export default function SchedulePage() {
                     </div>
                   </div>
                   {isFinal ? (
-                    spoilerFree ? (
+                    hideScores ? (
                       <span className="text-xs text-white/30">Final</span>
                     ) : (
                       <span className={`text-sm font-bold ${won ? "text-emerald-400" : "text-red-400"}`}>

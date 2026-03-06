@@ -13,6 +13,7 @@ interface RedditPost {
   subreddit: string;
   author: string;
   thumbnail: string | null;
+  category: "game-thread" | "postgame" | "injury" | "news" | "discussion" | "general";
 }
 
 function timeAgo(timestamp: number): string {
@@ -21,6 +22,23 @@ function timeAgo(timestamp: number): string {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function categoryLabel(category: RedditPost["category"]): string | null {
+  switch (category) {
+    case "game-thread":
+      return "Game thread";
+    case "postgame":
+      return "Postgame";
+    case "injury":
+      return "Injury";
+    case "news":
+      return "News";
+    case "discussion":
+      return "Discussion";
+    default:
+      return null;
+  }
 }
 
 export default function SocialPage() {
@@ -51,6 +69,7 @@ export default function SocialPage() {
         <div>
           <h1 className="text-2xl font-bold">{selectedTeam.name} Social Feed</h1>
           <p className="text-sm text-white/40 italic">&quot;No algorithms. Just your team.&quot;</p>
+          <p className="text-xs text-white/30 mt-1">Game threads, injury updates, and actual fan context are ranked first.</p>
         </div>
       </div>
 
@@ -104,6 +123,11 @@ export default function SocialPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm line-clamp-2">{post.title}</p>
                   <div className="flex items-center gap-3 mt-2 text-xs text-white/40">
+                    {categoryLabel(post.category) && (
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
+                        {categoryLabel(post.category)}
+                      </span>
+                    )}
                     <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 font-medium">
                       r/{post.subreddit}
                     </span>
