@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
 import { NewsItem, getNews } from "@/lib/api";
+import { useSpoilerContext } from "./SpoilerModeProvider";
 
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -15,21 +16,43 @@ function relativeTime(dateStr: string): string {
 
 export default function NewsFeed() {
   const { selectedTeam } = useTeam();
+  const { spoilerFree } = useSpoilerContext();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
     setLoading(true);
+    setRevealed(false);
     getNews(selectedTeam.name).then((n) => { setNews(n); setLoading(false); });
   }, [selectedTeam.name]);
 
   const displayNews = news.slice(0, 5);
   const hasMore = news.length > 5;
+  const hiddenCount = displayNews.filter((item) => spoilerFree && item.isSpoiler && !revealed).length;
 
   return (
     <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
       <div className="p-5">
-        <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest mb-4">News</h3>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest">News</h3>
+            {spoilerFree && hiddenCount > 0 && (
+              <p className="text-[11px] text-amber-400/80 mt-1">
+                {hiddenCount} headline{hiddenCount > 1 ? "s" : ""} hidden to avoid spoilers
+              </p>
+            )}
+          </div>
+          {spoilerFree && displayNews.some((item) => item.isSpoiler) && (
+            <button
+              type="button"
+              onClick={() => setRevealed((prev) => !prev)}
+              className="shrink-0 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-medium text-white/60 hover:bg-white/5 hover:text-white/80 transition"
+            >
+              {revealed ? "Hide spoilers" : "Reveal headlines"}
+            </button>
+          )}
+        </div>
         {loading ? (
           <div className="space-y-4 animate-pulse">
             {[...Array(5)].map((_, i) => (
@@ -53,15 +76,22 @@ export default function NewsFeed() {
                     href={item.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-medium group-hover:text-white transition-colors line-clamp-2"
+                    className={`text-sm font-medium transition-colors line-clamp-2 ${
+                      spoilerFree && item.isSpoiler && !revealed
+                        ? "text-white/60 group-hover:text-white/75"
+                        : "group-hover:text-white"
+                    }`}
                   >
-                    {item.title}
+                    {spoilerFree && item.isSpoiler && !revealed ? item.safeTitle : item.title}
                   </a>
                   <p className="text-xs text-white/40 mt-1">
                     {item.source && <span className="text-white/50">{item.source}</span>}
                     {item.source && item.pubDate && <span> · </span>}
                     {item.pubDate && relativeTime(item.pubDate)}
                   </p>
+                  {spoilerFree && item.isSpoiler && !revealed && (
+                    <p className="text-[11px] text-white/25 mt-1">Tap reveal to view the original headline</p>
+                  )}
                 </li>
               ))}
             </ul>

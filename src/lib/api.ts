@@ -17,6 +17,7 @@ export interface TeamRecord {
 
 export interface GamesResponse {
   lastGame: GameInfo | null;
+  currentGame: GameInfo | null;
   nextGame: GameInfo | null;
   record: TeamRecord;
   error: string | null;
@@ -24,9 +25,11 @@ export interface GamesResponse {
 
 export interface NewsItem {
   title: string;
+  safeTitle: string;
   link: string;
   pubDate: string;
   source: string;
+  isSpoiler: boolean;
 }
 
 // Single fetch for all game data — server-side via API route
@@ -37,6 +40,7 @@ export async function fetchGameData(teamId: number): Promise<GamesResponse> {
       const data = await res.json().catch(() => ({}));
       return {
         lastGame: null,
+        currentGame: null,
         nextGame: null,
         record: { wins: 0, losses: 0 },
         error: data.error || `Failed to load (${res.status})`,
@@ -46,6 +50,7 @@ export async function fetchGameData(teamId: number): Promise<GamesResponse> {
   } catch {
     return {
       lastGame: null,
+      currentGame: null,
       nextGame: null,
       record: { wins: 0, losses: 0 },
       error: "Network error — check your connection",

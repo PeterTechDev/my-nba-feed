@@ -46,6 +46,15 @@ function timeUntil(dateStr: string): string {
   return "Soon";
 }
 
+function isSameLocalDay(dateStr: string, compareDate: Date = new Date()): boolean {
+  const date = new Date(dateStr);
+  return (
+    date.getFullYear() === compareDate.getFullYear() &&
+    date.getMonth() === compareDate.getMonth() &&
+    date.getDate() === compareDate.getDate()
+  );
+}
+
 export function LastGameCard() {
   const { selectedTeam } = useTeam();
   const { lastGame, loading, error } = useGameData();
@@ -104,10 +113,25 @@ export function LastGameCard() {
 }
 
 export function NextGameCard() {
-  const { nextGame, loading, error } = useGameData();
+  const { currentGame, nextGame, loading, error } = useGameData();
 
   if (loading) return <SkeletonCard label="Next Game" />;
   if (error) return <ErrorCard label="Next Game" error={error} />;
+  if (currentGame) return (
+    <Card>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest">Current Game</h3>
+        <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-red-400">
+          Live
+        </span>
+      </div>
+      <p className="text-2xl font-bold">{currentGame.isHome ? "vs" : "at"} {getOpponent(currentGame).name}</p>
+      <p className="text-white/60 text-sm mt-1">{currentGame.status || "In progress"}</p>
+      <p className="text-xs text-white/45 mt-3">
+        The live game state has moved ahead of the next-game preview until the final buzzer.
+      </p>
+    </Card>
+  );
   if (!nextGame) return (
     <Card>
       <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest mb-3">Next Game</h3>
@@ -116,16 +140,32 @@ export function NextGameCard() {
   );
 
   const opponent = getOpponent(nextGame);
+  const isGameDay = isSameLocalDay(nextGame.date);
   const date = new Date(nextGame.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const time = new Date(nextGame.date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
   return (
     <Card>
-      <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest mb-3">Next Game</h3>
-      <p className="text-2xl font-bold">vs {opponent.name}</p>
-      <p className="text-white/60 text-sm mt-1">{date} · {nextGame.isHome ? "Home" : "Away"}</p>
-      <p className="text-sm mt-2 font-medium text-emerald-400">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest">Next Game</h3>
+        {isGameDay && (
+          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+            Tonight
+          </span>
+        )}
+      </div>
+      <p className="text-2xl font-bold">{nextGame.isHome ? "vs" : "at"} {opponent.name}</p>
+      <p className="text-white/60 text-sm mt-1">
+        {date} · {time} · {nextGame.isHome ? "Home" : "Away"}
+      </p>
+      <p className={`text-sm mt-2 font-medium ${isGameDay ? "text-white" : "text-emerald-400"}`}>
         {timeUntil(nextGame.date)}
       </p>
+      {isGameDay && (
+        <p className="text-xs text-white/45 mt-3">
+          The dashboard is in game day mode, so tonight&apos;s matchup is front and center.
+        </p>
+      )}
     </Card>
   );
 }

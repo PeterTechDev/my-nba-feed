@@ -5,6 +5,7 @@ import { fetchGameData, GameInfo, TeamRecord } from "@/lib/api";
 
 interface GameDataState {
   lastGame: GameInfo | null;
+  currentGame: GameInfo | null;
   nextGame: GameInfo | null;
   record: TeamRecord;
   loading: boolean;
@@ -13,6 +14,7 @@ interface GameDataState {
 
 const defaultState: GameDataState = {
   lastGame: null,
+  currentGame: null,
   nextGame: null,
   record: { wins: 0, losses: 0 },
   loading: true,
@@ -40,6 +42,7 @@ export function useGameDataFetcher(): GameDataState {
       if (cancelled) return;
       setState({
         lastGame: data.lastGame,
+        currentGame: data.currentGame,
         nextGame: data.nextGame,
         record: data.record,
         loading: false,

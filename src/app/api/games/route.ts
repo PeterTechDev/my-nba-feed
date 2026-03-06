@@ -13,6 +13,20 @@ interface BDLGame {
   visitor_team_score: number;
 }
 
+function isFinalStatus(status: string): boolean {
+  return status.trim().toLowerCase().startsWith("final");
+}
+
+function isCurrentStatus(game: BDLGame, now: Date): boolean {
+  const normalizedStatus = game.status.trim().toLowerCase();
+  if (!normalizedStatus || isFinalStatus(game.status)) return false;
+  if (normalizedStatus === "scheduled" || normalizedStatus === "postponed") {
+    return new Date(game.date) <= now;
+  }
+
+  return true;
+}
+
 export async function GET(req: NextRequest) {
   const teamId = req.nextUrl.searchParams.get("teamId");
   if (!teamId) {
@@ -22,7 +36,7 @@ export async function GET(req: NextRequest) {
   const key = process.env.BALLDONTLIE_KEY || "";
   if (!key) {
     return NextResponse.json(
-      { error: "API key not configured", lastGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
+      { error: "API key not configured", lastGame: null, currentGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
       { status: 503 }
     );
   }
@@ -39,7 +53,7 @@ export async function GET(req: NextRequest) {
     if (!res.ok) {
       const status = res.status;
       return NextResponse.json(
-        { error: `BallDontLie API returned ${status}`, lastGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
+        { error: `BallDontLie API returned ${status}`, lastGame: null, currentGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
         { status: 502 }
       );
     }
@@ -69,20 +83,25 @@ export async function GET(req: NextRequest) {
 
     // Last game (most recent finished)
     const finished = games
-      .filter((g) => g.status === "Final" && new Date(g.date) <= now)
+      .filter((g) => isFinalStatus(g.status) && new Date(g.date) <= now)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const lastGame = finished.length > 0 ? toInfo(finished[0]) : null;
 
+    const current = games
+      .filter((g) => isCurrentStatus(g, now))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const currentGame = current.length > 0 ? toInfo(current[0]) : null;
+
     // Next game (soonest upcoming)
     const upcoming = games
-      .filter((g) => g.status !== "Final" && new Date(g.date) >= now)
+      .filter((g) => !isFinalStatus(g.status) && new Date(g.date) > now)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const nextGame = upcoming.length > 0 ? toInfo(upcoming[0]) : null;
 
     // Record
     let wins = 0, losses = 0;
     for (const g of games) {
-      if (g.status !== "Final") continue;
+      if (!isFinalStatus(g.status)) continue;
       const isHome = g.home_team.id === tid;
       const ts = isHome ? g.home_team_score : g.visitor_team_score;
       const os = isHome ? g.visitor_team_score : g.home_team_score;
@@ -90,10 +109,10 @@ export async function GET(req: NextRequest) {
       else losses++;
     }
 
-    return NextResponse.json({ lastGame, nextGame, record: { wins, losses }, error: null });
+    return NextResponse.json({ lastGame, currentGame, nextGame, record: { wins, losses }, error: null });
   } catch {
     return NextResponse.json(
-      { error: "Failed to fetch game data", lastGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
+      { error: "Failed to fetch game data", lastGame: null, currentGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
       { status: 500 }
     );
   }
