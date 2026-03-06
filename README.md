@@ -4,19 +4,21 @@
 
 ---
 
-## Why I Built This
+## The Problem
 
-I follow basketball closely — and every time I wanted to check on my team, I had to bounce between the NBA app for scores, Reddit for the community reaction, and Google for standings. None of them talked to each other, and most were bloated with ads and noise.
+Modern sports apps aren't built for fans — they're built for engagement metrics.
 
-So I built exactly what I wanted: one clean page, my team, everything relevant. No ads. No fluff. Spoiler-free by default so I can check the score on my own terms.
+You open the NBA app to check one score and get hit with ads, push notification prompts, recommended content you didn't ask for, and an algorithm trying to keep you scrolling. Reddit buries the game thread under memes and hot takes. ESPN wants you to subscribe. Google shows you highlights you didn't want to see yet.
 
-It also became my sandbox for learning Next.js 14 App Router in a real project — data fetching, server-side API routes, dynamic theming, and state management without reaching for a heavy library.
+The result: checking on your team becomes a chore. You either get spoiled, get distracted, or give up and wait for someone to tell you.
 
----
+## The Solution
 
-## The Goal
+NBA Feed cuts all of that out.
 
-A focused, fast, personal NBA dashboard. Pick your team. See what matters. Everything else gets out of the way.
+One page. Your team. The score, the record, the next game, the schedule, and what fans are actually saying — with spoiler-free mode on by default so you control when you see results. No ads. No algorithm. No recommendations. No paywall. No FOMO loop.
+
+Just basketball, on your terms.
 
 ---
 
