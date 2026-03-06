@@ -1,23 +1,13 @@
 "use client";
 import Link from "next/link";
 
-function getTodaySearchLabel(): string {
-  return new Date().toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function getYouTubeSearchUrl(query: string): string {
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+function getChannelSearchUrl(query: string): string {
+  return `https://www.youtube.com/@NBA/search?query=${encodeURIComponent(query)}`;
 }
 
 const NBA_CHANNEL_VIDEOS_URL = "https://www.youtube.com/@NBA/videos";
 
 export default function TopPlaysCard() {
-  const todaySearchLabel = getTodaySearchLabel();
-
   return (
     <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
       <div className="p-5">
@@ -32,14 +22,14 @@ export default function TopPlaysCard() {
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <a
-            href={getYouTubeSearchUrl(`@NBA "NBA's Top 10 Plays of the Night" "${todaySearchLabel}"`)}
+            href={getChannelSearchUrl("Top 10 Plays of the Night")}
             target="_blank"
             rel="noopener noreferrer"
             className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3 transition hover:bg-white/[0.06]"
           >
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Latest Top 10</p>
             <p className="mt-2 text-lg font-bold">Top 10 of the Night</p>
-            <p className="text-xs text-white/40 mt-1">Official-title search for today&apos;s upload</p>
+            <p className="text-xs text-white/40 mt-1">Search only inside the official NBA channel</p>
           </a>
           <a
             href={NBA_CHANNEL_VIDEOS_URL}
@@ -49,7 +39,7 @@ export default function TopPlaysCard() {
           >
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Official feed</p>
             <p className="mt-2 text-lg font-bold">NBA Uploads</p>
-            <p className="text-xs text-white/40 mt-1">Open the NBA channel&apos;s latest videos directly</p>
+            <p className="text-xs text-white/40 mt-1">Open the latest NBA channel uploads directly</p>
           </a>
         </div>
       </div>
