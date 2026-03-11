@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff } from "lucide-react";
+import { Home, Users, BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff, BookOpen } from "lucide-react";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 
 const links = [
@@ -13,6 +13,7 @@ const links = [
   { href: "/highlights", label: "Highlights", icon: Play },
   { href: "/compare", label: "Compare", icon: ArrowLeftRight },
   { href: "/social", label: "Social", icon: MessageCircle },
+  { href: "/digest", label: "Digest", icon: BookOpen },
 ];
 
 export default function NavBar() {
