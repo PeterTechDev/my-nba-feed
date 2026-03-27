@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
 import { NewsItem, getNews } from "@/lib/api";
 import { useSpoilerContext } from "./SpoilerModeProvider";
+import { useLastVisit } from "@/hooks/useLastVisit";
 
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -29,12 +30,24 @@ function categoryLabel(category: NewsItem["category"]): string | null {
   }
 }
 
+/** Returns a human-friendly relative time string like "3 hours ago" */
+function relativeVisitTime(isoStr: string): string {
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days !== 1 ? "s" : ""} ago`;
+}
+
 export default function NewsFeed({ limit = 3 }: { limit?: number }) {
   const { selectedTeam } = useTeam();
   const { hideHeadlines } = useSpoilerContext();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [revealed, setRevealed] = useState(false);
+  const { lastVisitAt, ready: visitReady } = useLastVisit();
 
   useEffect(() => {
     setLoading(true);
@@ -45,6 +58,17 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
   const displayNews = news.slice(0, limit);
   const hasMore = news.length > limit;
   const hiddenCount = displayNews.filter((item) => hideHeadlines && item.isSpoiler && !revealed).length;
+
+  // Determine the index where the separator should appear (first "old" item)
+  const separatorIndex: number | null = (() => {
+    if (!visitReady || !lastVisitAt || loading) return null;
+    const lastVisitTime = new Date(lastVisitAt).getTime();
+    const idx = displayNews.findIndex(
+      (item) => item.pubDate && new Date(item.pubDate).getTime() < lastVisitTime
+    );
+    // Only show if there are genuinely "new" items above it
+    return idx > 0 ? idx : null;
+  })();
 
   return (
     <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
@@ -86,34 +110,45 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
           <>
             <ul className="divide-y divide-white/5">
               {displayNews.map((item, i) => (
-                <li key={i} className="group py-3 -mx-2 px-2 rounded-lg hover:bg-white/5 transition-colors first:pt-0">
-                  <a
-                    href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`text-sm font-medium transition-colors line-clamp-2 ${
-                      hideHeadlines && item.isSpoiler && !revealed
-                        ? "text-white/60 group-hover:text-white/75"
-                        : "group-hover:text-white"
-                    }`}
-                  >
-                    {hideHeadlines && item.isSpoiler && !revealed ? item.safeTitle : item.title}
-                  </a>
-                  <p className="text-xs text-white/40 mt-1">
-                    {categoryLabel(item.category) && (
-                      <>
-                        <span className="text-emerald-400/80">{categoryLabel(item.category)}</span>
-                        <span> · </span>
-                      </>
-                    )}
-                    {item.source && <span className="text-white/50">{item.source}</span>}
-                    {item.source && item.pubDate && <span> · </span>}
-                    {item.pubDate && relativeTime(item.pubDate)}
-                  </p>
-                  {hideHeadlines && item.isSpoiler && !revealed && (
-                    <p className="text-[11px] text-white/25 mt-1">Tap reveal to view the original headline</p>
+                <>
+                  {separatorIndex !== null && i === separatorIndex && (
+                    <li key={`separator-${i}`} className="py-3 -mx-2 px-2 flex items-center gap-3 select-none">
+                      <div className="flex-1 border-t border-dashed border-white/15" />
+                      <span className="text-[10px] font-medium text-white/30 whitespace-nowrap shrink-0">
+                        Since your last visit ({relativeVisitTime(lastVisitAt!)})
+                      </span>
+                      <div className="flex-1 border-t border-dashed border-white/15" />
+                    </li>
                   )}
-                </li>
+                  <li key={i} className="group py-3 -mx-2 px-2 rounded-lg hover:bg-white/5 transition-colors first:pt-0">
+                    <a
+                      href={item.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`text-sm font-medium transition-colors line-clamp-2 ${
+                        hideHeadlines && item.isSpoiler && !revealed
+                          ? "text-white/60 group-hover:text-white/75"
+                          : "group-hover:text-white"
+                      }`}
+                    >
+                      {hideHeadlines && item.isSpoiler && !revealed ? item.safeTitle : item.title}
+                    </a>
+                    <p className="text-xs text-white/40 mt-1">
+                      {categoryLabel(item.category) && (
+                        <>
+                          <span className="text-emerald-400/80">{categoryLabel(item.category)}</span>
+                          <span> · </span>
+                        </>
+                      )}
+                      {item.source && <span className="text-white/50">{item.source}</span>}
+                      {item.source && item.pubDate && <span> · </span>}
+                      {item.pubDate && relativeTime(item.pubDate)}
+                    </p>
+                    {hideHeadlines && item.isSpoiler && !revealed && (
+                      <p className="text-[11px] text-white/25 mt-1">Tap reveal to view the original headline</p>
+                    )}
+                  </li>
+                </>
               ))}
             </ul>
             {hasMore && (
