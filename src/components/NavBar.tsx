@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Users, BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff, BookOpen } from "lucide-react";
 import { useSpoilerContext } from "./SpoilerModeProvider";
+import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
+import FavoriteTeamsModal from "./FavoriteTeamsModal";
 
 const links = [
   { href: "/", label: "Home", icon: Home },
@@ -20,6 +22,8 @@ export default function NavBar() {
   const pathname = usePathname();
   const { spoilerFree, hideScores, hideHeadlines, toggleSpoiler, setHideScores, setHideHeadlines } = useSpoilerContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [myTeamsOpen, setMyTeamsOpen] = useState(false);
+  const { favoriteTeamIds } = useFavoriteTeams();
 
   return (
     <>
@@ -58,6 +62,23 @@ export default function NavBar() {
           >
             {spoilerFree ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             <span className="hidden sm:inline">{spoilerFree ? "Spoiler-free" : "Scores visible"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMyTeamsOpen(true)}
+            className={`shrink-0 flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+              favoriteTeamIds.length > 0
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                : "border-white/10 text-white/50 hover:bg-white/5 hover:text-white/80"
+            }`}
+            title="My Teams"
+          >
+            ⚙️ <span className="hidden sm:inline">My Teams</span>
+            {favoriteTeamIds.length > 0 && (
+              <span className="ml-0.5 text-xs bg-emerald-500/20 text-emerald-400 rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                {favoriteTeamIds.length}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -113,6 +134,7 @@ export default function NavBar() {
         </div>
       </div>
     )}
+    {myTeamsOpen && <FavoriteTeamsModal onClose={() => setMyTeamsOpen(false)} />}
     </>
   );
 }

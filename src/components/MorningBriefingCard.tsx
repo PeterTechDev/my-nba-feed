@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
-import { NewsItem, getNews, getOpponent, getTeamScore, getOpponentScore } from "@/lib/api";
+import { NewsItem, getNews, getOpponent, getTeamScore, getOpponentScore, fetchGameData, GameInfo } from "@/lib/api";
+import { useFavoriteTeams, useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
+import { teams } from "@/lib/teams";
 
 function isSameLocalDay(dateStr: string): boolean {
   const date = new Date(dateStr);
@@ -45,8 +47,14 @@ export default function MorningBriefingCard() {
   const { selectedTeam } = useTeam();
   const { lastGame, currentGame, nextGame, loading } = useGameData();
   const { hideScores, hideHeadlines } = useSpoilerContext();
+  const { favoriteTeamIds } = useFavoriteTeams();
+  const favoriteTeamObjects = useFavoriteTeamObjects();
   const [topStory, setTopStory] = useState<NewsItem | null>(null);
   const [newsLoading, setNewsLoading] = useState(true);
+
+  // For favorite teams: track which favorite played last night
+  const [favLastNightGame, setFavLastNightGame] = useState<{ game: GameInfo; teamId: number } | null>(null);
+  const [favGamesLoading, setFavGamesLoading] = useState(false);
 
   useEffect(() => {
     setNewsLoading(true);
@@ -55,6 +63,29 @@ export default function MorningBriefingCard() {
       setNewsLoading(false);
     });
   }, [selectedTeam.name]);
+
+  // Fetch last-night game for all favorites to find the best one to surface
+  useEffect(() => {
+    if (favoriteTeamIds.length === 0) {
+      setFavLastNightGame(null);
+      return;
+    }
+    setFavGamesLoading(true);
+    Promise.all(
+      favoriteTeamIds.map((id) =>
+        fetchGameData(id).then((data) => ({ teamId: id, lastGame: data.lastGame }))
+      )
+    ).then((results) => {
+      // Find first favorite that played last night
+      const hit = results.find(
+        (r) => r.lastGame && isYesterday(r.lastGame.date)
+      );
+      setFavLastNightGame(
+        hit && hit.lastGame ? { game: hit.lastGame, teamId: hit.teamId } : null
+      );
+      setFavGamesLoading(false);
+    });
+  }, [favoriteTeamIds.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -72,8 +103,22 @@ export default function MorningBriefingCard() {
   const todayGame =
     currentGame ??
     (nextGame && isSameLocalDay(nextGame.date) ? nextGame : null);
-  const lastNightGame =
-    lastGame && isYesterday(lastGame.date) ? lastGame : null;
+
+  // If a favorite team played last night, prioritize that over the default selectedTeam game
+  const lastNightGame: GameInfo | null = (() => {
+    if (favoriteTeamIds.length > 0 && !favGamesLoading) {
+      if (favLastNightGame) return favLastNightGame.game;
+      return null; // favorites selected but none played last night
+    }
+    return lastGame && isYesterday(lastGame.date) ? lastGame : null;
+  })();
+
+  // Which team do we treat as "ours" for the last-night display?
+  const lastNightTeamId: number = (() => {
+    if (favLastNightGame) return favLastNightGame.teamId;
+    return selectedTeam.id;
+  })();
+  const lastNightTeam = teams.find((t) => t.id === lastNightTeamId) ?? selectedTeam;
 
   const hasContent = todayGame || lastNightGame || topStory;
   if (!hasContent && !newsLoading) return null;
@@ -148,34 +193,59 @@ export default function MorningBriefingCard() {
             {lastNightGame ? (
               <div className="flex items-center gap-3">
                 <div className="flex-1">
+                  {/* Show which favorite team if different from selectedTeam */}
+                  {favLastNightGame && lastNightTeam.id !== selectedTeam.id && (
+                    <div className="flex items-center gap-1.5 mb-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={lastNightTeam.logo} alt={lastNightTeam.name} className="w-4 h-4 object-contain" />
+                      <span className="text-[10px] text-white/40 uppercase tracking-widest">
+                        {lastNightTeam.city} {lastNightTeam.name}
+                      </span>
+                    </div>
+                  )}
                   {hideScores ? (
                     <p className="text-sm text-white/60 italic">
                       Score hidden · {formatDate(lastNightGame.date)} vs{" "}
-                      {getOpponent(lastNightGame).name}
+                      {(() => {
+                        const isHome = lastNightGame.homeTeam.id === lastNightTeam.id;
+                        return isHome ? lastNightGame.awayTeam.name : lastNightGame.homeTeam.name;
+                      })()}
                     </p>
                   ) : (
                     <>
                       <p className="text-sm font-semibold text-white">
-                        {selectedTeam.abbreviation}{" "}
+                        {lastNightTeam.abbreviation}{" "}
                         <span className="text-lg font-extrabold tabular-nums">
-                          {getTeamScore(lastNightGame)}
+                          {lastNightGame.homeTeam.id === lastNightTeam.id
+                            ? lastNightGame.homeScore
+                            : lastNightGame.awayScore}
                         </span>
                         <span className="text-white/40 mx-1.5">–</span>
                         <span className="text-lg font-extrabold tabular-nums">
-                          {getOpponentScore(lastNightGame)}
+                          {lastNightGame.homeTeam.id === lastNightTeam.id
+                            ? lastNightGame.awayScore
+                            : lastNightGame.homeScore}
                         </span>{" "}
-                        {getOpponent(lastNightGame).abbreviation}
+                        {lastNightGame.homeTeam.id === lastNightTeam.id
+                          ? lastNightGame.awayTeam.abbreviation
+                          : lastNightGame.homeTeam.abbreviation}
                       </p>
                       <p className="text-xs text-white/50 mt-0.5">
                         {lastNightGame.won !== undefined && (
                           <span
                             className={
-                              lastNightGame.won
+                              (lastNightGame.homeTeam.id === lastNightTeam.id
+                                ? lastNightGame.homeScore > lastNightGame.awayScore
+                                : lastNightGame.awayScore > lastNightGame.homeScore)
                                 ? "text-emerald-400 font-semibold"
                                 : "text-red-400 font-semibold"
                             }
                           >
-                            {lastNightGame.won ? "Win" : "Loss"}
+                            {(lastNightGame.homeTeam.id === lastNightTeam.id
+                              ? lastNightGame.homeScore > lastNightGame.awayScore
+                              : lastNightGame.awayScore > lastNightGame.homeScore)
+                              ? "Win"
+                              : "Loss"}
                             {" · "}
                           </span>
                         )}
