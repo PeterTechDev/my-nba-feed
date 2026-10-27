@@ -2,7 +2,7 @@
 import { formatGameDate, gameDaysAgo } from "@/lib/nbaDate";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import { useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
-import type { Team } from "@/lib/teams";
+import { getContrastColor, type Team } from "@/lib/teams";
 import { getOpponent, getOpponentScore, getTeamScore, type GamesResponse, type NewsFeeds } from "@/lib/api";
 import DataError from "./DataError";
 import NewsList, { NewsLinkWarning, type NewsState } from "./NewsList";
@@ -12,12 +12,11 @@ function TeamNewsSection({ team, ...newsState }: NewsState & { team: Team }) {
   const { data: gameData, error: gameError, retry: retryGame } = useRemoteData<GamesResponse>(`/api/games?teamId=${team.id}`, 30000);
   const lastGame = gameData?.lastGame;
   const lastNight = lastGame && gameDaysAgo(lastGame.date) === 1 ? lastGame : null;
-  return <section aria-label={`${team.city} ${team.name} news`} className="self-start rounded-xl overflow-hidden border"
-    style={{ borderColor: `${team.primaryColor}30`, backgroundColor: `${team.primaryColor}08` }}>
-    <div className="px-4 py-3 flex items-center gap-3 border-b" style={{ borderColor: `${team.primaryColor}20` }}>
+  return <section aria-label={`${team.city} ${team.name} news`} className="self-start rounded-xl overflow-hidden border border-white/10 bg-[#111111]">
+    <div className="px-4 py-4 flex items-center gap-3" style={{ background: team.primaryColor, color: getContrastColor(team.primaryColor) }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={team.logo} alt="" className="w-8 h-8 object-contain" />
-      <div><h3 className="text-base font-bold">{team.city} {team.name}</h3><p className="text-sm text-white/70">Newest first{lastNight ? " · Played last night" : ""}</p></div>
+      <img src={team.logo} alt="" width={40} height={40} className="w-10 h-10 object-contain shrink-0" />
+      <h3 className="text-lg font-semibold">{team.city} {team.name}</h3>
     </div>
     <div className="p-4 space-y-3">
       <NewsList {...newsState} subject={`${team.name} stories`} showWarning={false} />
@@ -45,7 +44,7 @@ export default function PersonalizedFeed({ feeds, loading, error, retry }: { fee
   const favoriteTeams = useFavoriteTeamObjects();
   if (!favoriteTeams.length) return null;
   return <section aria-labelledby="my-teams-heading">
-    <div className="flex items-center gap-2 mb-3 sm:mb-4"><h2 id="my-teams-heading" className="text-base font-semibold">My Teams</h2><span className="text-sm text-white/70">({favoriteTeams.length})</span></div>
+    <div className="flex items-center gap-3 mb-3 sm:mb-4"><h2 id="my-teams-heading" className="text-xl font-bold tracking-tight">Your teams, latest news</h2><span className="text-sm text-white/70">{favoriteTeams.length}</span></div>
     <NewsLinkWarning />
     <div className="grid grid-cols-1 md:grid-cols-2 items-start gap-4">{favoriteTeams.map((team) => <TeamNewsSection key={team.id} team={team}
       news={feeds[team.name]?.items ?? []} loading={loading} error={error || Boolean(feeds[team.name]?.error)} retry={retry} />)}</div>

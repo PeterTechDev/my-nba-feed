@@ -27,27 +27,26 @@ function FeedContent() {
   return (
     <>
       <TeamHeader />
-      {hasPersonalized && <PersonalizedFeed feeds={feeds} loading={loading} error={error} retry={retry} />}
-      <GameDayHero />
-      {!followedFocus && <MorningBriefingCard {...focus} news={focus.news.slice(0, 1)} />}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8">
-        <div className="space-y-5 sm:space-y-8">
-          <NextGameCard />
-          <LastGameCard />
-        </div>
-        <div className="space-y-5 sm:space-y-8">
-          {!hasPersonalized && <NewsFeed {...focus} news={focus.news.slice(1)} />}
-          <TopPlaysCard />
-        </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[1.1fr_1.1fr_0.9fr]">
+        <LastGameCard />
+        <GameDayHero />
+        <NextGameCard />
+        <TopPlaysCard />
       </div>
-      {hasPersonalized && <LeagueNewsSection {...newsState("NBA")} />}
+      {hasPersonalized && <PersonalizedFeed feeds={feeds} loading={loading} error={error} retry={retry} />}
+      {!followedFocus && <MorningBriefingCard {...focus} news={focus.news.slice(0, 1)} />}
+      {!hasPersonalized && <NewsFeed {...focus} news={focus.news.slice(1)} />}
+      {hasPersonalized && <details className="border-t border-white/10 pt-2">
+        <summary className="min-h-11 cursor-pointer py-3 font-medium text-white/70 hover:text-white">Around the League</summary>
+        <LeagueNewsSection {...newsState("NBA")} />
+      </details>}
     </>
   );
 }
 
 export default function Home() {
   return (
-    <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto space-y-5 sm:space-y-8">
+    <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto space-y-6 sm:space-y-8">
       <GameDataProvider>
         <FeedContent />
       </GameDataProvider>

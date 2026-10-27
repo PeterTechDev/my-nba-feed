@@ -1,47 +1,32 @@
 "use client";
 import Link from "next/link";
+import { ArrowRight, ArrowUpRight, Play } from "lucide-react";
 import { useSpoilerContext } from "./SpoilerModeProvider";
-
-function getChannelSearchUrl(query: string): string {
-  return `https://www.youtube.com/@NBA/search?query=${encodeURIComponent(query)}`;
-}
-
-const NBA_CHANNEL_VIDEOS_URL = "https://www.youtube.com/@NBA/videos";
+import { useTeam } from "@/hooks/useTeam";
+import { getContrastColor } from "@/lib/teams";
 
 export default function TopPlaysCard() {
+  const { selectedTeam } = useTeam();
   const { hideScores, hideHeadlines } = useSpoilerContext();
   return (
-    <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest">Top Plays</h2>
-          <Link href="/highlights" className="inline-flex min-h-11 items-center text-sm text-white/70 transition hover:text-white/75 shrink-0">
-            Highlights →
-          </Link>
+    <section className="flex min-w-0 flex-col rounded-xl p-5 sm:p-6 md:col-span-2 lg:col-span-1"
+      style={{ background: selectedTeam.secondaryColor, color: getContrastColor(selectedTeam.secondaryColor) }}>
+      <Link href="/highlights" className="group flex flex-1 flex-col items-start">
+        <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full border border-current">
+          <Play aria-hidden="true" className="h-5 w-5 fill-current transition-transform duration-200 group-hover:scale-110" />
         </div>
-        <p className="text-sm text-white/70 mt-2 [text-wrap:pretty]">Explore top plays on the NBA YouTube channel.</p>
-        <div className="mt-4 grid gap-3 xl:grid-cols-2">
-          <a
-            href={getChannelSearchUrl("Top 10 Plays of the Night")}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-3 transition hover:bg-white/[0.06]"
-          >
-            <p className="text-base font-bold">Find Top 10 plays ↗</p>
-            <p className="text-xs text-white/70 mt-1">Search the NBA channel on YouTube</p>
-          </a>
-          <a
-            href={NBA_CHANNEL_VIDEOS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-3 transition hover:bg-white/[0.06]"
-          >
-            <p className="text-base font-bold">Browse NBA uploads ↗</p>
-            <p className="text-xs text-white/70 mt-1">Open the NBA channel on YouTube</p>
-          </a>
-        </div>
-        {(hideScores || hideHeadlines) && <p className="mt-3 text-sm text-white/70 [text-wrap:pretty]">YouTube results may contain spoilers.</p>}
-      </div>
-    </div>
+        <h2 className="text-2xl font-bold tracking-tight">Highlights</h2>
+        <p className="mt-1 text-sm">Recent {selectedTeam.name} games</p>
+        <span className="mt-4 flex min-h-11 w-full items-center justify-between gap-2 text-sm font-semibold">Browse game highlights<ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" /></span>
+      </Link>
+      <details className="mt-2 border-t border-current">
+        <summary className="min-h-11 cursor-pointer py-3 text-xs font-medium">More from the NBA</summary>
+        <a href={`https://www.youtube.com/@NBA/search?query=${encodeURIComponent("Top 10 Plays of the Night")}`} target="_blank" rel="noopener noreferrer"
+          className="flex min-h-11 items-center justify-between gap-2 text-sm underline underline-offset-4">Top 10 plays<ArrowUpRight aria-hidden="true" className="h-4 w-4" /><span className="sr-only">on YouTube (opens in a new tab)</span></a>
+        <a href="https://www.youtube.com/@NBA/videos" target="_blank" rel="noopener noreferrer"
+          className="flex min-h-11 items-center justify-between gap-2 text-sm underline underline-offset-4">NBA uploads<ArrowUpRight aria-hidden="true" className="h-4 w-4" /><span className="sr-only">on YouTube (opens in a new tab)</span></a>
+        {(hideScores || hideHeadlines) && <p className="mt-2 text-xs">YouTube results may contain spoilers.</p>}
+      </details>
+    </section>
   );
 }

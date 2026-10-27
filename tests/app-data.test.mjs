@@ -190,7 +190,7 @@ test("news labels remove only publisher suffixes and report honest publication a
   }
 });
 
-test("homepage prioritizes followed stories and shows the focus-team lead only once", () => {
+test("homepage puts games and highlights before news and shows the focus-team lead only once", () => {
   const focus = teams.getCeltics();
   const other = teams.teams.find((team) => team.name === "Lakers");
   let favorites = [focus.id];
@@ -224,7 +224,8 @@ test("homepage prioritizes followed stories and shows the focus-team lead only o
   const Home = load("app/page.tsx", {}, mocked).exports.default;
   let html = renderToStaticMarkup(createElement(Home));
   assert.equal(html.split("Celtics lead").length - 1, 1);
-  assert.ok(html.indexOf("Celtics lead") < html.indexOf("vs Nets"));
+  assert.ok(html.indexOf("vs Nets") < html.indexOf("Celtics lead"));
+  assert.ok(html.indexOf("Browse game highlights") < html.indexOf("Celtics lead"));
   assert.doesNotMatch(html, /Morning Briefing/);
   favorites = [focus.id, other.id];
   lastVisitAt = "2026-10-27T14:00:00Z";
@@ -236,7 +237,7 @@ test("homepage prioritizes followed stories and shows the focus-team lead only o
   lastVisitAt = null;
   favorites = [other.id];
   html = renderToStaticMarkup(createElement(Home));
-  assert.ok(html.indexOf("Lakers latest") < html.indexOf("vs Nets"));
+  assert.ok(html.indexOf("vs Nets") < html.indexOf("Lakers latest"));
   assert.equal(html.split("Celtics lead").length - 1, 1);
   assert.match(html, /Morning Briefing/);
   favorites = [];
@@ -245,6 +246,28 @@ test("homepage prioritizes followed stories and shows the focus-team lead only o
   assert.match(html, /Celtics second/);
   assert.match(html, /Celtics third/);
   assert.doesNotMatch(html, /Celtics fourth/);
+});
+
+test("last-game scores and outcome stay protected while highlights remain available", () => {
+  let hideScores = true;
+  const focus = teams.getCeltics();
+  const mocked = { ...imports,
+    "next/link": { default: "a" },
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: focus }) },
+    "@/hooks/useGameData": { useGameData: () => ({ loading: false, error: null,
+      lastGame: { id: 77, date: "2026-10-26", isHome: false, homeTeam: { id: 5, name: "Bulls", abbreviation: "CHI" }, awayTeam: focus, homeScore: 99, awayScore: 134 } }) },
+    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores, hideHeadlines: true }) },
+  };
+  mocked["./ScoreReveal"] = load("components/ScoreReveal.tsx", {}, mocked).exports;
+  const LastGame = load("components/GameSection.tsx", {}, mocked).exports.LastGameCard;
+  const render = () => renderToStaticMarkup(createElement(LastGame));
+  assert.match(render(), /Reveal Celtics result/);
+  assert.doesNotMatch(render(), />134<|>99<|>Win|>Loss/);
+  assert.match(render(), /href="https:\/\/www.youtube.com\/results\?search_query=Celtics%20vs%20Bulls/);
+  hideScores = false;
+  assert.match(render(), />134</);
+  assert.match(render(), />99</);
+  assert.match(render(), />Win/);
 });
 
 test("homepage shows a matchup once, including live games that cross midnight", () => {
@@ -270,6 +293,8 @@ test("homepage shows a matchup once, including live games that cross midnight", 
   daysAgo = -1;
   assert.equal(renderToStaticMarkup(Hero()), "");
   assert.match(renderToStaticMarkup(NextGame()), /vs Nets/);
+  state.nextGame = { ...game, startTime: "2026-10-28T03:00:00Z" };
+  assert.ok(renderToStaticMarkup(NextGame()).includes(dates.formatGameDate(state.nextGame.startTime, { weekday: "short", month: "short", day: "numeric" })), "The date and tipoff use the same local calendar day");
   daysAgo = 1;
   state.currentGame = { ...game, status: "4th Qtr" };
   state.nextGame = null;

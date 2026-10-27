@@ -53,7 +53,7 @@ test("league date-only values keep their calendar day across timezones and DST",
   }
 });
 
-test("context action has at least 4.5:1 contrast for all 30 teams", () => {
+test("team surfaces and actions have at least 4.5:1 contrast for all 30 teams", () => {
   assert.equal(teams.length, 30);
   const luminance = (hex) => {
     const channels = hex.match(/[a-f\d]{2}/gi).map((part) => parseInt(part, 16) / 255)
@@ -61,8 +61,10 @@ test("context action has at least 4.5:1 contrast for all 30 teams", () => {
     return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
   };
   for (const team of teams) {
-    const values = [luminance(team.secondaryColor), luminance(getContrastColor(team.secondaryColor))].sort((a, b) => a - b);
-    assert.ok((values[1] + 0.05) / (values[0] + 0.05) >= 4.5, team.name);
+    for (const color of [team.primaryColor, team.secondaryColor]) {
+      const values = [luminance(color), luminance(getContrastColor(color))].sort((a, b) => a - b);
+      assert.ok((values[1] + 0.05) / (values[0] + 0.05) >= 4.5, team.name);
+    }
   }
   assert.equal(getContrastColor("#000000"), "#ffffff");
 });
