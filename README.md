@@ -119,12 +119,12 @@ Digests and aggregated reactions persist in private Blob documents; conditional
 writes prevent concurrent updates from silently overwriting each other.
 
 The [Daily NBA Digest cloud workflow](https://github.com/PeterTechDev/my-nba-feed/actions/workflows/digest.yml)
-runs on GitHub Actions at 08:00 America/Bahia, using OpenAI and the authenticated
-publisher. It needs no local computer or Codex session. Configure `OPENAI_API_KEY`
-and `DIGEST_PUBLISH_TOKEN` as repository Actions secrets. Existing daily editions
+runs on GitHub Actions at 08:00 America/Bahia, using a free Qwen model on the cloud
+runner's CPU and the authenticated publisher. It needs no paid inference API,
+local computer or Codex session. Configure `DIGEST_PUBLISH_TOKEN` as a repository Actions secret. Existing daily editions
 are preserved unless a manual recovery run explicitly replaces today's edition.
-See [the publisher runbook](docs/digest-publisher.md) for verification, API billing,
-key expiry and GitHub's 60-day inactivity limitation for public repositories.
+See [the publisher runbook](docs/digest-publisher.md) for verification, the free public
+runner requirement and GitHub's 60-day inactivity limitation for public repositories.
 Empty content is shown only after a successful read; storage failures have a retry action.
 
 ### Data fallbacks

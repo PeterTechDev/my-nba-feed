@@ -15,7 +15,7 @@ const boston = { error: null, record: { wins: 2, losses: 1 }, nextGame: null,
   lastGame: { date: "2026-10-26", homeTeam: { abbreviation: "BOS" }, awayTeam: { abbreviation: "CHI" }, homeScore: 134, awayScore: 99 } };
 const output = { title: "Boston leads the briefing", content: "## Celtics first\n\nBoston beat Chicago 134–99." };
 
-function fixture({ scoreboard = board, celtics = boston, generated = output, status = "completed", existing = null, apiError = false } = {}) {
+function fixture({ scoreboard = board, celtics = boston, generated = output, status = "stop", existing = null, apiError = false } = {}) {
   let saved = existing;
   const calls = [];
   return {
@@ -29,17 +29,15 @@ function fixture({ scoreboard = board, celtics = boston, generated = output, sta
       }
       if (url.includes("espn.com")) return Response.json(scoreboard);
       if (url.includes("/api/games")) return Response.json(celtics);
-      if (url === "https://api.openai.com/v1/responses") {
-        if (apiError) return Response.json({ error: { code: apiError === true ? "insufficient_quota" : apiError } }, { status: 429 });
-        return Response.json({ status, model: "gpt-5-mini-test", output: [{ type: "message", content: [
-          { type: "output_text", text: JSON.stringify(generated) },
-        ] }] });
+      if (url === "http://127.0.0.1:8080/v1/chat/completions") {
+        if (apiError) return Response.json({ error: { code: "invalid_model" } }, { status: 400 });
+        return Response.json({ choices: [{ finish_reason: status, message: { content: JSON.stringify(generated) } }] });
       }
       throw new Error("Unexpected network destination");
     },
   };
 }
-const run = (f, extra = {}) => runDailyDigest({ now, apiKey: "model-secret", publishToken: "publisher-secret", fetcher: f.fetcher, ...extra });
+const run = (f, extra = {}) => runDailyDigest({ now, publishToken: "publisher-secret", fetcher: f.fetcher, ...extra });
 
 test("daily dates use the NBA calendar across midnight, month boundaries and daylight saving", () => {
   assert.deepEqual(digestDates(now), { date: "2026-10-27", previousDate: "2026-10-26" });
@@ -60,7 +58,7 @@ test("scoreboard validation rejects missing, duplicated, unfinished and wrong-da
   assert.equal(postponed.unplayed[0].status, "STATUS_POSTPONED");
 });
 
-test("full generator authenticates each service separately, publishes sourced facts, and verifies the saved edition", async () => {
+test("full generator uses only runner AI, authenticates the publisher, and verifies the saved edition", async () => {
   const f = fixture();
   const result = await run(f);
   assert.equal(result.status, "published");
@@ -68,20 +66,19 @@ test("full generator authenticates each service separately, publishes sourced fa
   assert.deepEqual(f.saved.games_covered, ["CHI 99–134 BOS"]);
   assert.match(f.saved.content, /League date: 2026-10-26/);
   assert.match(f.saved.content, /scoreboard\?dates=20261026/);
-  assert.equal(f.saved.metadata.model, "gpt-5-mini-test");
+  assert.equal(f.saved.metadata.model, "Qwen2.5-1.5B-Instruct (CPU, Q4_K_M)");
   assert.ok(f.saved.metadata.generation_time_ms >= 0);
   for (const { url, options } of f.calls) {
-    assert.equal(options.headers?.Authorization, url.includes("api.openai.com") ? "Bearer model-secret" :
-      options.method === "POST" ? "Bearer publisher-secret" : undefined);
+    assert.equal(options.headers?.Authorization, url.includes("/api/digest") && options.method === "POST" ? "Bearer publisher-secret" : undefined);
+    assert.ok(!url.includes("api.openai.com"));
   }
-  const request = JSON.parse(f.calls.find(({ url }) => url.includes("api.openai.com")).options.body);
-  assert.equal(request.store, false);
-  assert.equal(request.text.format.strict, true);
-  assert.equal(request.model, "gpt-5-mini");
-  assert.equal(request.max_output_tokens, 5000);
+  const request = JSON.parse(f.calls.find(({ url }) => url.startsWith("http://127.0.0.1")).options.body);
+  assert.equal(request.response_format.schema.additionalProperties, false);
+  assert.equal(request.model, "qwen2.5-1.5b-instruct");
+  assert.equal(request.max_tokens, 1200);
 });
 
-test("repeat runs skip generation costs; replacement requires an explicit manual option", async () => {
+test("repeat runs skip generation; replacement requires an explicit manual option", async () => {
   const f = fixture({ existing: { date: "2026-10-27", title: "Old edition" } });
   assert.equal((await run(f)).status, "already-published");
   assert.equal(f.calls.length, 1);
@@ -89,7 +86,7 @@ test("repeat runs skip generation costs; replacement requires an explicit manual
   assert.equal(f.saved.title, output.title);
 });
 
-test("source disagreement, invalid generation, incomplete responses and billing errors never publish", async () => {
+test("source disagreement, invalid generation, incomplete responses and model errors never publish", async () => {
   for (const config of [{ celtics: { error: "Unavailable" } },
     { celtics: { ...boston, lastGame: { ...boston.lastGame, homeScore: 100 } } },
     { generated: { title: "No content" } }, { generated: { ...output, title: "" } },
@@ -108,11 +105,9 @@ test("a verified empty game day produces an honest edition with no fabricated ma
   assert.deepEqual(f.saved.stats_highlighted, ["0 completed games"]);
 });
 
-test("exhausted credits stop after one model request and preserve the existing edition", async () => {
-  for (const code of ["insufficient_quota", "credit_balance_exhausted"]) {
-    const f = fixture({ apiError: code });
-    await assert.rejects(run(f), new RegExp(code));
-    assert.equal(f.calls.filter(({ url }) => url.includes("api.openai.com")).length, 1);
-    assert.equal(f.saved, null);
-  }
+test("non-transient model errors preserve existing content without repeated generation", async () => {
+  const f = fixture({ apiError: true });
+  await assert.rejects(run(f), /invalid_model/);
+  assert.equal(f.calls.filter(({ url }) => url.startsWith("http://127.0.0.1")).length, 1);
+  assert.equal(f.saved, null);
 });

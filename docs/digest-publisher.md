@@ -8,12 +8,25 @@ minute delivery guarantee.
 
 ## Credentials
 
-Repository Actions secrets `OPENAI_API_KEY` and `DIGEST_PUBLISH_TOKEN` are exposed
-only to the generation step on `main`. The publisher token must match Vercel's
-production `DIGEST_PUBLISH_TOKEN`. The OpenAI key is for the owner's selected
-Platform project; API usage is billed to that project. This key was created with
-a one-year expiration on October 27, 2026: replace it before October 27, 2027.
-Never commit env files, print either key or upload credential files as artifacts.
+Only `DIGEST_PUBLISH_TOKEN` is needed as a repository Actions secret, exposed to the
+publication step on `main`. It must match Vercel's production publisher token.
+No OpenAI key or paid inference API is used; the unused OpenAI Actions secret was
+removed. Never commit env files, print the token or upload credential files.
+
+## Free inference
+
+Qwen2.5-1.5B-Instruct (Apache-2.0), quantized Q4_K_M, runs on the standard GitHub
+Ubuntu 24.04 runner's CPU through llama.cpp. Inference listens only on
+`127.0.0.1:8080`; no prompt or credential is sent to a model provider.
+The workflow pins the runtime release and model revision, checks both SHA-256
+hashes, and discards the temporary model/server after the job. No model weights
+are committed or uploaded as artifacts. The roughly 1.1 GB model download happens
+inside the cloud runner, not on the owner's computer.
+
+[Standard Actions runners are free for public repositories](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+This depends on the repository remaining public and using a standard runner.
+The small CPU model has less writing capacity than a large paid model; validation
+rejects malformed/incomplete outputs, while scores and source references come from code.
 
 ## Each run
 
@@ -23,9 +36,9 @@ Never commit env files, print either key or upload credential files as artifacts
 3. It reads yesterday's ESPN NBA scoreboard and production Celtics context. It
    rejects malformed feeds, unfinished games, duplicate events, unexpected dates
    and conflicting Celtics scores. Postponed/canceled games have no final score.
-4. It asks OpenAI `gpt-5-mini` for a short analytical briefing using only the supplied
-   facts, with strict JSON output, no tools and a 5,000-token output limit.
-   A refusal, incomplete response, billing error or invalid payload stops publication.
+4. It asks the runner's Qwen model for a short analytical briefing using only the
+   supplied facts, with schema-constrained JSON, no tools and a 1,200-token limit.
+   An incomplete response or invalid payload stops publication.
 5. Dates, matchup chips, margin statistics, source URLs and model metadata are
    derived by code. The model writes the title and briefing only. Source retrieval
    time is included in the published Sources section.
@@ -48,12 +61,11 @@ To deliberately regenerate today's edition, select `replace_today=true` on a man
 run. Only `workflow_dispatch` can enable this override; daily schedules preserve
 existing editions. Replacing an edition preserves its date and aggregated reactions.
 For a failed run, inspect Actions logs; no failure should be presented as an empty
-successful edition. A 401 indicates a publisher-token mismatch. OpenAI
-`insufficient_quota` or `credit_balance_exhausted` requires the owner to restore API
-billing/credits; these errors stop immediately without repeated model requests.
+successful edition. A 401 indicates a publisher-token mismatch. A failed model
+download, checksum mismatch or inference failure stops the job without publishing.
 
-For local debugging with Node 22.18+, supply the two variables through ignored env
-files or the process environment, then use `npm run digest:generate`. A local run
+For local debugging with Node 22.18+, start the same model server and supply the
+publisher token through an ignored env file, then use `npm run digest:generate`. A local run
 cannot enable the manual cloud replacement override. Generated local JSON remains
 under ignored `data/`; the hosted runner's temporary files are discarded after the job.
 

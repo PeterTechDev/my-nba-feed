@@ -21,7 +21,7 @@ concurrency:
 jobs:
   publish:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -32,9 +32,38 @@ jobs:
           node-version: '22.21.1'
       - name: Check generator and publisher
         run: node --experimental-strip-types --test tests/digest-generator.test.mjs tests/digest-publisher.test.mjs
+      - name: Start the free CPU model inside this cloud runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          task_model_dir="$RUNNER_TEMP/digest-model"
+          mkdir -p "$task_model_dir"
+          curl --fail --location --retry 3 --output "$task_model_dir/llama.tar.gz" \
+            https://github.com/ggml-org/llama.cpp/releases/download/b11928/llama-b11928-bin-ubuntu-x64.tar.gz
+          echo "c4fdc4b9913c3fc7b0ede9ed1970a43271aff7366889444797e05472f7c365da  $task_model_dir/llama.tar.gz" | sha256sum --check
+          tar -xzf "$task_model_dir/llama.tar.gz" -C "$task_model_dir"
+          curl --fail --location --retry 3 --output "$task_model_dir/model.gguf" \
+            https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf
+          echo "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e  $task_model_dir/model.gguf" | sha256sum --check
+          "$task_model_dir/llama-b11928/llama-server" --model "$task_model_dir/model.gguf" \
+            --host 127.0.0.1 --port 8080 --threads 4 --ctx-size 4096 --parallel 1 \
+            --alias qwen2.5-1.5b-instruct > "$RUNNER_TEMP/digest-model.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/digest-model.pid"
+          for attempt in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:8080/health; then exit 0; fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/digest-model.pid")" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          tail -60 "$RUNNER_TEMP/digest-model.log"
+          exit 1
       - name: Generate, publish and verify the daily edition
         run: npm run digest:generate
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DIGEST_PUBLISH_TOKEN: ${{ secrets.DIGEST_PUBLISH_TOKEN }}
           DIGEST_REPLACE_TODAY: ${{ github.event_name == 'workflow_dispatch' && inputs.replace_today && 'true' || 'false' }}
+      - name: Stop the temporary model server
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/digest-model.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/digest-model.pid")" 2>/dev/null || true
+          fi
