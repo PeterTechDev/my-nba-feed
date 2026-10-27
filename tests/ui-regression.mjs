@@ -129,7 +129,7 @@ export default async function runUiRegression(page) {
       check(favoriteRect.x >= 0 && favoriteRect.x + favoriteRect.width <= width && favoriteRect.width >= 44 && favoriteRect.height >= 44, `${width}px: My Teams has a visible 44px target`);
       if (width < 1280) {
         await p.getByRole("button", { name: "Open navigation" }).click();
-        check(await nav.getByRole("link").count() === 9, `${width}px: all destinations available in menu`);
+        check(await nav.getByRole("link").count() === 10, `${width}px: all destinations available in menu`);
         await nav.getByRole("link", { name: "Schedule", exact: true }).click();
         await p.waitForURL("**/schedule");
         check(await p.getByRole("button", { name: "Open navigation" }).count() === 1, `${width}px: navigation closes after route change`);

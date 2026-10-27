@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart } from "lucide-react";
+import { Home, Users, BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
 import Modal from "./Modal";
 import FavoriteTeamsModal from "./FavoriteTeamsModal";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
@@ -17,6 +17,7 @@ const links = [
   { href: "/compare", label: "Compare", icon: ArrowLeftRight },
   { href: "/social", label: "Social", icon: MessageCircle },
   { href: "/digest", label: "Digest", icon: BookOpen },
+  { href: "/about", label: "About", icon: Info },
 ];
 
 export default function NavBar() {

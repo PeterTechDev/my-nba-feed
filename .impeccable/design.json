@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-27T20:46:06.026Z",
+  "title": "Design System: NBA Feed",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "canvas",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(50% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "panel",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(50% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "dialog": {
+        "role": "neutral",
+        "displayName": "dialog",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(50% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "field": {
+        "role": "neutral",
+        "displayName": "field",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(50% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "panel-border": {
+        "role": "neutral",
+        "displayName": "panel border",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(50% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "text",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(50% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "text muted",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(50% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "divider": {
+        "role": "neutral",
+        "displayName": "divider",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(50% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "control-hover": {
+        "role": "neutral",
+        "displayName": "control hover",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(50% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "amber-link": {
+        "role": "primary",
+        "displayName": "amber link",
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#b45309",
+          "#d97706",
+          "#fbbf24",
+          "#fde68a",
+          "#fffbeb"
+        ]
+      },
+      "amber-focus": {
+        "role": "primary",
+        "displayName": "amber focus",
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#b45309",
+          "#d97706",
+          "#fbbf24",
+          "#fde68a",
+          "#fffbeb"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Page headline",
+        "purpose": "Compact dashboard and roster headings; not the About display treatment."
+      },
+      "title": {
+        "displayName": "Panel title",
+        "purpose": "Dashboard card headings."
+      },
+      "body": {
+        "displayName": "Compact body",
+        "purpose": "Supporting copy and navigation."
+      },
+      "label": {
+        "displayName": "Compact label",
+        "purpose": "Small labels and category badges."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "--motion-quick",
+        "value": "140ms",
+        "purpose": "Control color, border, opacity and transform transitions."
+      },
+      {
+        "name": "--motion-enter",
+        "value": "240ms",
+        "purpose": "Dialog and disclosure entrance."
+      },
+      {
+        "name": "--motion-ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Shared transform and entrance easing; reduced motion disables animation."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Subdued button",
+      "kind": "button",
+      "refersTo": "button-subdued",
+      "description": "Focus-team selector and retry action.",
+      "html": "<button class=\"ds-subdued\" type=\"button\">Change focus team</button>",
+      "css": ".ds-subdued{min-height:44px;padding:8px 16px;border:0;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;font:500 14px/20px var(--font-inter,Inter),sans-serif;transition:background-color var(--motion-quick,140ms)}.ds-subdued:hover{background:rgba(255,255,255,.2)}.ds-subdued:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}@media(prefers-reduced-motion:no-preference){.ds-subdued:active{transform:scale(.98)}}"
+    },
+    {
+      "name": "Reveal button",
+      "kind": "button",
+      "description": "Explicit per-item score reveal control.",
+      "html": "<button class=\"ds-reveal\" type=\"button\" aria-pressed=\"false\">Reveal score</button>",
+      "css": ".ds-reveal{min-height:44px;padding:0 12px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:transparent;color:rgba(255,255,255,.8);font:400 14px/20px var(--font-inter,Inter),sans-serif;transition:background-color var(--motion-quick,140ms)}.ds-reveal:hover{background:rgba(255,255,255,.1)}.ds-reveal:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}@media(prefers-reduced-motion:no-preference){.ds-reveal:active{transform:scale(.98)}}"
+    },
+    {
+      "name": "Dashboard card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat panel from MorningBriefingCard.",
+      "html": "<section class=\"ds-card\"><h2>Morning Briefing</h2><p>Latest story · Your focus team</p></section>",
+      "css": ".ds-card{padding:16px;border:1px solid #2a2a2a;border-radius:12px;background:#161616;color:#fff;font-family:var(--font-inter,Inter),sans-serif}.ds-card h2{margin:0 0 12px;font-size:16px;line-height:24px;font-weight:600}.ds-card p{margin:0;color:rgba(255,255,255,.7);font-size:14px;line-height:20px}@media(min-width:640px){.ds-card{padding:20px}}"
+    },
+    {
+      "name": "Team select",
+      "kind": "input",
+      "refersTo": "select",
+      "description": "Native selector from the comparison view.",
+      "html": "<label class=\"ds-select-label\" for=\"ds-team\">Team<select class=\"ds-select\" id=\"ds-team\"><option>Boston Celtics</option><option>Chicago Bulls</option></select></label>",
+      "css": ".ds-select-label{display:block;color:rgba(255,255,255,.7);font:400 12px/16px var(--font-inter,Inter),sans-serif}.ds-select{display:block;margin-top:4px;min-height:44px;width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:#1a1a1a;color:#fff;font:400 16px/24px var(--font-inter,Inter),sans-serif;cursor:pointer;color-scheme:dark}.ds-select:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}"
+    },
+    {
+      "name": "Navigation links",
+      "kind": "nav",
+      "description": "Shared neutral active and hover treatment.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Example navigation\"><a href=\"#home\" aria-current=\"page\">Home</a><a href=\"#about\">About</a></nav>",
+      "css": ".ds-nav{display:flex;gap:4px;padding:4px;background:#0a0a0a}.ds-nav a{display:flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;color:rgba(255,255,255,.7);text-decoration:none;font:500 14px/20px var(--font-inter,Inter),sans-serif;transition:color var(--motion-quick,140ms),background-color var(--motion-quick,140ms)}.ds-nav a:hover{background:rgba(255,255,255,.05);color:#fff}.ds-nav a[aria-current]{background:rgba(255,255,255,.1);color:#fff}.ds-nav a:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}"
+    },
+    {
+      "name": "Digest category badge",
+      "kind": "chip",
+      "description": "The existing casual category; local category colors are not global accents.",
+      "html": "<span class=\"ds-chip\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M10 2v2M14 2v2M4 7h14v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4ZM18 8h1a3 3 0 1 1 0 6h-1M2 22h20\"/></svg>Casual</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border:1px solid rgba(34,197,94,.3);border-radius:9999px;background:rgba(34,197,94,.15);color:#86efac;font:500 12px/16px var(--font-inter,Inter),sans-serif}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The dark basketball dashboard",
+    "overview": "An implementation-derived description of the incumbent interface, not a new visual identity. Near-black surfaces, Inter, compact statistics and team imagery give fans a consistent low-light environment. Amber identifies protection and selected links; team colors remain contextual and change with the chosen team.",
+    "keyCharacteristics": [
+      "Dark, compact and readable.",
+      "Quiet borders and tonal surfaces.",
+      "Team identity and explicit spoiler controls."
+    ],
+    "rules": [],
+    "dos": [
+      "Do reuse the dark shell, Inter and shared controls when extending the interface.",
+      "Do preserve keyboard focus visibility and reduced-motion behavior.",
+      "Do resolve team colors from the selected team rather than treating a fallback as the brand."
+    ],
+    "donts": [
+      "Don't promote an individual page's composition or type size into a global requirement.",
+      "Don't add shadow-based elevation to represent the sampled flat dashboard surfaces."
+    ]
+  }
+}
