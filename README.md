@@ -118,8 +118,11 @@ or storyteller), `title`, `content` (Markdown), and optional `games_covered`,
 Digests and aggregated reactions persist in private Blob documents; conditional
 writes prevent concurrent updates from silently overwriting each other.
 
-The external daily generator is separate from this app. Empty content is shown
-only after a successful read; storage failures have a retry action.
+The external generator runs as a Codex scheduled follow-up at 08:00 America/Bahia.
+It generates a sourced daily edition and publishes with `npm run digest:publish --
+data/digest-YYYY-MM-DD.json` (Node 22.18+). The computer must be on and Codex running.
+See [the publisher runbook](docs/digest-publisher.md) for the full workflow and recovery.
+Empty content is shown only after a successful read; storage failures have a retry action.
 
 ### Data fallbacks
 
@@ -130,7 +133,7 @@ Missing votes/comments are omitted rather than presented as zero.
 
 ### Regression checks
 
-Run `npm run lint`, `npm run build` and `node --test tests/*.test.mjs`.
+Run `npm run lint`, `npm run build` and `node --experimental-strip-types --test tests/*.test.mjs`.
 The `tests/*regression.mjs` browser suites export functions that accept a
 Playwright page, with the app running on port 3000. Their API fixtures exercise
 errors, spoilers and retries without modifying production.

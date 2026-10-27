@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "digest:publish": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/publish-digest.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.2",
