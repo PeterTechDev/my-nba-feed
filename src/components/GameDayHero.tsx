@@ -1,28 +1,15 @@
 "use client";
 import Link from "next/link";
+import { getContrastColor } from "@/lib/teams";
+import { formatTipoff, gameDaysAgo } from "@/lib/nbaDate";
 import DataError from "./DataError";
 import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 import { getOpponent, getOpponentScore, getTeamScore } from "@/lib/api";
 
-function isSameLocalDay(dateStr: string, compareDate: Date = new Date()): boolean {
-  const date = new Date(dateStr);
-  return (
-    date.getFullYear() === compareDate.getFullYear() &&
-    date.getMonth() === compareDate.getMonth() &&
-    date.getDate() === compareDate.getDate()
-  );
-}
-
-function formatTipoff(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function getCountdown(dateStr: string): string {
+function getCountdown(dateStr?: string | null): string {
+  if (!dateStr) return "Tipoff time TBD";
   const diff = new Date(dateStr).getTime() - Date.now();
   if (diff <= 0) return "Starting soon";
 
@@ -43,14 +30,14 @@ export default function GameDayHero() {
   if (loading) return null;
 
   const heroGame = currentGame ?? nextGame;
-  if (!heroGame || !isSameLocalDay(heroGame.date)) return null;
+  if (!heroGame || gameDaysAgo(heroGame.startTime || heroGame.date) !== 0) return null;
 
   const opponent = getOpponent(heroGame);
   const isLive = Boolean(currentGame);
   const matchupLabel = heroGame.isHome ? `vs ${opponent.name}` : `at ${opponent.name}`;
   const teamScore = getTeamScore(heroGame);
   const opponentScore = getOpponentScore(heroGame);
-  const statusLabel = isLive ? heroGame.status || "Live" : formatTipoff(heroGame.date);
+  const statusLabel = isLive ? heroGame.status || "Live" : formatTipoff(heroGame.startTime, heroGame.status);
   const searchContext = `${selectedTeam.city} ${selectedTeam.name} vs ${opponent.name}`;
 
   return (
@@ -71,7 +58,7 @@ export default function GameDayHero() {
             {isLive ? "Live Now" : "Game Day"}
           </span>
           <div>
-            <p className="text-sm text-white/70">{isLive ? "Live focus" : "Tonight&apos;s focus"}</p>
+            <p className="text-sm text-white/70">{isLive ? "Live focus" : "Tonight's focus"}</p>
             <h2 className="text-2xl font-bold sm:text-3xl">{matchupLabel}</h2>
           </div>
           <div className="flex flex-wrap gap-2 text-sm text-white/60">
@@ -87,7 +74,7 @@ export default function GameDayHero() {
               </span>
             ) : (
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                {getCountdown(heroGame.date)}
+                {getCountdown(heroGame.startTime)}
               </span>
             )}
           </div>
@@ -95,7 +82,7 @@ export default function GameDayHero() {
         <div className="flex flex-wrap gap-3">
           <Link
             href="/schedule"
-            className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="inline-flex min-h-11 items-center rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
           >
             Open schedule
           </Link>
@@ -103,8 +90,8 @@ export default function GameDayHero() {
             href={`https://www.google.com/search?q=${encodeURIComponent(searchContext)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg px-4 py-2 text-sm font-medium text-black transition"
-            style={{ background: selectedTeam.secondaryColor }}
+            className="inline-flex min-h-11 items-center rounded-lg px-4 py-2 text-sm font-medium transition"
+            style={{ background: selectedTeam.secondaryColor, color: getContrastColor(selectedTeam.secondaryColor) }}
           >
             {isLive ? "Live context" : "Matchup context"}
           </a>

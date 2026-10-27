@@ -16,7 +16,7 @@ export default function TopPlaysCard() {
             <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest">Top Plays</h2>
             <p className="text-sm text-white/70 mt-2">Fast links to the official NBA top plays without relying on noisy generic search terms.</p>
           </div>
-          <Link href="/highlights" className="text-sm text-white/70 transition hover:text-white/75 shrink-0">
+          <Link href="/highlights" className="inline-flex min-h-11 items-center text-sm text-white/70 transition hover:text-white/75 shrink-0">
             Highlights →
           </Link>
         </div>

@@ -156,7 +156,7 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
                   href={`https://www.google.com/search?q=${encodeURIComponent(selectedTeam.name + " NBA news")}&tbm=nws`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-white/70 hover:text-white/80 transition-colors"
+                  className="inline-flex min-h-11 items-center text-sm text-white/70 hover:text-white/80 transition-colors"
                 >
                   View all →
                 </a>

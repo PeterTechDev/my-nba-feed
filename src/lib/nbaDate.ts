@@ -35,3 +35,23 @@ export function getNBASeason(date: Date = new Date()): number {
 }
 
 export { NBA_TIME_ZONE };
+
+export function parseGameDate(value: string): Date {
+  // A league calendar date is not midnight UTC in the visitor's timezone.
+  return new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value);
+}
+
+export function gameDaysAgo(value: string, now: Date = new Date()): number {
+  const date = parseGameDate(value);
+  return Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) -
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())) / 86400000);
+}
+
+export function formatGameDate(value: string, options: Intl.DateTimeFormatOptions): string {
+  return parseGameDate(value).toLocaleDateString("en-US", options);
+}
+
+export function formatTipoff(startTime?: string | null, status = ""): string {
+  if (!startTime) return /\b(?:am|pm)\s+(?:ET|EST|EDT)\b/i.test(status) ? status : "Time TBD";
+  return new Date(startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+}

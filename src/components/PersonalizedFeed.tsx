@@ -1,4 +1,5 @@
 "use client";
+import { formatGameDate, gameDaysAgo } from "@/lib/nbaDate";
 import { Fragment } from "react";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "./DataError";
@@ -20,20 +21,9 @@ function relativeTime(dateStr: string): string {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  return formatGameDate(dateStr, {
     weekday: "short", month: "short", day: "numeric",
   });
-}
-
-function isYesterday(dateStr: string): boolean {
-  const date = new Date(dateStr);
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return (
-    date.getFullYear() === yesterday.getFullYear() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getDate() === yesterday.getDate()
-  );
 }
 
 // ---- Per-team news section ----
@@ -46,11 +36,11 @@ function TeamNewsSection({ team }: TeamNewsSectionProps) {
   const { hideHeadlines, hideScores } = useSpoilerContext();
   const { lastVisitAt, ready: visitReady } = useLastVisit();
   const { data, loading, error, retry } = useRemoteData<NewsItem[]>(`/api/news?team=${encodeURIComponent(team.name)}`);
-  const { data: gameData, error: gameError, retry: retryGame } = useRemoteData<GamesResponse>(`/api/games?teamId=${team.id}`);
+  const { data: gameData, error: gameError, retry: retryGame } = useRemoteData<GamesResponse>(`/api/games?teamId=${team.id}`, 30000);
   const news = (data || []).slice(0, 3);
   const lastGame = gameData?.lastGame;
 
-  const lastNightGame = lastGame && isYesterday(lastGame.date) ? lastGame : null;
+  const lastNightGame = lastGame && gameDaysAgo(lastGame.date) === 1 ? lastGame : null;
 
   // Determine new-since-last-visit separator
   const separatorIndex: number | null = (() => {

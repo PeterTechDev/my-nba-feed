@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getNBASeason } from "@/lib/nbaDate";
+import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
+import { getGameStartTime, isFinalStatus, isLiveStatus } from "@/lib/gameStatus";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
@@ -7,24 +8,12 @@ interface BDLGame {
   id: number;
   date: string;
   status: string;
+  datetime?: string | null;
+  postponed?: boolean;
   home_team: { id: number; name: string; abbreviation: string };
   visitor_team: { id: number; name: string; abbreviation: string };
   home_team_score: number;
   visitor_team_score: number;
-}
-
-function isFinalStatus(status: string): boolean {
-  return status.trim().toLowerCase().startsWith("final");
-}
-
-function isCurrentStatus(game: BDLGame, now: Date): boolean {
-  const normalizedStatus = game.status.trim().toLowerCase();
-  if (!normalizedStatus || isFinalStatus(game.status)) return false;
-  if (normalizedStatus === "scheduled" || normalizedStatus === "postponed") {
-    return new Date(game.date) <= now;
-  }
-
-  return true;
 }
 
 export async function GET(req: NextRequest) {
@@ -47,7 +36,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(url, {
       headers: { Authorization: key },
-      next: { revalidate: 300 },
+      next: { revalidate: 30 },
     });
 
     if (!res.ok) {
@@ -61,6 +50,7 @@ export async function GET(req: NextRequest) {
     const json = await res.json();
     const games: BDLGame[] = json.data || [];
     const now = new Date();
+    const today = formatNBADate(now);
     const tid = parseInt(teamId);
 
     // Process into GameInfo format
@@ -71,30 +61,32 @@ export async function GET(req: NextRequest) {
       return {
         id: g.id,
         date: g.date,
+        startTime: getGameStartTime(g),
         status: g.status,
         homeTeam: g.home_team,
         awayTeam: g.visitor_team,
         homeScore: g.home_team_score,
         awayScore: g.visitor_team_score,
         isHome,
-        won: g.status === "Final" ? teamScore > oppScore : undefined,
+        won: isFinalStatus(g.status) ? teamScore > oppScore : undefined,
       };
     };
 
     // Last game (most recent finished)
     const finished = games
-      .filter((g) => isFinalStatus(g.status) && new Date(g.date) <= now)
+      .filter((g) => isFinalStatus(g.status) && g.date.slice(0, 10) <= today)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const lastGame = finished.length > 0 ? toInfo(finished[0]) : null;
 
     const current = games
-      .filter((g) => isCurrentStatus(g, now))
+      .filter((g) => !g.postponed && isLiveStatus(g.status))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const currentGame = current.length > 0 ? toInfo(current[0]) : null;
 
     // Next game (soonest upcoming)
     const upcoming = games
-      .filter((g) => !isFinalStatus(g.status) && new Date(g.date) > now)
+      .filter((g) => !isFinalStatus(g.status) && !isLiveStatus(g.status) && !g.postponed &&
+        !/^(postponed|cancell?ed)\b/i.test(g.status.trim()) && g.date.slice(0, 10) >= today)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const nextGame = upcoming.length > 0 ? toInfo(upcoming[0]) : null;
 

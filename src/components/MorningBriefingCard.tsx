@@ -1,4 +1,5 @@
 "use client";
+import { formatGameDate, formatTipoff, gameDaysAgo } from "@/lib/nbaDate";
 import { fetchRemoteData, useRemoteData } from "@/hooks/useRemoteData";
 import { useEffect, useState } from "react";
 import { useGameData } from "@/hooks/useGameData";
@@ -8,40 +9,8 @@ import { NewsItem, getOpponent, getTeamScore, getOpponentScore, GamesResponse, G
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { teams } from "@/lib/teams";
 
-function isSameLocalDay(dateStr: string): boolean {
-  const date = new Date(dateStr);
-  const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
-}
-
-function isYesterday(dateStr: string): boolean {
-  const date = new Date(dateStr);
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return (
-    date.getFullYear() === yesterday.getFullYear() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getDate() === yesterday.getDate()
-  );
-}
-
-function formatTipoff(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+function formatDate(value: string): string {
+  return formatGameDate(value, { weekday: "short", month: "short", day: "numeric" });
 }
 
 export default function MorningBriefingCard() {
@@ -63,20 +32,18 @@ export default function MorningBriefingCard() {
   useEffect(() => {
     if (favoriteTeamIds.length === 0) return;
     const key = favoriteTeamIds.join(",");
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
     let cancelled = false;
     setFavoriteGames({ key, game: null, teamId: null, loading: true, error: false });
     Promise.allSettled(favoriteTeamIds.map(async (teamId) => ({
-      teamId, data: await fetchRemoteData<GamesResponse>(`/api/games?teamId=${teamId}`, controller.signal),
+      teamId, data: await fetchRemoteData<GamesResponse>(`/api/games?teamId=${teamId}`),
     }))).then((results) => {
       if (cancelled) return;
       const hit = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : [])
-        .find((result) => result.data.lastGame && isYesterday(result.data.lastGame.date));
+        .find((result) => result.data.lastGame && gameDaysAgo(result.data.lastGame.date) === 1);
       setFavoriteGames({ key, game: hit?.data.lastGame || null, teamId: hit?.teamId || null,
         loading: false, error: results.some((result) => result.status === "rejected") });
-    }).finally(() => clearTimeout(timer));
-    return () => { cancelled = true; clearTimeout(timer); controller.abort(); };
+    });
+    return () => { cancelled = true; };
   }, [favoriteTeamIds]);
 
   if (error) return null;
@@ -96,7 +63,7 @@ export default function MorningBriefingCard() {
 
   const todayGame =
     currentGame ??
-    (nextGame && isSameLocalDay(nextGame.date) ? nextGame : null);
+    (nextGame && gameDaysAgo(nextGame.startTime || nextGame.date) === 0 ? nextGame : null);
 
   // If a favorite team played last night, prioritize that over the default selectedTeam game
   const lastNightGame: GameInfo | null = (() => {
@@ -104,7 +71,7 @@ export default function MorningBriefingCard() {
       if (favLastNightGame) return favLastNightGame.game;
       return null; // favorites selected but none played last night
     }
-    return lastGame && isYesterday(lastGame.date) ? lastGame : null;
+    return lastGame && gameDaysAgo(lastGame.date) === 1 ? lastGame : null;
   })();
 
   // Which team do we treat as "ours" for the last-night display?
@@ -154,7 +121,7 @@ export default function MorningBriefingCard() {
                   <p className="text-xs text-white/70 mt-0.5">
                     {currentGame
                       ? currentGame.status || "In progress"
-                      : formatTipoff(todayGame.date)}
+                      : formatTipoff(todayGame.startTime, todayGame.status)}
                     {" · "}
                     {todayGame.isHome ? "Home" : "Away"}
                   </p>
@@ -257,11 +224,8 @@ export default function MorningBriefingCard() {
               <p className="text-sm text-white/70 italic">
                 Last game was{" "}
                 {formatDate(lastGame.date)} —{" "}
-                {Math.floor(
-                  (Date.now() - new Date(lastGame.date).getTime()) /
-                    86400000
-                )}{" "}
-                days ago
+                {gameDaysAgo(lastGame.date)}{" "}
+                {gameDaysAgo(lastGame.date) === 1 ? "day" : "days"} ago
               </p>
             ) : (
               <p className="text-sm text-white/70 italic">No recent games</p>

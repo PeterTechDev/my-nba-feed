@@ -1,6 +1,7 @@
 export interface GameInfo {
   id: number;
   date: string;
+  startTime?: string | null;
   status: string;
   homeTeam: { id: number; name: string; abbreviation: string };
   awayTeam: { id: number; name: string; abbreviation: string };

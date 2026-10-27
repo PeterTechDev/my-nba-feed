@@ -34,7 +34,7 @@ export { GameDataContext };
 
 export function useGameDataFetcher(): GameDataState {
   const { selectedTeam } = useTeam();
-  const { data, loading, error, retry } = useRemoteData<GamesResponse>(`/api/games?teamId=${selectedTeam.id}`);
+  const { data, loading, error, retry } = useRemoteData<GamesResponse>(`/api/games?teamId=${selectedTeam.id}`, 30000);
   return {
     ...defaultState,
     ...data,

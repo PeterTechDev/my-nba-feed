@@ -63,3 +63,12 @@ export const teams: Team[] = [
 
 export const getTeamById = (id: number) => teams.find((t) => t.id === id);
 export const getCeltics = () => teams.find((t) => t.abbreviation === "BOS")!;
+
+export function getContrastColor(color: string): string {
+  const rgb = color.match(/[a-f\d]{2}/gi)!.map((part) => {
+    const value = parseInt(part, 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+  return luminance > 0.179 ? "#000000" : "#ffffff";
+}

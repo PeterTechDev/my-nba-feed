@@ -1,4 +1,5 @@
 "use client";
+import { formatGameDate, formatTipoff, gameDaysAgo } from "@/lib/nbaDate";
 import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
@@ -25,7 +26,8 @@ function SkeletonCard({ label }: { label: string }) {
   );
 }
 
-function timeUntil(dateStr: string): string {
+function timeUntil(dateStr?: string | null): string {
+  if (!dateStr) return "Tipoff time TBD";
   const diff = new Date(dateStr).getTime() - Date.now();
   if (diff < 0) return "Starting soon";
   const days = Math.floor(diff / 86400000);
@@ -33,15 +35,6 @@ function timeUntil(dateStr: string): string {
   if (days > 0) return `in ${days} day${days > 1 ? "s" : ""}`;
   if (hours > 0) return `in ${hours} hour${hours > 1 ? "s" : ""}`;
   return "Soon";
-}
-
-function isSameLocalDay(dateStr: string, compareDate: Date = new Date()): boolean {
-  const date = new Date(dateStr);
-  return (
-    date.getFullYear() === compareDate.getFullYear() &&
-    date.getMonth() === compareDate.getMonth() &&
-    date.getDate() === compareDate.getDate()
-  );
 }
 
 export function LastGameCard() {
@@ -62,7 +55,7 @@ export function LastGameCard() {
   const oppScore = getOpponentScore(lastGame);
   const opponent = getOpponent(lastGame);
   const won = lastGame.won;
-  const date = new Date(lastGame.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const date = formatGameDate(lastGame.date, { month: "short", day: "numeric", year: "numeric" });
 
   return (
     <Card>
@@ -93,7 +86,7 @@ export function LastGameCard() {
         href={getHighlightUrl(selectedTeam.name, opponent.name, date)}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-block mt-3 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+        className="inline-flex min-h-11 items-center mt-3 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
       >
         Watch Highlights →
       </a>
@@ -129,9 +122,9 @@ export function NextGameCard() {
   );
 
   const opponent = getOpponent(nextGame);
-  const isGameDay = isSameLocalDay(nextGame.date);
-  const date = new Date(nextGame.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  const time = new Date(nextGame.date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const isGameDay = gameDaysAgo(nextGame.startTime || nextGame.date) === 0;
+  const date = formatGameDate(nextGame.date, { weekday: "short", month: "short", day: "numeric" });
+  const time = formatTipoff(nextGame.startTime, nextGame.status);
 
   return (
     <Card>
@@ -148,7 +141,7 @@ export function NextGameCard() {
         {date} · {time} · {nextGame.isHome ? "Home" : "Away"}
       </p>
       <p className={`text-sm mt-2 font-medium ${isGameDay ? "text-white" : "text-emerald-400"}`}>
-        {timeUntil(nextGame.date)}
+        {timeUntil(nextGame.startTime)}
       </p>
       {isGameDay && (
         <p className="text-xs text-white/70 mt-3">
