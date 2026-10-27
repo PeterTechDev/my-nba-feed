@@ -10,7 +10,9 @@ interface RedditPost {
   comments: number | null;
   created: number;
   url: string;
-  subreddit: string;
+  subreddit: string | null;
+  publisher: string | null;
+  indexed: boolean;
   author: string;
   thumbnail: string | null;
   category: "game-thread" | "postgame" | "injury" | "news" | "discussion" | "general";
@@ -92,7 +94,7 @@ export async function GET(req: NextRequest) {
       if (!Array.isArray(json.data?.children)) throw new Error("Invalid Reddit feed");
       return (json.data.children as RedditListingChild[]).map(({ data }) => ({
         id: data.id, title: data.title, score: data.score, comments: data.num_comments, created: data.created_utc,
-        url: `https://reddit.com${data.permalink}`, subreddit: data.subreddit, author: data.author,
+        url: `https://reddit.com${data.permalink}`, subreddit: data.subreddit.toLowerCase(), publisher: "Reddit", indexed: false, author: data.author,
         thumbnail: /^https:\/\//.test(data.thumbnail) ? data.thumbnail : null, category: getCategory(data.title),
       }));
     } catch {
@@ -103,7 +105,7 @@ export async function GET(req: NextRequest) {
         if (!response.ok) throw new Error("Reddit RSS unavailable");
         const entries = parseCommunityFeed(await response.text());
         if (!entries.length) throw new Error("Reddit RSS empty");
-        return entries.map((entry) => ({ ...entry, score: null, comments: null, subreddit: sub, thumbnail: null, category: getCategory(entry.title) }));
+        return entries.map((entry) => ({ ...entry, score: null, comments: null, thumbnail: null, category: getCategory(entry.title) }));
       } catch {
         const query = `site:reddit.com/r/${sub} ${team.city} ${team.name} when:7d`;
         const response = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`, {
@@ -113,7 +115,7 @@ export async function GET(req: NextRequest) {
         const entries = parseCommunityFeed(await response.text());
         if (!entries.length) throw new Error("Community sources empty");
         usedIndex = true;
-        return entries.map((entry) => ({ ...entry, score: null, comments: null, subreddit: sub, thumbnail: null, category: getCategory(entry.title) }));
+        return entries.map((entry) => ({ ...entry, score: null, comments: null, thumbnail: null, category: getCategory(entry.title) }));
       }
     }
   };
@@ -123,7 +125,7 @@ export async function GET(req: NextRequest) {
   const now = Date.now() / 1000;
   const posts = fulfilled.flatMap((result) => result.value)
     .filter((post) => Number.isFinite(post.created) && post.created <= now && post.created >= now - 7 * 86400)
-    .filter((post) => post.subreddit !== "nba" || isRelevantToTeam(post.title, keywords));
+    .filter((post) => post.subreddit === subreddit?.toLowerCase() || isRelevantToTeam(post.title, keywords));
   const deduped = Array.from(new Map(posts.map((post) => [new URL(post.url).pathname, post])).values());
   deduped.sort((a, b) => b.created - a.created);
   return NextResponse.json({ posts: deduped.slice(0, 50), source: usedIndex ? "news-index" : "reddit", partial: fulfilled.length < subs.length, error: null });

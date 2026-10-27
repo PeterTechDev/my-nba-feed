@@ -26,7 +26,7 @@ export default function NavBar() {
   const [myTeamsOpen, setMyTeamsOpen] = useState(false);
   const { favoriteTeamIds } = useFavoriteTeams();
   const [menuOpen, setMenuOpen] = useState(false);
-  const protection = spoilerFree ? "Spoiler-free" : hideScores || hideHeadlines ? "Custom protection" : "Spoilers visible";
+  const protection = spoilerFree ? "Protection on by default" : hideScores || hideHeadlines ? "Custom protection defaults" : "Protection off by default";
 
   const navigationLinks = links.map((link) => {
     const active = pathname === link.href;
@@ -48,11 +48,12 @@ export default function NavBar() {
             NBA Feed
           </Link>
           <button type="button" onClick={toggleSpoiler}
-            aria-label={`${protection}. ${spoilerFree ? "Show spoilers" : "Hide scores and headlines"}`}
+            aria-label={`${protection}. ${spoilerFree ? "Turn default protection off" : "Hide scores and headlines by default"}`}
+            title="Default spoiler protection. Individual items can be revealed."
             aria-pressed={spoilerFree ? true : hideScores || hideHeadlines ? "mixed" : false}
             className={`flex min-h-11 min-w-11 justify-center shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs min-[360px]:text-sm font-medium sm:px-3 ${hideScores || hideHeadlines ? "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
             {hideScores || hideHeadlines ? <EyeOff aria-hidden="true" className="hidden h-4 w-4 min-[360px]:block" /> : <Eye aria-hidden="true" className="hidden h-4 w-4 min-[360px]:block" />}
-            <span className="sm:hidden">{spoilerFree ? "Safe" : hideScores || hideHeadlines ? "Custom" : "Visible"}</span>
+            <span className="sm:hidden">{spoilerFree ? "Default on" : hideScores || hideHeadlines ? "Custom" : "Default off"}</span>
             <span className="hidden sm:inline">{protection}</span>
           </button>
           <button type="button" onClick={() => setMyTeamsOpen(true)} aria-label={`My Teams (${favoriteTeamIds.length} selected)`}
@@ -83,7 +84,7 @@ export default function NavBar() {
     </nav>
     {settingsOpen && (
       <Modal title="Spoiler settings" onClose={() => setSettingsOpen(false)}>
-          <p className="text-sm text-white/70">Choose whether scores and result-heavy headlines stay hidden.</p>
+          <p className="text-sm text-white/70">Choose what stays hidden by default. Revealing a post, digest or results view shows only that content without changing these defaults.</p>
           <div className="mt-5 space-y-3">
             <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
               <div>

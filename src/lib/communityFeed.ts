@@ -10,7 +10,7 @@ function decodeXml(value: string): string {
 }
 
 export function parseCommunityFeed(xml: string) {
-  const entries: { id: string; title: string; url: string; created: number; author: string }[] = [];
+  const entries: { id: string; title: string; url: string; created: number; author: string; publisher: string | null; subreddit: string | null; indexed: boolean }[] = [];
   for (const match of xml.matchAll(/<(entry|item)\b[^>]*>([\s\S]*?)<\/\1>/g)) {
     const block = match[2];
     const tag = (name: string) => decodeXml(block.match(new RegExp("<" + name + "\\b[^>]*>([\\s\\S]*?)</" + name + ">"))?.[1] ?? "");
@@ -21,7 +21,11 @@ export function parseCommunityFeed(xml: string) {
       const url = new URL(decodeXml(link));
       if (url.protocol !== "https:" || !["reddit.com", "www.reddit.com", "old.reddit.com", "news.google.com"].includes(url.hostname)) continue;
       if (!title || !Number.isFinite(created)) continue;
-      entries.push({ id: tag("id") || tag("guid") || url.href, title, url: url.href, created, author: tag("name") || "Reddit" });
+      const indexed = url.hostname === "news.google.com";
+      const publisher = indexed ? tag("source") || null : "Reddit";
+      const subreddit = indexed ? null : url.pathname.match(/^\/r\/([a-z\d_]+)\/comments\//i)?.[1].toLowerCase() ?? null;
+      entries.push({ id: tag("id") || tag("guid") || url.href, title, url: url.href, created,
+        author: tag("name") || "", publisher, subreddit, indexed });
     } catch {
       // Ignore malformed links from the external feed.
     }

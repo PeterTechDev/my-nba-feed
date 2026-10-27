@@ -9,7 +9,7 @@ export default function SpoilerGuard({ label, children }: { label: string; child
 
   return <>
     {hideScores && <div className={revealed ? "mb-4" : "mb-6 rounded-xl border border-white/15 p-4"}>
-      {!revealed && <p className="mb-3 text-sm text-white/80">This view includes records and statistics that can reveal game results.</p>}
+      <p role={revealed ? "status" : undefined} className="mb-3 text-sm text-white/80">{revealed ? "Results revealed in this view. Default protection is still on." : "This view includes records and statistics that can reveal game results."}</p>
       <button type="button" aria-pressed={revealed} onClick={() => setRevealed((value) => !value)}
         className="min-h-11 rounded-lg border border-white/20 px-4 text-sm hover:bg-white/10">
         {revealed ? `Hide ${label}` : `Reveal ${label}`}

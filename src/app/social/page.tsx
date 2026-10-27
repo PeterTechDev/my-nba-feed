@@ -15,7 +15,9 @@ interface RedditPost {
   comments: number | null;
   created: number;
   url: string;
-  subreddit: string;
+  subreddit: string | null;
+  publisher: string | null;
+  indexed: boolean;
   author: string;
   thumbnail: string | null;
   category: "game-thread" | "postgame" | "injury" | "news" | "discussion" | "general";
@@ -56,7 +58,7 @@ export default function SocialPage() {
   const { data, loading, error, retry } = useRemoteData<{ posts: RedditPost[]; source?: string; partial?: boolean }>(`/api/social?team=${encodeURIComponent(selectedTeam.name)}&subreddit=${encodeURIComponent(teamSub)}`);
   const posts = data?.posts || [];
 
-  const subreddits = [...new Set(posts.map((p) => p.subreddit))];
+  const subreddits = [...new Set(posts.flatMap((p) => p.subreddit ? [p.subreddit] : []))];
   const activeFilter = filter && subreddits.includes(filter) ? filter : null;
   const filtered = activeFilter ? posts.filter((p) => p.subreddit === activeFilter) : posts;
 
@@ -98,7 +100,7 @@ export default function SocialPage() {
           </button>
         ))}
       </div>
-      {data?.source === "news-index" && <p role="status" className="mb-4 text-sm text-white/70">Direct community feeds are unavailable. Showing Reddit discussions found through a news index.</p>}
+      {data?.source === "news-index" && <p role="status" className="mb-4 text-sm text-white/70">Some posts were found through a news index. Publisher names come from the index; subreddit badges appear only for verified links.</p>}
       {data?.partial && <p role="status" className="mb-4 text-sm text-white/70">Some community feeds are unavailable. Showing available posts.</p>}
       {hideHeadlines && <p className="mb-4 text-sm text-white/70">Reveal a post before opening it. External discussions may contain spoilers.</p>}
 
@@ -117,6 +119,8 @@ export default function SocialPage() {
           {filtered.map((post) => {
             const key = `${selectedTeam.id}:${post.id}`;
             const hidden = hideHeadlines && !revealedPosts.includes(key);
+            const protectedTitle = post.indexed ? "Spoiler-protected indexed result" : post.subreddit ? `Spoiler-protected post from r/${post.subreddit}` : "Spoiler-protected post";
+            const title = post.publisher?.toLowerCase() === "reddit" || post.subreddit ? post.title.replace(/\s+[-–—]\s+Reddit$/i, "") : post.title;
             return (
               <article key={post.id} className="rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
                 <a
@@ -132,7 +136,7 @@ export default function SocialPage() {
                       <img src={post.thumbnail} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-base line-clamp-2">{hidden ? `Spoiler-protected post from r/${post.subreddit}` : post.title.replace(/\s+[-–—]\s+Reddit$/i, "")}</p>
+                      <p className="font-medium text-base break-words">{hidden ? protectedTitle : title}</p>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-2 text-xs text-white/70">
                         {!hidden && categoryLabel(post.category) && (
                           <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
@@ -140,8 +144,9 @@ export default function SocialPage() {
                           </span>
                         )}
                         <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 font-medium">
-                          r/{post.subreddit}
+                          {post.subreddit ? `r/${post.subreddit}` : post.publisher || "Publisher unavailable"}
                         </span>
+                        {post.indexed && <span>Indexed result</span>}
                         {!hidden && post.score !== null && <span className="inline-flex items-center gap-1"><ArrowUp aria-hidden="true" className="h-3.5 w-3.5" /><span className="sr-only">Score: </span>{post.score}</span>}
                         {!hidden && post.comments !== null && <span className="inline-flex items-center gap-1"><MessageCircle aria-hidden="true" className="h-3.5 w-3.5" /><span className="sr-only">Comments: </span>{post.comments}</span>}
                         <time dateTime={new Date(post.created * 1000).toISOString()} title={new Date(post.created * 1000).toLocaleString()}>{timeAgo(post.created)}</time>
@@ -150,10 +155,13 @@ export default function SocialPage() {
                   </div>
                 </a>
                 {hideHeadlines && (
-                  <button type="button" className="mx-4 mb-3 min-h-11 rounded-lg border border-white/15 px-3 text-sm text-white/80 hover:bg-white/10"
-                    onClick={() => setRevealedPosts((posts) => hidden ? [...posts, key] : posts.filter((id) => id !== key))}>
-                    {hidden ? "Reveal post and image" : "Hide spoilers"}
-                  </button>
+                  <div className="mx-4 mb-3 flex flex-wrap items-center gap-3">
+                    {!hidden && <span role="status" className="text-sm text-amber-200">Post revealed</span>}
+                    <button type="button" aria-pressed={!hidden} className="min-h-11 rounded-lg border border-white/15 px-3 text-sm text-white/80 hover:bg-white/10"
+                      onClick={() => setRevealedPosts((posts) => hidden ? [...posts, key] : posts.filter((id) => id !== key))}>
+                      {hidden ? "Reveal post and image" : "Hide spoilers"}
+                    </button>
+                  </div>
                 )}
               </article>
             );

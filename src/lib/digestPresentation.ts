@@ -17,5 +17,19 @@ export function getDigestPresentation(digest: DigestEntry) {
       return `${formatGameDate(instant, { month: "short", day: "numeric", year: "numeric" })} at ${formatTipoff(instant)}`;
     });
   const sources = sourceText.replace(/^([^:\r\n]+):[ \t]*(https?:\/\/\S+)[ \t]*$/gm, "[$1]($2)");
-  return { title, content, sources, coverageDate };
+  const readerSources = new Set<string>();
+  for (const match of sourceText.matchAll(/https?:\/\/[^\s)]+/g)) {
+    try {
+      const url = new URL(match[0]);
+      if (url.origin === "https://site.api.espn.com" && url.pathname === "/apis/site/v2/sports/basketball/nba/scoreboard") {
+        const date = url.searchParams.get("dates") ?? "";
+        const leagueDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+        if (/^\d{8}$/.test(date) && isDigestDate(leagueDate)) readerSources.add(`[ESPN NBA scoreboard — ${formatGameDate(leagueDate, { month: "short", day: "numeric", year: "numeric" })}](https://www.espn.com/nba/scoreboard/_/date/${date})`);
+      }
+      if (url.origin === "https://my-nba-feed.vercel.app" && url.pathname === "/api/games" && url.searchParams.get("teamId") === "2") {
+        readerSources.add("[Boston Celtics schedule and results](https://www.nba.com/celtics/schedule)");
+      }
+    } catch { /* Keep malformed source URLs in the original edition details. */ }
+  }
+  return { title, content, sources, readerSources: [...readerSources].join("\n\n"), coverageDate };
 }

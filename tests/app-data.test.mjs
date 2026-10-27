@@ -262,14 +262,23 @@ test("community Atom/RSS parsing decodes text and rejects unsafe links", () => {
   const atom = '<feed><entry><id>t3_1</id><title>Celtics &amp; Nets</title><link href="https://www.reddit.com/r/bostonceltics/comments/1/test/"/><updated>2026-10-27T10:00:00Z</updated><author><name>fan</name></author></entry></feed>';
   assert.equal(parseCommunityFeed(atom)[0].title, "Celtics & Nets");
   assert.equal(parseCommunityFeed(atom)[0].author, "fan");
+  assert.equal(parseCommunityFeed(atom)[0].subreddit, "bostonceltics");
+  assert.equal(parseCommunityFeed(atom)[0].publisher, "Reddit");
+  assert.equal(parseCommunityFeed(atom)[0].indexed, false);
   assert.equal(parseCommunityFeed(atom.replace("https://www.reddit.com", "javascript:alert")).length, 0);
-  const rss = '<rss><item><guid>id</guid><title><![CDATA[Fan discussion]]></title><link>https://news.google.com/rss/articles/test</link><pubDate>Tue, 27 Oct 2026 10:00:00 GMT</pubDate></item></rss>';
+  const rss = '<rss><item><guid>id</guid><title><![CDATA[Fan discussion]]></title><link>https://news.google.com/rss/articles/test</link><pubDate>Tue, 27 Oct 2026 10:00:00 GMT</pubDate><source url="https://www.reddit.com">Reddit</source></item></rss>';
   assert.equal(parseCommunityFeed(rss)[0].title, "Fan discussion");
+  assert.equal(parseCommunityFeed(rss)[0].publisher, "Reddit");
+  assert.equal(parseCommunityFeed(rss)[0].subreddit, null);
+  assert.equal(parseCommunityFeed(rss)[0].indexed, true);
+  assert.equal(parseCommunityFeed(rss.replace('>Reddit</source>', '>Sports &amp; News</source>'))[0].publisher, "Sports & News");
+  assert.equal(parseCommunityFeed(rss.replace(/<source.*?<\/source>/, ""))[0].publisher, null);
 });
 
 test("community API recovers with RSS or a labeled index and reports total outages", async () => {
   const atom = '<feed><entry><id>t3_1</id><title>Celtics fan discussion</title><link href="https://www.reddit.com/r/bostonceltics/comments/1/test/"/><updated>2026-10-27T10:00:00Z</updated></entry></feed>';
-  const rss = '<rss><item><guid>id</guid><title>Celtics discussion</title><link>https://news.google.com/rss/articles/test</link><pubDate>Tue, 27 Oct 2026 10:00:00 GMT</pubDate></item></rss>';
+  const item = (id, title) => `<item><guid>${id}</guid><title>${title}</title><link>https://news.google.com/rss/articles/${id}</link><pubDate>Tue, 27 Oct 2026 10:00:00 GMT</pubDate><source url="https://www.reddit.com">Reddit</source></item>`;
+  const rss = `<rss>${item("id", "Celtics discussion")}${item("unrelated", "Lakers discussion")}</rss>`;
   let mode = "rss";
   const fetch = async (url) => ({
     ok: mode === "rss" ? url.endsWith(".rss") : mode === "index" ? url.includes("news.google") : false,
@@ -283,10 +292,14 @@ test("community API recovers with RSS or a labeled index and reports total outag
   assert.equal(result.body.source, "reddit");
   assert.equal(result.body.posts.length, 1);
   assert.equal(result.body.posts[0].score, null);
+  assert.equal(result.body.posts[0].subreddit, "bostonceltics");
   mode = "index";
   result = await route.GET(request);
   assert.equal(result.body.source, "news-index");
   assert.equal(result.body.posts.length, 1);
+  assert.equal(result.body.posts[0].subreddit, null);
+  assert.equal(result.body.posts[0].publisher, "Reddit");
+  assert.equal(result.body.posts[0].indexed, true);
   mode = "offline";
   assert.equal((await route.GET(request)).status, 502);
 });
@@ -416,9 +429,33 @@ test("protected social posts cannot open an external result before reveal", () =
   assert.match(html, /href="https:\/\/reddit.com\/secret"/);
 });
 
+test("indexed Social results preserve publishers without inventing subreddit filters", () => {
+  let hideHeadlines = true;
+  const post = { id: "indexed", title: "A complete Celtics discussion title with a long ending that stays readable on mobile - Reddit", created: Date.now() / 1000,
+    subreddit: null, publisher: "Sports News", indexed: true, category: "general", url: "https://news.google.com/rss/articles/indexed", score: null, comments: null };
+  const mocked = { ...imports,
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: teams.getCeltics() }) },
+    "@/lib/reddit": { teamSubreddits: { Celtics: "bostonceltics" } },
+    "@/components/TeamSelector": { default: () => null },
+    "@/components/SpoilerModeProvider": { useSpoilerContext: () => ({ hideHeadlines }) },
+    "@/components/DataError": load("components/DataError.tsx").exports,
+    "@/hooks/useRemoteData": { useRemoteData: () => ({ data: { posts: [post], source: "news-index" }, loading: false }) },
+  };
+  const Social = load("app/social/page.tsx", {}, mocked).exports.default;
+  let html = renderToStaticMarkup(createElement(Social));
+  assert.match(html, /Spoiler-protected indexed result/);
+  assert.match(html, /Sports News/);
+  assert.doesNotMatch(html, /r\/bostonceltics|r\/nba|r\/null|href="https:\/\/news.google.com/);
+  hideHeadlines = false;
+  html = renderToStaticMarkup(createElement(Social));
+  assert.ok(html.includes(post.title));
+  assert.doesNotMatch(html, /line-clamp/);
+  assert.match(html, /Indexed result/);
+});
+
 test("digest presentation separates coverage, localizes old UTC prose and names safe source links", () => {
   const { getDigestPresentation } = load("lib/digestPresentation.ts", {}, imports).exports;
-  const entry = { title: "NBA Morning Briefing: 2026-10-26", content: "## Next game\n\nBoston plays on 2026-10-27 at 23:30 UTC.\n\n## Sources\n\nLeague date: 2026-10-26. Retrieved 2026-10-27T11:00:00Z.\n\nESPN scoreboard: https://site.api.espn.com/scoreboard?dates=20261026\n\nBoston next game: https://example.com/next" };
+  const entry = { title: "NBA Morning Briefing: 2026-10-26", content: "## Next game\n\nBoston plays on 2026-10-27 at 23:30 UTC.\n\n## Sources\n\nLeague date: 2026-10-26. Retrieved 2026-10-27T11:00:00Z.\n\nESPN scoreboard: https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261026\n\nBoston next game: https://my-nba-feed.vercel.app/api/games?teamId=2" };
   const result = getDigestPresentation(entry);
   assert.equal(result.title, "NBA Morning Briefing");
   assert.equal(result.coverageDate, "2026-10-26");
@@ -426,10 +463,19 @@ test("digest presentation separates coverage, localizes old UTC prose and names 
   assert.doesNotMatch(result.content, /Sources|Retrieved|23:30 UTC/);
   const Markdown = load("components/MarkdownContent.tsx").exports.default;
   const html = renderToStaticMarkup(Markdown({ content: result.sources + "\n\n[Unsafe](javascript:alert(1))\n\n<script>bad</script>" }));
-  assert.match(html, /href="https:\/\/site.api.espn.com\/scoreboard\?dates=20261026"/);
+  assert.match(html, /href="https:\/\/site.api.espn.com\/apis\/site\/v2\/sports\/basketball\/nba\/scoreboard\?dates=20261026"/);
   assert.match(html, />ESPN scoreboard<\/a>/);
   assert.match(html, />ESPN scoreboard<\/a><\/p><p[^>]*><a[^>]*>Boston next game<\/a>/);
   assert.doesNotMatch(html, /href="javascript:|<script>/);
+  const readers = renderToStaticMarkup(Markdown({ content: result.readerSources }));
+  assert.match(readers, /href="https:\/\/www.espn.com\/nba\/scoreboard\/_\/date\/20261026"/);
+  assert.match(readers, /href="https:\/\/www.nba.com\/celtics\/schedule"/);
+  assert.doesNotMatch(readers, /api\/games|site.api.espn.com/);
+  for (const invalid of [
+    entry.content.replaceAll("https://", "http://"),
+    entry.content.replace("20261026", "20260230").replace("teamId=2", "teamId=14"),
+    entry.content.replace("site.api.espn.com", "site.api.espn.com.evil.test").replace("my-nba-feed.vercel.app", "my-nba-feed.vercel.app.evil.test"),
+  ]) assert.equal(getDigestPresentation({ ...entry, content: invalid }).readerSources, "");
   assert.equal(getDigestPresentation({ title: "Special edition", content: "No source section" }).title, "Special edition");
   assert.equal(getDigestPresentation({ ...entry, content: entry.content.replace("League date: 2026-10-26", "League date: 2026-02-30") }).coverageDate, null);
 });
