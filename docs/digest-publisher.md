@@ -49,7 +49,8 @@ run. Only `workflow_dispatch` can enable this override; daily schedules preserve
 existing editions. Replacing an edition preserves its date and aggregated reactions.
 For a failed run, inspect Actions logs; no failure should be presented as an empty
 successful edition. A 401 indicates a publisher-token mismatch. OpenAI
-`insufficient_quota` requires the owner to restore API billing/credits.
+`insufficient_quota` or `credit_balance_exhausted` requires the owner to restore API
+billing/credits; these errors stop immediately without repeated model requests.
 
 For local debugging with Node 22.18+, supply the two variables through ignored env
 files or the process environment, then use `npm run digest:generate`. A local run

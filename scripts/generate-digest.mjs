@@ -49,7 +49,7 @@ async function requestJSON(url, label, fetcher, options = {}) {
     const body = await response.json().catch(() => null);
     if (response.ok && body) return body;
     const code = /^[a-z_]{1,60}$/.test(body?.error?.code ?? "") ? body.error.code : "request_failed";
-    if (attempt < 2 && code !== "insufficient_quota" && (response.status === 429 || response.status >= 500)) {
+    if (attempt < 2 && !["insufficient_quota", "credit_balance_exhausted"].includes(code) && (response.status === 429 || response.status >= 500)) {
       await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
       continue;
     }
@@ -131,7 +131,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY,
       `Digest **${result.date}**: ${result.status}. [Read in production](https://my-nba-feed.vercel.app/digest).\n`);
   } catch (error) {
-    console.error(error instanceof SyntaxError ? "Invalid generation response; nothing published" : error.message);
+    const message = error instanceof SyntaxError ? "Invalid generation response; nothing published" : error.message;
+    console.error(message);
+    if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `Digest not published: ${message}. Existing content was preserved.\n`);
     process.exitCode = 1;
   }
 }

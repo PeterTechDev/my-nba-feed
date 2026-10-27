@@ -30,7 +30,7 @@ function fixture({ scoreboard = board, celtics = boston, generated = output, sta
       if (url.includes("espn.com")) return Response.json(scoreboard);
       if (url.includes("/api/games")) return Response.json(celtics);
       if (url === "https://api.openai.com/v1/responses") {
-        if (apiError) return Response.json({ error: { code: "insufficient_quota" } }, { status: 429 });
+        if (apiError) return Response.json({ error: { code: apiError === true ? "insufficient_quota" : apiError } }, { status: 429 });
         return Response.json({ status, model: "gpt-5-mini-test", output: [{ type: "message", content: [
           { type: "output_text", text: JSON.stringify(generated) },
         ] }] });
@@ -106,4 +106,13 @@ test("a verified empty game day produces an honest edition with no fabricated ma
   await run(f);
   assert.deepEqual(f.saved.games_covered, []);
   assert.deepEqual(f.saved.stats_highlighted, ["0 completed games"]);
+});
+
+test("exhausted credits stop after one model request and preserve the existing edition", async () => {
+  for (const code of ["insufficient_quota", "credit_balance_exhausted"]) {
+    const f = fixture({ apiError: code });
+    await assert.rejects(run(f), new RegExp(code));
+    assert.equal(f.calls.filter(({ url }) => url.includes("api.openai.com")).length, 1);
+    assert.equal(f.saved, null);
+  }
 });
