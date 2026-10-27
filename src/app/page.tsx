@@ -7,31 +7,40 @@ import GameDataProvider from "@/components/GameDataProvider";
 import TopPlaysCard from "@/components/TopPlaysCard";
 import MorningBriefingCard from "@/components/MorningBriefingCard";
 import PersonalizedFeed, { LeagueNewsSection } from "@/components/PersonalizedFeed";
-import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
+import { useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
 import { useTeam } from "@/hooks/useTeam";
+import { useRemoteData } from "@/hooks/useRemoteData";
+import { selectHomepageNews } from "@/lib/news";
+import type { NewsFeeds } from "@/lib/api";
 
 function FeedContent() {
-  const { favoriteTeamIds } = useFavoriteTeams();
+  const favoriteTeams = useFavoriteTeamObjects();
   const { selectedTeam } = useTeam();
-  const hasPersonalized = favoriteTeamIds.length > 0;
+  const hasPersonalized = favoriteTeams.length > 0;
+  const followedFocus = favoriteTeams.some((team) => team.id === selectedTeam.id);
+  const order = [...new Set([...favoriteTeams.map((team) => team.name), ...(!followedFocus ? [selectedTeam.name] : []), ...(hasPersonalized ? ["NBA"] : [])])];
+  const { data, loading, error, retry } = useRemoteData<{ feeds: NewsFeeds }>(`/api/news?teams=${encodeURIComponent(order.join(","))}`);
+  const feeds = selectHomepageNews(data?.feeds ?? {}, order, hasPersonalized && !followedFocus ? selectedTeam.name : undefined);
+  const newsState = (name: string) => ({ news: feeds[name]?.items ?? [], loading, error: error || Boolean(feeds[name]?.error), retry });
+  const focus = newsState(selectedTeam.name);
 
   return (
     <>
       <TeamHeader />
-      {hasPersonalized && <PersonalizedFeed />}
+      {hasPersonalized && <PersonalizedFeed feeds={feeds} loading={loading} error={error} retry={retry} />}
       <GameDayHero />
-      {!favoriteTeamIds.includes(selectedTeam.id) && <MorningBriefingCard />}
+      {!followedFocus && <MorningBriefingCard {...focus} news={focus.news.slice(0, 1)} />}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8">
         <div className="space-y-5 sm:space-y-8">
           <NextGameCard />
           <LastGameCard />
         </div>
         <div className="space-y-5 sm:space-y-8">
-          {!hasPersonalized && <NewsFeed limit={2} />}
+          {!hasPersonalized && <NewsFeed {...focus} news={focus.news.slice(1)} />}
           <TopPlaysCard />
         </div>
       </div>
-      {hasPersonalized && <LeagueNewsSection />}
+      {hasPersonalized && <LeagueNewsSection {...newsState("NBA")} />}
     </>
   );
 }

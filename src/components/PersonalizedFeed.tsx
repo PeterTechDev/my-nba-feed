@@ -1,229 +1,52 @@
 "use client";
 import { formatGameDate, gameDaysAgo } from "@/lib/nbaDate";
-import { Fragment } from "react";
 import { useRemoteData } from "@/hooks/useRemoteData";
+import { useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
+import type { Team } from "@/lib/teams";
+import { getOpponent, getOpponentScore, getTeamScore, type GamesResponse, type NewsFeeds } from "@/lib/api";
 import DataError from "./DataError";
-import { useFavoriteTeams, useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
-import { teams, Team } from "@/lib/teams";
-import { NewsItem, GamesResponse, getNewsTitle, formatNewsAge } from "@/lib/api";
-import { useSpoilerContext } from "./SpoilerModeProvider";
-import { useLastVisit } from "@/hooks/useLastVisit";
+import NewsList, { type NewsState } from "./NewsList";
+import ScoreReveal from "./ScoreReveal";
 
-// ---- Helpers ----
-
-function formatDate(dateStr: string): string {
-  return formatGameDate(dateStr, {
-    weekday: "short", month: "short", day: "numeric",
-  });
-}
-
-// ---- Per-team news section ----
-
-interface TeamNewsSectionProps {
-  team: Team;
-}
-
-function TeamNewsSection({ team }: TeamNewsSectionProps) {
-  const { hideHeadlines, hideScores } = useSpoilerContext();
-  const { lastVisitAt, ready: visitReady } = useLastVisit();
-  const { data, loading, error, retry } = useRemoteData<NewsItem[]>(`/api/news?team=${encodeURIComponent(team.name)}`);
+function TeamNewsSection({ team, ...newsState }: NewsState & { team: Team }) {
   const { data: gameData, error: gameError, retry: retryGame } = useRemoteData<GamesResponse>(`/api/games?teamId=${team.id}`, 30000);
-  const news = (data || []).slice(0, 3);
   const lastGame = gameData?.lastGame;
-
-  const lastNightGame = lastGame && gameDaysAgo(lastGame.date) === 1 ? lastGame : null;
-
-  // Determine new-since-last-visit separator
-  const separatorIndex: number | null = (() => {
-    if (!visitReady || !lastVisitAt || loading) return null;
-    const lastVisitTime = new Date(lastVisitAt).getTime();
-    const idx = news.findIndex(
-      (item) => item.pubDate && new Date(item.pubDate).getTime() < lastVisitTime
-    );
-    return idx > 0 ? idx : null;
-  })();
-
-  return (
-    <div
-      className="rounded-xl overflow-hidden border"
-      style={{ borderColor: `${team.primaryColor}30`, backgroundColor: `${team.primaryColor}08` }}
-    >
-      {/* Team header */}
-      <div
-        className="px-4 py-3 flex items-center gap-3 border-b"
-        style={{ borderColor: `${team.primaryColor}20` }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={team.logo} alt={team.name} className="w-8 h-8 object-contain" />
-        <div>
-          <p className="text-sm font-bold text-white">{team.city} {team.name}</p>
-          {lastNightGame && (
-            <p className="text-xs text-white/70">
-              Played last night
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="p-4 space-y-3">
-        {/* News */}
-        {error ? (
-          <DataError subject={`${team.name} news`} retry={retry} />
-        ) : loading ? (
-          <div className="space-y-3 animate-pulse">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="space-y-1.5">
-                <div className="h-3.5 w-full bg-white/10 rounded" />
-                <div className="h-3 w-24 bg-white/10 rounded" />
-              </div>
-            ))}
-          </div>
-        ) : news.length === 0 ? (
-          <p className="text-sm text-white/70 italic">No recent news</p>
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {news.map((item, i) => (
-              <Fragment key={item.link}>
-                {separatorIndex !== null && i === separatorIndex && (
-                  <li key={`sep-${i}`} className="py-2 flex items-center gap-2">
-                    <div className="flex-1 border-t border-dashed border-white/15" />
-                    <span className="text-xs text-white/70 whitespace-nowrap shrink-0">Older</span>
-                    <div className="flex-1 border-t border-dashed border-white/15" />
-                  </li>
-                )}
-                <li key={i} className="py-2.5 first:pt-0">
-                  <a
-                    href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-white/80 hover:text-white transition-colors line-clamp-2 font-medium"
-                  >
-                    {getNewsTitle(item, hideHeadlines)}
-                  </a>
-                  <p className="text-xs text-white/70 mt-0.5">
-                    {item.source && <span>{item.source} · </span>}
-                    {formatNewsAge(item.pubDate)}
-                  </p>
-                </li>
-              </Fragment>
-            ))}
-          </ul>
-        )}
-        {gameError && <DataError subject={`${team.name} games`} retry={retryGame} />}
-        {lastNightGame && hideScores && <p className="text-sm text-white/70">Last night: score hidden · {formatDate(lastNightGame.date)}</p>}
-        {lastNightGame && !hideScores && (
-          <div
-            className="rounded-lg px-3 py-2.5 border"
-            style={{ backgroundColor: `${team.primaryColor}12`, borderColor: `${team.primaryColor}25` }}
-          >
-            <p className="text-xs font-bold text-white/70 uppercase tracking-wider mb-1">Last Night</p>
-            {(() => {
-              const isHome = lastNightGame.homeTeam.id === team.id;
-              const opponentTeam = isHome
-                ? teams.find((t) => t.id === lastNightGame.awayTeam.id)
-                : teams.find((t) => t.id === lastNightGame.homeTeam.id);
-              const teamScore = isHome ? lastNightGame.homeScore : lastNightGame.awayScore;
-              const oppScore = isHome ? lastNightGame.awayScore : lastNightGame.homeScore;
-              const won = teamScore > oppScore;
-
-              if (!opponentTeam) return null;
-
-              return (
-                <>
-                  <p className="text-sm font-semibold text-white">
-                    {team.abbreviation}{" "}
-                    <span className="text-lg font-extrabold tabular-nums">{teamScore}</span>
-                    <span className="text-white/70 mx-1.5">–</span>
-                    <span className="text-lg font-extrabold tabular-nums">{oppScore}</span>{" "}
-                    {opponentTeam.abbreviation}
-                  </p>
-                  <p className="text-xs mt-0.5">
-                    <span className={won ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
-                      {won ? "Win" : "Loss"}
-                    </span>
-                    <span className="text-white/70"> · {formatDate(lastNightGame.date)}</span>
-                  </p>
-                </>
-              );
-            })()}
-          </div>
-        )}
-      </div>
+  const lastNight = lastGame && gameDaysAgo(lastGame.date) === 1 ? lastGame : null;
+  return <section aria-label={`${team.city} ${team.name} news`} className="self-start rounded-xl overflow-hidden border"
+    style={{ borderColor: `${team.primaryColor}30`, backgroundColor: `${team.primaryColor}08` }}>
+    <div className="px-4 py-3 flex items-center gap-3 border-b" style={{ borderColor: `${team.primaryColor}20` }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={team.logo} alt="" className="w-8 h-8 object-contain" />
+      <div><h3 className="text-base font-bold">{team.city} {team.name}</h3><p className="text-sm text-white/70">Newest first{lastNight ? " · Played last night" : ""}</p></div>
     </div>
-  );
+    <div className="p-4 space-y-3">
+      <NewsList {...newsState} subject={`${team.name} stories`} />
+      {gameError && <DataError subject={`${team.name} games`} retry={retryGame} />}
+      {lastNight && <div className="border-t border-white/10 pt-3 space-y-2">
+        <p className="text-sm text-white/70">Last night · {formatGameDate(lastNight.date, { month: "short", day: "numeric" })}</p>
+        <ScoreReveal scope={`${team.id}:${lastNight.id}`} label={`${team.name} result`}>
+          <p className="text-lg font-bold tabular-nums">{team.abbreviation} {getTeamScore(lastNight)} – {getOpponentScore(lastNight)} {getOpponent(lastNight).abbreviation}</p>
+          <p className={`text-sm ${getTeamScore(lastNight) > getOpponentScore(lastNight) ? "text-emerald-400" : "text-red-400"}`}>{getTeamScore(lastNight) > getOpponentScore(lastNight) ? "Win" : "Loss"}</p>
+        </ScoreReveal>
+      </div>}
+    </div>
+  </section>;
 }
 
-// ---- League-wide news (Around the League) ----
-
-export function LeagueNewsSection() {
-  const { hideHeadlines } = useSpoilerContext();
-  const { data, loading, error, retry } = useRemoteData<NewsItem[]>("/api/news?team=NBA");
-  const news = (data || []).slice(0, 6);
-
-  return (
-    <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
-      <div className="p-5">
-        <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest mb-4">
-          🌐 Around the League
-        </h2>
-        {error ? (
-          <DataError subject="league news" retry={retry} />
-        ) : loading ? (
-          <div className="space-y-4 animate-pulse">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="space-y-1.5">
-                <div className="h-4 w-full bg-white/10 rounded" />
-                <div className="h-3 w-24 bg-white/10 rounded" />
-              </div>
-            ))}
-          </div>
-        ) : news.length === 0 ? (
-          <p className="text-sm text-white/70 italic">No league news right now</p>
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {news.map((item, i) => (
-              <li key={i} className="py-3 first:pt-0">
-                <a
-                  href={item.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-white/80 hover:text-white transition-colors line-clamp-2 font-medium"
-                >
-                  {getNewsTitle(item, hideHeadlines)}
-                </a>
-                <p className="text-xs text-white/70 mt-0.5">
-                  {item.source && <span>{item.source} · </span>}
-                  {formatNewsAge(item.pubDate)}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
+export function LeagueNewsSection(props: NewsState) {
+  return <section aria-labelledby="league-news-heading" className="rounded-xl bg-[#161616] border border-[#2a2a2a] p-5">
+    <h2 id="league-news-heading" className="text-base font-semibold">Around the League</h2>
+    <p className="mt-1 mb-4 text-sm text-white/70">Newest first · Articles already shown above are excluded</p>
+    <NewsList {...props} subject="league stories" />
+  </section>;
 }
 
-// ---- Main component ----
-
-export default function PersonalizedFeed() {
-  const { favoriteTeamIds } = useFavoriteTeams();
+export default function PersonalizedFeed({ feeds, loading, error, retry }: { feeds: NewsFeeds; loading: boolean; error: boolean; retry: () => void }) {
   const favoriteTeams = useFavoriteTeamObjects();
-
-  // No favorites → render nothing (caller renders the default feed)
-  if (favoriteTeamIds.length === 0) return null;
-
-  return (
-      <section>
-        <div className="flex items-center gap-2 mb-3 sm:mb-4">
-          <h2 className="text-base font-semibold">My Teams</h2>
-          <span className="text-xs text-white/70">({favoriteTeamIds.length})</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {favoriteTeams.map((team) => (
-            <TeamNewsSection key={team.id} team={team} />
-          ))}
-        </div>
-      </section>
-  );
+  if (!favoriteTeams.length) return null;
+  return <section aria-labelledby="my-teams-heading">
+    <div className="flex items-center gap-2 mb-3 sm:mb-4"><h2 id="my-teams-heading" className="text-base font-semibold">My Teams</h2><span className="text-sm text-white/70">({favoriteTeams.length})</span></div>
+    <div className="grid grid-cols-1 md:grid-cols-2 items-start gap-4">{favoriteTeams.map((team) => <TeamNewsSection key={team.id} team={team}
+      news={feeds[team.name]?.items ?? []} loading={loading} error={error || Boolean(feeds[team.name]?.error)} retry={retry} />)}</div>
+  </section>;
 }

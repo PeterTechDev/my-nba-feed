@@ -32,7 +32,10 @@ export interface NewsItem {
   source: string;
   isSpoiler: boolean;
   category: "injury" | "lineup" | "transaction" | "analysis" | "recap" | "general";
+  related?: NewsItem[];
 }
+
+export type NewsFeeds = Record<string, { items: NewsItem[]; error: boolean }>;
 
 export function getNewsTitle(item: NewsItem, hideHeadlines: boolean): string {
   const title = hideHeadlines && item.isSpoiler ? item.safeTitle : item.title;

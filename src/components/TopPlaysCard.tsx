@@ -19,7 +19,7 @@ export default function TopPlaysCard() {
             Highlights →
           </Link>
         </div>
-        <p className="text-sm text-white/70 mt-2">Explore top plays and uploads from the NBA on YouTube.</p>
+        <p className="text-sm text-white/70 mt-2 [text-wrap:pretty]">Explore top plays on the NBA YouTube channel.</p>
         <div className="mt-4 grid gap-3 xl:grid-cols-2">
           <a
             href={getChannelSearchUrl("Top 10 Plays of the Night")}
@@ -40,7 +40,7 @@ export default function TopPlaysCard() {
             <p className="text-xs text-white/70 mt-1">Open the NBA channel on YouTube</p>
           </a>
         </div>
-        {(hideScores || hideHeadlines) && <p className="mt-3 text-xs text-white/70">YouTube videos and search results may contain spoilers.</p>}
+        {(hideScores || hideHeadlines) && <p className="mt-3 text-sm text-white/70 [text-wrap:pretty]">YouTube results may contain spoilers.</p>}
       </div>
     </div>
   );

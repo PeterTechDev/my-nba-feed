@@ -4,6 +4,7 @@ import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 import { getHighlightUrl, getOpponent, getTeamScore, getOpponentScore } from "@/lib/api";
+import ScoreReveal from "./ScoreReveal";
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
@@ -54,34 +55,19 @@ export function LastGameCard() {
   const teamScore = getTeamScore(lastGame);
   const oppScore = getOpponentScore(lastGame);
   const opponent = getOpponent(lastGame);
-  const won = lastGame.won;
+  const won = teamScore > oppScore;
   const date = formatGameDate(lastGame.date, { month: "short", day: "numeric", year: "numeric" });
 
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest">Last Game</h2>
-        {!hideScores && (
-          <span className={`text-sm font-bold px-2 py-0.5 rounded ${won ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
-            {won ? "W" : "L"}
-          </span>
-        )}
       </div>
-      {hideScores ? (
-        <>
-          <p className="text-lg font-semibold text-white/80">
-            vs {opponent.name} · {date}
-          </p>
-          <p className="text-xs text-white/70 mt-2">Score hidden — spoiler-free mode</p>
-        </>
-      ) : (
-        <p className="text-2xl font-extrabold tabular-nums tracking-tight">
-          {teamScore} – {oppScore}
-        </p>
-      )}
-      <p className="text-white/60 text-sm mt-1">
-        {!hideScores && <>vs {opponent.name} · {date}</>}
-      </p>
+      <p className="mb-3 text-lg font-semibold text-white/80">vs {opponent.name} · {date}</p>
+      <ScoreReveal scope={`${selectedTeam.id}:${lastGame.id}`} label={`${selectedTeam.name} result`}>
+        <p className="text-2xl font-extrabold tabular-nums tracking-tight">{teamScore} – {oppScore}</p>
+        <p className={`text-sm font-semibold ${won ? "text-green-400" : "text-red-400"}`}>{won ? "Win" : "Loss"}</p>
+      </ScoreReveal>
       <a
         href={getHighlightUrl(selectedTeam.name, opponent.name, date)}
         target="_blank"

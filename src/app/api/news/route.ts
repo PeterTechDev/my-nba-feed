@@ -1,148 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
+import { teams } from "@/lib/teams";
+import type { NewsItem } from "@/lib/api";
+import { decodeXml } from "@/lib/communityFeed";
+import { isTeamNews, newestNews } from "@/lib/news";
 
-interface NewsItem {
-  title: string;
-  safeTitle: string;
-  link: string;
-  pubDate: string;
-  source: string;
-  isSpoiler: boolean;
-  category: "injury" | "lineup" | "transaction" | "analysis" | "recap" | "general";
-}
-
-const SPOILER_PATTERNS = [
-  /\b\d{2,3}\s*[-–]\s*\d{2,3}\b/i,
-  /\b(final|recap|box score|game recap|postgame)\b/i,
-  /\b(beat|beats|defeat|defeats|edge|edges|blow out|blows out|rout|routes|survive|survives|stun|stuns)\b/i,
-  /\b(win|wins|winning|loss|losses|lose|loses|lost)\b/i,
-];
-
-const HIGH_SIGNAL_PATTERNS = {
-  injury: /\b(injury|injured|questionable|probable|doubtful|available|out|return|returns|status|ankle|knee|hamstring|wrist|illness)\b/i,
-  lineup: /\b(starting lineup|starting five|rotation|minutes restriction|bench|starting|available tonight)\b/i,
-  transaction: /\b(trade|waive|waived|sign|signed|release|released|contract|extension|call-up)\b/i,
-  analysis: /\b(report|reports|practice|coach|preview|expects|expected|progress|update)\b/i,
-  recap: /\b(recap|box score|postgame|final)\b/i,
-};
-
-const TRUSTED_SOURCE_PATTERNS = [
-  /\bESPN\b/i,
-  /\bThe Athletic\b/i,
-  /\bYahoo\b/i,
-  /\bCBS Sports\b/i,
-  /\bSports Illustrated\b/i,
-  /\bBleacher Report\b/i,
-  /\bNBA\b/i,
-  /\bAP News\b/i,
-  /\bReuters\b/i,
-];
-
-const LOW_SIGNAL_SOURCE_PATTERNS = [
-  /\bYardbarker\b/i,
-  /\bSportskeeda\b/i,
-  /\bClutchPoints\b/i,
-];
-
-const LOW_SIGNAL_TITLE_PATTERNS = [
-  /\bthreatens\b/i,
-  /\bdominance\b/i,
-  /\bstuns fans\b/i,
-  /\binternet reacts\b/i,
-  /\bmust-see\b/i,
-];
-
-function decodeCDATA(value: string): string {
-  return value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim();
-}
-
-function isSpoilerHeadline(title: string): boolean {
-  return SPOILER_PATTERNS.some((pattern) => pattern.test(title));
-}
-
-function getSafeTitle(source: string): string {
-  return source ? `Spoiler-protected headline from ${source}` : "Spoiler-protected headline";
-}
+const SPOILERS = /\b\d{2,3}\s*[-–]\s*\d{2,3}\b|\b(final|recap|box score|postgame|beat|beats|defeat|defeats|edge|edges|blow out|blows out|blown out|rout|routs|survive|survives|stun|stuns|win|wins|won|winning|winless|unbeaten|undefeated|loss|losses|lose|loses|losing|lost)\b/i;
+const PROMOTIONS = /\b(promo code|sportsbook|prop bets?|best bets?|odds[\s,]+(?:and|picks))\b/i;
 
 function getCategory(title: string): NewsItem["category"] {
-  if (HIGH_SIGNAL_PATTERNS.injury.test(title)) return "injury";
-  if (HIGH_SIGNAL_PATTERNS.lineup.test(title)) return "lineup";
-  if (HIGH_SIGNAL_PATTERNS.transaction.test(title)) return "transaction";
-  if (HIGH_SIGNAL_PATTERNS.recap.test(title)) return "recap";
-  if (HIGH_SIGNAL_PATTERNS.analysis.test(title)) return "analysis";
+  if (/\b(injury|injured|questionable|probable|doubtful|ruled out|out with|out due to|ankle|knee|hamstring|wrist|illness|surgery)\b/i.test(title)) return "injury";
+  if (/\b(starting lineup|starting five|rotation|minutes restriction|bench|available tonight)\b/i.test(title)) return "lineup";
+  if (/\b(trade|waive|waived|sign|signed|release|released|contract|extension|call-up)\b/i.test(title)) return "transaction";
+  if (/\b(recap|box score|postgame|final)\b/i.test(title)) return "recap";
+  if (/\b(report|reports|practice|coach|preview|expects|expected|progress|update)\b/i.test(title)) return "analysis";
   return "general";
 }
 
-function getQualityScore(item: Pick<NewsItem, "title" | "source" | "pubDate" | "isSpoiler" | "category">): number {
-  let score = 0;
-
-  switch (item.category) {
-    case "injury":
-      score += 40;
-      break;
-    case "lineup":
-      score += 34;
-      break;
-    case "transaction":
-      score += 30;
-      break;
-    case "analysis":
-      score += 18;
-      break;
-    case "general":
-      score += 10;
-      break;
-    case "recap":
-      score -= 12;
-      break;
+async function fetchNews(team: string): Promise<NewsItem[]> {
+  const res = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(team + " NBA when:7d")}&hl=en-US&gl=US&ceid=US:en`, {
+    next: { revalidate: 600 }, signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error("News source unavailable");
+  const xml = await res.text();
+  if (!/<(?:rss|feed)\b/i.test(xml)) throw new Error("Invalid news feed");
+  const items: NewsItem[] = [];
+  for (const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/g)) {
+    const tag = (name: string) => decodeXml(match[1].match(new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)</${name}>`))?.[1] ?? "");
+    const title = tag("title"), source = tag("source");
+    if (!isTeamNews(title, team) || PROMOTIONS.test(title)) continue;
+    const isSpoiler = SPOILERS.test(title);
+    items.push({ title, source, link: tag("link"), pubDate: tag("pubDate"), isSpoiler,
+      safeTitle: isSpoiler ? `Spoiler-protected headline${source ? ` from ${source}` : ""}` : title, category: getCategory(title) });
   }
-
-  if (TRUSTED_SOURCE_PATTERNS.some((pattern) => pattern.test(item.source))) score += 12;
-  if (LOW_SIGNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(item.source))) score -= 10;
-  if (LOW_SIGNAL_TITLE_PATTERNS.some((pattern) => pattern.test(item.title))) score -= 8;
-  if (item.isSpoiler) score -= 6;
-
-  const ageHours = Math.max(0, (Date.now() - new Date(item.pubDate).getTime()) / 3600000);
-  score += Math.max(0, 12 - ageHours * 0.6);
-
-  return score;
+  return newestNews(items).slice(0, 10);
 }
 
 export async function GET(req: NextRequest) {
-  const team = req.nextUrl.searchParams.get("team");
-  if (!team) return NextResponse.json([], { status: 400 });
-
-  try {
-    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(team + " NBA")}&hl=en-US&gl=US&ceid=US:en`;
-    const res = await fetch(url, { next: { revalidate: 600 } });
-    if (!res.ok) return NextResponse.json([], { status: 502 });
-    const xml = await res.text();
-
-    const items: NewsItem[] = [];
-    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-    let match;
-    while ((match = itemRegex.exec(xml)) !== null) {
-      const block = match[1];
-      const title = decodeCDATA(block.match(/<title>([\s\S]*?)<\/title>/)?.[1] || "");
-      const link = block.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() || "";
-      const pubDate = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || "";
-      const source = decodeCDATA(block.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1] || "");
-      const isSpoiler = isSpoilerHeadline(title);
-      const category = getCategory(title);
-      items.push({
-        title,
-        safeTitle: isSpoiler ? getSafeTitle(source) : title,
-        link,
-        pubDate,
-        source,
-        isSpoiler,
-        category,
-      });
-    }
-
-    items.sort((a, b) => getQualityScore(b) - getQualityScore(a));
-
-    return NextResponse.json(items.slice(0, 10));
-  } catch {
-    return NextResponse.json([], { status: 500 });
+  const batch = req.nextUrl.searchParams.get("teams");
+  const names = [...new Set((batch ?? req.nextUrl.searchParams.get("team") ?? "").split(","))];
+  if (!names.length || names.some((name) => name !== "NBA" && !teams.some((team) => team.name === name))) {
+    return NextResponse.json({ error: "Valid teams required" }, { status: 400 });
   }
+  const results = await Promise.allSettled(names.map(fetchNews));
+  if (!batch) {
+    const result = results[0];
+    return result.status === "fulfilled" ? NextResponse.json(result.value) : NextResponse.json({ error: "News unavailable" }, { status: 502 });
+  }
+  const feeds = Object.fromEntries(names.map((name, i) => [name, {
+    items: results[i].status === "fulfilled" ? results[i].value : [], error: results[i].status === "rejected",
+  }]));
+  return NextResponse.json({ feeds }, { status: results.every((result) => result.status === "rejected") ? 502 : 200 });
 }

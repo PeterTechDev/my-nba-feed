@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getContrastColor } from "@/lib/teams";
 import { formatTipoff, gameDaysAgo } from "@/lib/nbaDate";
 import DataError from "./DataError";
+import ScoreReveal from "./ScoreReveal";
 import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
@@ -68,9 +69,9 @@ export default function GameDayHero() {
               {heroGame.isHome ? "Home game" : "Road game"}
             </span>
             {isLive ? (
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                {hideScores ? "Score hidden" : `${selectedTeam.abbreviation} ${teamScore} - ${opponent.abbreviation} ${opponentScore}`}
-              </span>
+              <ScoreReveal scope={`live:${selectedTeam.id}:${heroGame.id}`} label={`${selectedTeam.name} live score`}>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">{selectedTeam.abbreviation} {teamScore} - {opponent.abbreviation} {opponentScore}</span>
+              </ScoreReveal>
             ) : (
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
                 {getCountdown(heroGame.startTime)}

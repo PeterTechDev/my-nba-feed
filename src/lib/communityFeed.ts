@@ -1,4 +1,4 @@
-function decodeXml(value: string): string {
+export function decodeXml(value: string): string {
   return value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/&(?:amp|lt|gt|quot|apos|#\d+|#x[a-f\d]+);/gi, (entity) => {
       const named: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'" };

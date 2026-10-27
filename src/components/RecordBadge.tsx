@@ -1,16 +1,17 @@
 "use client";
 import { useGameData } from "@/hooks/useGameData";
-import { useSpoilerContext } from "./SpoilerModeProvider";
+import { useTeam } from "@/hooks/useTeam";
+import ScoreReveal from "./ScoreReveal";
 
 export default function RecordBadge() {
   const { record, loading, error } = useGameData();
-  const { hideScores } = useSpoilerContext();
+  const { selectedTeam } = useTeam();
 
-  if (hideScores || loading || error || (record.wins === 0 && record.losses === 0)) return null;
+  if (loading || error || (record.wins === 0 && record.losses === 0)) return null;
 
   return (
-    <span className="text-sm font-bold text-white/70 tabular-nums">
+    <ScoreReveal scope={`${selectedTeam.id}:${record.wins}:${record.losses}`} label="record"><span className="text-sm font-bold text-white/70 tabular-nums">
       {record.wins}-{record.losses}
-    </span>
+    </span></ScoreReveal>
   );
 }
