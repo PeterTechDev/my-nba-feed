@@ -9,8 +9,8 @@ import { teamSubreddits } from "@/lib/reddit";
 interface RedditPost {
   id: string;
   title: string;
-  score: number;
-  comments: number;
+  score: number | null;
+  comments: number | null;
   created: number;
   url: string;
   subreddit: string;
@@ -50,7 +50,7 @@ export default function SocialPage() {
   const [revealedPosts, setRevealedPosts] = useState<string[]>([]);
   const [filter, setFilter] = useState<string | null>(null);
   const teamSub = teamSubreddits[selectedTeam.name] || "";
-  const { data, loading, error, retry } = useRemoteData<{ posts: RedditPost[] }>(`/api/social?team=${encodeURIComponent(selectedTeam.name)}&subreddit=${encodeURIComponent(teamSub)}`);
+  const { data, loading, error, retry } = useRemoteData<{ posts: RedditPost[]; source?: string; partial?: boolean }>(`/api/social?team=${encodeURIComponent(selectedTeam.name)}&subreddit=${encodeURIComponent(teamSub)}`);
   const posts = data?.posts || [];
 
   const subreddits = [...new Set(posts.map((p) => p.subreddit))];
@@ -73,7 +73,8 @@ export default function SocialPage() {
       <div className="flex gap-2 mt-4 mb-6 overflow-x-auto">
         <button
           onClick={() => setFilter(null)}
-          className={`min-h-11 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0 ${
+          aria-pressed={!activeFilter}
+          className={`min-h-11 min-w-11 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0 ${
             !activeFilter ? "bg-white/15 text-white" : "bg-white/5 text-white/70 hover:bg-white/10"
           }`}
         >
@@ -82,6 +83,7 @@ export default function SocialPage() {
         {subreddits.map((sub) => (
           <button
             key={sub}
+            aria-pressed={activeFilter === sub}
             onClick={() => setFilter(sub)}
             className={`min-h-11 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0 ${
               activeFilter === sub ? "bg-white/15 text-white" : "bg-white/5 text-white/70 hover:bg-white/10"
@@ -91,6 +93,8 @@ export default function SocialPage() {
           </button>
         ))}
       </div>
+      {data?.source === "news-index" && <p role="status" className="mb-4 text-sm text-white/70">Direct community feeds are unavailable. Showing Reddit discussions found through a news index.</p>}
+      {data?.partial && <p role="status" className="mb-4 text-sm text-white/70">Some community feeds are unavailable. Showing available posts.</p>}
 
       {error ? (
         <DataError subject="social posts" retry={retry} />
@@ -132,8 +136,8 @@ export default function SocialPage() {
                         <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 font-medium">
                           r/{post.subreddit}
                         </span>
-                        {!hidden && <span>↑ {post.score}</span>}
-                        {!hidden && <span>💬 {post.comments}</span>}
+                        {!hidden && post.score !== null && <span>↑ {post.score}</span>}
+                        {!hidden && post.comments !== null && <span>💬 {post.comments}</span>}
                         <span>{timeAgo(post.created)}</span>
                       </div>
                     </div>

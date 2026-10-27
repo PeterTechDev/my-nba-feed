@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
+import { getGameStartTime } from "@/lib/gameStatus";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
@@ -13,6 +14,8 @@ interface BDLGame {
   id: number;
   date: string;
   status: string;
+  datetime?: string | null;
+  postponed?: boolean;
   home_team: BDLTeam;
   visitor_team: BDLTeam;
   home_team_score: number;
@@ -60,7 +63,8 @@ export async function GET(req: NextRequest) {
     const games = ((json.data || []) as BDLGame[]).map((g) => ({
       id: g.id,
       date: g.date,
-      status: g.status,
+      startTime: getGameStartTime(g),
+      status: g.postponed ? "Postponed" : g.status,
       homeTeam: { id: g.home_team.id, name: g.home_team.name, abbreviation: g.home_team.abbreviation },
       awayTeam: { id: g.visitor_team.id, name: g.visitor_team.name, abbreviation: g.visitor_team.abbreviation },
       homeScore: g.home_team_score,

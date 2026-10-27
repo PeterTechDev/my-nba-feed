@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
+import { isFinalStatus } from "@/lib/gameStatus";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
@@ -105,7 +106,7 @@ export async function GET() {
     const records: Record<number, TeamRecord> = {};
 
     for (const g of allGames) {
-      if (g.status !== "Final") continue;
+      if (!isFinalStatus(g.status)) continue;
 
       const homeId = g.home_team.id;
       const awayId = g.visitor_team.id;

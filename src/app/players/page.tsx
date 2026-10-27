@@ -21,7 +21,7 @@ interface Player {
 
 export default function PlayersPage() {
   const { selectedTeam } = useTeam();
-  const { data, loading, error, retry } = useRemoteData<{ players: Player[] }>(`/api/players?teamId=${selectedTeam.id}`);
+  const { data, loading, error, retry } = useRemoteData<{ players: Player[]; source?: string }>(`/api/players?teamId=${selectedTeam.id}`);
   const players = data?.players || [];
 
   return (
@@ -31,7 +31,7 @@ export default function PlayersPage() {
         <img src={selectedTeam.logo} alt="" className="w-10 h-10" />
         <div>
           <h1 className="text-2xl font-bold">{selectedTeam.name} Roster</h1>
-          <p className="text-sm text-white/70">Current season players</p>
+          <p className="text-sm text-white/70">Current roster{data?.source ? ` · ${data.source}` : ""}</p>
         </div>
       </div>
 
@@ -60,7 +60,7 @@ export default function PlayersPage() {
                     <p className="text-sm text-white/70">{p.position || "N/A"}</p>
                   </div>
                   {p.jerseyNumber && (
-                    <span className="text-2xl font-extrabold text-white/10">#{p.jerseyNumber}</span>
+                    <span className="text-2xl font-extrabold text-white/70">#{p.jerseyNumber}</span>
                   )}
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-white/70">

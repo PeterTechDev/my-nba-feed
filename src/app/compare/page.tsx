@@ -2,7 +2,7 @@
 import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
 import { useState } from "react";
-import { teams, Team } from "@/lib/teams";
+import { teams, Team, getChartColor } from "@/lib/teams";
 
 interface TeamStats {
   wins: number;
@@ -36,13 +36,13 @@ function StatBar({ label, val1, val2, color1, color2, higher1Better }: { label: 
         <div className="flex-1 flex justify-end">
           <div
             className="h-full rounded-l transition-all"
-            style={{ width: `${pct1}%`, background: best1 ? color1 : "#333" }}
+            style={{ width: `${pct1}%`, background: best1 ? getChartColor(color1) : "#737373" }}
           />
         </div>
         <div className="flex-1">
           <div
             className="h-full rounded-r transition-all"
-            style={{ width: `${pct2}%`, background: best2 ? color2 : "#333" }}
+            style={{ width: `${pct2}%`, background: best2 ? getChartColor(color2) : "#737373" }}
           />
         </div>
       </div>
@@ -61,7 +61,7 @@ function TeamSelect({ value, onChange, label }: { value: Team; onChange: (t: Tea
           const t = teams.find((t) => t.id === parseInt(e.target.value));
           if (t) onChange(t);
         }}
-        className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-2 text-base cursor-pointer"
+        className="min-h-11 w-full bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-2 text-base cursor-pointer"
       >
         {teams.map((t) => (
           <option key={t.id} value={t.id}>{t.city} {t.name}</option>

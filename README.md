@@ -102,6 +102,39 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Set `BALLDONTLIE_KEY` in your environment before starting the app.
 
+### Digest storage and publishing
+
+Connect a **private Vercel Blob store** to the project. Production uses the
+automatically configured `BLOB_STORE_ID` and Vercel OIDC; no browser receives a
+storage credential. For local development Blob access, pull development credentials
+with `vercel env pull .env.development.local`. Keep all secrets in ignored environment
+files and preserve the publisher token in `.env.local` when pulling development values.
+
+Set a server-only `DIGEST_PUBLISH_TOKEN` for the external digest publisher.
+Publish to `POST /api/digest` with `Authorization: Bearer <DIGEST_PUBLISH_TOKEN>`
+and a JSON body containing `date` (YYYY-MM-DD), `style` (hype, analytical, casual
+or storyteller), `title`, `content` (Markdown), and optional `games_covered`,
+`stats_highlighted` and `metadata`. Publishing the same date replaces that entry.
+Digests and aggregated reactions persist in private Blob documents; conditional
+writes prevent concurrent updates from silently overwriting each other.
+
+The external daily generator is separate from this app. Empty content is shown
+only after a successful read; storage failures have a retry action.
+
+### Data fallbacks
+
+Rosters use BALLDONTLIE active players, falling back to the current ESPN roster
+when the API plan or service does not provide active players. Social tries Reddit
+JSON, then its RSS feed, then a clearly identified news index of Reddit links.
+Missing votes/comments are omitted rather than presented as zero.
+
+### Regression checks
+
+Run `npm run lint`, `npm run build` and `node --test tests/*.test.mjs`.
+The `tests/*regression.mjs` browser suites export functions that accept a
+Playwright page, with the app running on port 3000. Their API fixtures exercise
+errors, spoilers and retries without modifying production.
+
 ---
 
 ## Screenshots

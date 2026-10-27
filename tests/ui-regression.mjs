@@ -178,9 +178,11 @@ export default async function runUiRegression(page) {
     await p.getByRole("button", { name: "Open navigation" }).click();
     await p.getByRole("link", { name: "Digest", exact: true }).click();
     await p.getByRole("heading", { name: "AI Digest", exact: true }).waitFor();
+    await p.getByRole("button", { name: "Reveal digest", exact: true }).click();
     await p.getByRole("heading", { name: "Daily NBA test digest", exact: true }).waitFor();
     check(true, "Digest remains reachable and renders markdown content");
-    await p.getByRole("button", { name: /Yesterday's NBA digest/ }).click();
+    await p.getByRole("region", { name: "Digest archive" }).getByRole("button", { expanded: false }).click();
+    await p.getByRole("button", { name: "Reveal digest", exact: true }).click();
     await p.getByText("Archive analysis.", { exact: true }).waitFor();
     check(true, "Digest archive expands");
     const feedbackResponse = p.waitForResponse((response) => response.url().endsWith("/api/digest/feedback") && response.request().method() === "POST");

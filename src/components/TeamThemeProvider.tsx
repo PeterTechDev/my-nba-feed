@@ -9,7 +9,6 @@ export default function TeamThemeProvider({ children }: { children: ReactNode })
     const root = document.documentElement;
     root.style.setProperty("--team-primary", selectedTeam.primaryColor);
     root.style.setProperty("--team-secondary", selectedTeam.secondaryColor);
-    document.title = `${selectedTeam.name} | NBA Feed`;
   }, [selectedTeam]);
 
   return <>{children}</>;

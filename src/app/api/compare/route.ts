@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getNBASeason } from "@/lib/nbaDate";
+import { isFinalStatus } from "@/lib/gameStatus";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
@@ -21,7 +22,7 @@ function computeTeamStats(games: BDLGame[], teamId: number) {
   let wins = 0, losses = 0, totalPF = 0, totalPA = 0, count = 0;
 
   for (const g of games) {
-    if (g.status !== "Final") continue;
+    if (!isFinalStatus(g.status)) continue;
     const isHome = g.home_team.id === teamId;
     const pf = isHome ? g.home_team_score : g.visitor_team_score;
     const pa = isHome ? g.visitor_team_score : g.home_team_score;
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
 
     // Head-to-head
     const h2h = games1.filter((g: BDLGame) =>
-      g.status === "Final" && (g.home_team.id === t2 || g.visitor_team.id === t2)
+      isFinalStatus(g.status) && (g.home_team.id === t2 || g.visitor_team.id === t2)
     );
 
     let h2hTeam1Wins = 0, h2hTeam2Wins = 0;

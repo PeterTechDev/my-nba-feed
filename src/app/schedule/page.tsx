@@ -4,15 +4,25 @@ import DataError from "@/components/DataError";
 import { useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
+import { formatTipoff } from "@/lib/nbaDate";
+import { isFinalStatus, isLiveStatus } from "@/lib/gameStatus";
 
 interface ScheduleGame {
   id: number;
   date: string;
   status: string;
+  startTime?: string | null;
   homeTeam: { id: number; name: string; abbreviation: string };
   awayTeam: { id: number; name: string; abbreviation: string };
   homeScore: number;
   awayScore: number;
+}
+
+function gameStatus(game: ScheduleGame): string {
+  if (isFinalStatus(game.status)) return game.status;
+  if (isLiveStatus(game.status)) return `Live · ${game.status}`;
+  if (/^(postponed|cancell?ed)\b/i.test(game.status.trim())) return game.status;
+  return formatTipoff(game.startTime, game.status);
 }
 
 function getDaysInMonth(year: number, month: number) {
@@ -36,7 +46,7 @@ export default function SchedulePage() {
   const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
   const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
   const { data, loading, error, retry } = useRemoteData<{ games: ScheduleGame[] }>(
-    `/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`
+    `/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`, 30000
   );
   const games = data?.games || [];
 
@@ -94,7 +104,7 @@ export default function SchedulePage() {
               const game = getGameForDay(day);
               const isHome = game ? game.homeTeam.id === selectedTeam.id : false;
               const opponent = game ? (isHome ? game.awayTeam : game.homeTeam) : null;
-              const isFinal = game?.status === "Final";
+              const isFinal = game ? isFinalStatus(game.status) : false;
               let won = false;
               if (game && isFinal) {
                 const teamScore = isHome ? game.homeScore : game.awayScore;
@@ -126,8 +136,9 @@ export default function SchedulePage() {
                         </div>
                       )}
                       {isFinal && hideScores && (
-                        <div className="text-white/70">Final</div>
+                        <div className="text-white/70">{game.status}</div>
                       )}
+                      {!isFinal && <div className="text-white/70 break-words">{gameStatus(game)}</div>}
                     </div>
                   )}
                 </div>
@@ -150,7 +161,7 @@ export default function SchedulePage() {
             if (!game) return null;
             const isHome = game.homeTeam.id === selectedTeam.id;
             const opponent = isHome ? game.awayTeam : game.homeTeam;
-            const isFinal = game.status === "Final";
+            const isFinal = isFinalStatus(game.status);
             let won = false;
             if (isFinal) {
               const teamScore = isHome ? game.homeScore : game.awayScore;
@@ -182,14 +193,14 @@ export default function SchedulePage() {
                   </div>
                   {isFinal ? (
                     hideScores ? (
-                      <span className="text-xs text-white/70">Final</span>
+                      <span className="text-xs text-white/70">{game.status}</span>
                     ) : (
                       <span className={`text-sm font-bold ${won ? "text-emerald-400" : "text-red-400"}`}>
                         {won ? "W" : "L"} {isHome ? game.homeScore : game.awayScore}-{isHome ? game.awayScore : game.homeScore}
                       </span>
                     )
                   ) : (
-                    <span className="text-xs text-white/70">Scheduled</span>
+                    <span className="text-xs text-white/70 text-right max-w-[45%]">{gameStatus(game)}</span>
                   )}
                 </div>
               ))}

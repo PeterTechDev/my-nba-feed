@@ -1,7 +1,7 @@
 "use client";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { teams, Team } from "@/lib/teams";
+import { teams, Team, migrateLegacyTeamId } from "@/lib/teams";
 
 interface FavoriteTeamsStore {
   favoriteTeamIds: number[];
@@ -23,7 +23,15 @@ export const useFavoriteTeams = create<FavoriteTeamsStore>()(
       setFavorites: (ids) => set({ favoriteTeamIds: ids }),
       clearFavorites: () => set({ favoriteTeamIds: [] }),
     }),
-    { name: "nba-feed-favorite-teams" }
+    {
+      name: "nba-feed-favorite-teams", version: 1,
+      migrate: (persisted, version) => {
+        const saved = persisted as Partial<FavoriteTeamsStore>;
+        const ids = Array.isArray(saved?.favoriteTeamIds) ? saved.favoriteTeamIds : [];
+        return { favoriteTeamIds: [...new Set(ids.map((id) => version === 0 ? migrateLegacyTeamId(id) : id))]
+          .filter((id) => teams.some((team) => team.id === id)) };
+      },
+    }
   )
 );
 

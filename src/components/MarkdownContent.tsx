@@ -6,12 +6,14 @@ interface Props {
 }
 
 // Lightweight markdown renderer — handles the subset used by digest agents.
-// Supports: h1/h2/h3, bold, italic, unordered lists, blockquotes, paragraphs.
+// Supports headings, bold, italic, lists, blockquotes and paragraphs.
 export default function MarkdownContent({ content, className = "" }: Props) {
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
   let i = 0;
   let keyCounter = 0;
+  let firstHeadingLevel: number | undefined;
+  let lastHeadingLevel = 2;
 
   const key = () => keyCounter++;
 
@@ -38,34 +40,19 @@ export default function MarkdownContent({ content, className = "" }: Props) {
       continue;
     }
 
-    // H1
-    if (line.startsWith("# ")) {
+    const heading = line.match(/^(#{1,6}) (.*)$/);
+    if (heading) {
+      const level = heading[1].length;
+      // Digest cards own h2; keep authored headings beneath them without skipped levels.
+      firstHeadingLevel ??= level;
+      const headingLevel = Math.min(6, Math.max(3, level - firstHeadingLevel + 3), lastHeadingLevel + 1);
+      lastHeadingLevel = headingLevel;
+      const Heading = `h${headingLevel}` as `h${3 | 4 | 5 | 6}`;
       elements.push(
-        <h1 key={key()} className="text-xl font-bold mt-6 mb-2 text-white">
-          {parseInline(line.slice(2))}
-        </h1>
-      );
-      i++;
-      continue;
-    }
-
-    // H2
-    if (line.startsWith("## ")) {
-      elements.push(
-        <h2 key={key()} className="text-lg font-bold mt-5 mb-2 text-white">
-          {parseInline(line.slice(3))}
-        </h2>
-      );
-      i++;
-      continue;
-    }
-
-    // H3
-    if (line.startsWith("### ")) {
-      elements.push(
-        <h3 key={key()} className="text-base font-semibold mt-4 mb-1.5 text-white/90">
-          {parseInline(line.slice(4))}
-        </h3>
+        <Heading key={key()} className={level === 1 ? "text-xl font-bold mt-6 mb-2 text-white" :
+          level === 2 ? "text-lg font-bold mt-5 mb-2 text-white" : "text-base font-semibold mt-4 mb-1.5 text-white/90"}>
+          {parseInline(heading[2])}
+        </Heading>
       );
       i++;
       continue;
@@ -133,7 +120,8 @@ export default function MarkdownContent({ content, className = "" }: Props) {
 
     // Regular paragraph — collect until blank line
     const paraLines: string[] = [];
-    while (i < lines.length && lines[i].trim() !== "" && !lines[i].match(/^[#>*-]/) && !/^\d+\. /.test(lines[i])) {
+    while (i < lines.length && lines[i].trim() !== "" &&
+      !/^(?:#{1,6} |> |- |\* |\d+\. )/.test(lines[i]) && !/^[-*_]{3,}$/.test(lines[i])) {
       paraLines.push(lines[i]);
       i++;
     }
@@ -143,6 +131,10 @@ export default function MarkdownContent({ content, className = "" }: Props) {
           {parseInline(paraLines.join(" "))}
         </p>
       );
+    } else {
+      // Unsupported block syntax must still consume a line.
+      elements.push(<p key={key()} className="text-white/75 leading-relaxed my-3">{parseInline(line)}</p>);
+      i++;
     }
   }
 

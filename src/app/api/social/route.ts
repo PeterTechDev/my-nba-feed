@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { teams } from "@/lib/teams";
+import { teamSubreddits } from "@/lib/reddit";
+import { parseCommunityFeed } from "@/lib/communityFeed";
 
 interface RedditPost {
   id: string;
   title: string;
-  score: number;
-  comments: number;
+  score: number | null;
+  comments: number | null;
   created: number;
   url: string;
   subreddit: string;
@@ -98,7 +100,7 @@ function getQualityScore(post: RedditPost, subreddit: string): number {
 
   if (subreddit !== "nba") score += 10;
 
-  const engagementScore = Math.min(20, Math.log10(Math.max(1, post.score + post.comments)) * 6);
+  const engagementScore = Math.min(20, Math.log10(Math.max(1, (post.score ?? 0) + (post.comments ?? 0))) * 6);
   score += engagementScore;
 
   const ageHours = Math.max(0, (Date.now() / 1000 - post.created) / 3600);
@@ -110,64 +112,54 @@ function getQualityScore(post: RedditPost, subreddit: string): number {
 }
 
 export async function GET(req: NextRequest) {
-  const team = req.nextUrl.searchParams.get("team");
-  const subreddit = req.nextUrl.searchParams.get("subreddit");
-
-  if (!team) return NextResponse.json({ posts: [], error: "team required" }, { status: 400 });
-
-  try {
-    const subs = ["nba"];
-    if (subreddit) subs.push(subreddit);
-    const keywords = getTeamKeywords(team);
-
-    const allPosts: RedditPost[] = [];
-    let availableSources = 0;
-
-    for (const sub of subs) {
+  const teamName = req.nextUrl.searchParams.get("team");
+  const team = teams.find((entry) => entry.name === teamName);
+  if (!team) return NextResponse.json({ posts: [], error: "Valid team required" }, { status: 400 });
+  const subreddit = teamSubreddits[team.name];
+  const subs = subreddit ? ["nba", subreddit] : ["nba"];
+  const keywords = getTeamKeywords(team.name);
+  let usedIndex = false;
+  const fetchSource = async (sub: string): Promise<RedditPost[]> => {
+    try {
+      const response = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=25`, {
+        headers: { "User-Agent": "NBA-Feed/1.0" }, next: { revalidate: 120 }, signal: AbortSignal.timeout(3500),
+      });
+      if (!response.ok) throw new Error("Reddit feed unavailable");
+      const json = await response.json();
+      if (!Array.isArray(json.data?.children)) throw new Error("Invalid Reddit feed");
+      return (json.data.children as RedditListingChild[]).map(({ data }) => ({
+        id: data.id, title: data.title, score: data.score, comments: data.num_comments, created: data.created_utc,
+        url: `https://reddit.com${data.permalink}`, subreddit: data.subreddit, author: data.author,
+        thumbnail: /^https:\/\//.test(data.thumbnail) ? data.thumbnail : null, category: getCategory(data.title),
+      }));
+    } catch {
       try {
-        const res = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=25`, {
-          headers: { "User-Agent": "NBA-Feed/1.0" },
-          next: { revalidate: 120 },
+        const response = await fetch(`https://www.reddit.com/r/${sub}/new/.rss`, {
+          headers: { "User-Agent": "NBA-Feed/1.0" }, next: { revalidate: 120 }, signal: AbortSignal.timeout(3500),
         });
-
-        if (!res.ok) continue;
-        const json = await res.json();
-        availableSources++;
-        const posts = ((json.data?.children || []) as RedditListingChild[]).map((c) => ({
-          id: c.data.id,
-          title: c.data.title,
-          score: c.data.score,
-          comments: c.data.num_comments,
-          created: c.data.created_utc,
-          url: `https://reddit.com${c.data.permalink}`,
-          subreddit: c.data.subreddit,
-          author: c.data.author,
-          thumbnail: c.data.thumbnail !== "self" && c.data.thumbnail !== "default" && c.data.thumbnail !== "nsfw" ? c.data.thumbnail : null,
-          category: getCategory(c.data.title),
-        }));
-
-        const filteredPosts = sub === "nba"
-          ? posts.filter((post) => isRelevantToTeam(post.title, keywords))
-          : posts;
-
-        allPosts.push(...filteredPosts);
+        if (!response.ok) throw new Error("Reddit RSS unavailable");
+        const entries = parseCommunityFeed(await response.text());
+        if (!entries.length) throw new Error("Reddit RSS empty");
+        return entries.map((entry) => ({ ...entry, score: null, comments: null, subreddit: sub, thumbnail: null, category: getCategory(entry.title) }));
       } catch {
-        // Skip failed subreddit
+        const query = `site:reddit.com/r/${sub} ${team.city} ${team.name}`;
+        const response = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`, {
+          next: { revalidate: 600 }, signal: AbortSignal.timeout(3500),
+        });
+        if (!response.ok) throw new Error("Community sources unavailable");
+        const entries = parseCommunityFeed(await response.text());
+        if (!entries.length) throw new Error("Community sources empty");
+        usedIndex = true;
+        return entries.map((entry) => ({ ...entry, score: null, comments: null, subreddit: sub, thumbnail: null, category: getCategory(entry.title) }));
       }
     }
-
-    if (availableSources === 0) return NextResponse.json({ posts: [], error: "Social sources unavailable" }, { status: 502 });
-
-    const dedupedPosts = Array.from(new Map(allPosts.map((post) => [post.id, post])).values());
-
-    dedupedPosts.sort((a, b) => {
-      const scoreDiff = getQualityScore(b, b.subreddit) - getQualityScore(a, a.subreddit);
-      if (scoreDiff !== 0) return scoreDiff;
-      return b.created - a.created;
-    });
-
-    return NextResponse.json({ posts: dedupedPosts.slice(0, 50), error: null });
-  } catch {
-    return NextResponse.json({ posts: [], error: "Failed to fetch" }, { status: 500 });
-  }
+  };
+  const results = await Promise.allSettled(subs.map(fetchSource));
+  const fulfilled = results.filter((result) => result.status === "fulfilled");
+  if (!fulfilled.length) return NextResponse.json({ posts: [], error: "Social sources unavailable" }, { status: 502 });
+  const posts = fulfilled.flatMap((result) => result.value)
+    .filter((post) => post.subreddit !== "nba" || isRelevantToTeam(post.title, keywords));
+  const deduped = Array.from(new Map(posts.map((post) => [new URL(post.url).pathname, post])).values());
+  deduped.sort((a, b) => getQualityScore(b, b.subreddit) - getQualityScore(a, a.subreddit) || b.created - a.created);
+  return NextResponse.json({ posts: deduped.slice(0, 50), source: usedIndex ? "news-index" : "reddit", partial: fulfilled.length < subs.length, error: null });
 }

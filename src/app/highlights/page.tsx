@@ -3,6 +3,8 @@ import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
+import { formatGameDate } from "@/lib/nbaDate";
+import { isFinalStatus } from "@/lib/gameStatus";
 
 interface HighlightGame {
   id: number;
@@ -36,7 +38,7 @@ export default function HighlightsPage() {
     `/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`
   );
   const highlights: HighlightGame[] = (data?.games || [])
-    .filter((game) => game.status === "Final")
+    .filter((game) => isFinalStatus(game.status))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 15)
     .map((game) => {
@@ -44,7 +46,7 @@ export default function HighlightsPage() {
       const opponent = isHome ? game.awayTeam : game.homeTeam;
       const teamScore = isHome ? game.homeScore : game.awayScore;
       const oppScore = isHome ? game.awayScore : game.homeScore;
-      const date = new Date(game.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const date = formatGameDate(game.date, { month: "short", day: "numeric", year: "numeric" });
       return {
         id: game.id, date: game.date, opponent: opponent.name, opponentAbbr: opponent.abbreviation,
         isHome, teamScore, oppScore, won: teamScore > oppScore,
@@ -79,7 +81,7 @@ export default function HighlightsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {highlights.map((h) => {
-            const date = new Date(h.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+            const date = formatGameDate(h.date, { weekday: "short", month: "short", day: "numeric" });
             return (
               <a
                 key={h.id}
@@ -118,7 +120,7 @@ export default function HighlightsPage() {
           href={`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedTeam.city + " " + selectedTeam.name + " highlights " + new Date().getFullYear())}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition text-sm font-medium"
+          className="inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-lg bg-red-600/20 text-red-300 hover:bg-red-600/30 transition text-sm font-medium"
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
           More on YouTube

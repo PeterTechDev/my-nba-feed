@@ -74,8 +74,8 @@ export default function StandingsPage() {
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={getLogoUrl(team.abbreviation)} alt="" className="w-5 h-5" />
                           <span className="font-medium">{team.abbreviation}</span>
-                          {isPlayoff && <span className="text-[9px] text-emerald-400/60 font-medium">●</span>}
-                          {isPlayIn && <span className="text-[9px] text-yellow-400/60 font-medium">●</span>}
+                          {isPlayoff && <><span aria-hidden="true" className="text-[10px] text-emerald-300 font-medium">P</span><span className="sr-only">Playoff position</span></>}
+                          {isPlayIn && <><span aria-hidden="true" className="text-[10px] text-yellow-300 font-medium">PI</span><span className="sr-only">Play-In position</span></>}
                         </div>
                       </td>
                       <td className="text-center p-3 tabular-nums font-medium">{team.wins}</td>
@@ -89,8 +89,8 @@ export default function StandingsPage() {
             </table>
           </div>
           <div className="px-4 py-2 flex gap-4 text-[10px] text-white/70 border-t border-white/5">
-            <span className="flex items-center gap-1"><span className="text-emerald-400">●</span> Playoff</span>
-            <span className="flex items-center gap-1"><span className="text-yellow-400">●</span> Play-In</span>
+            <span className="flex items-center gap-1"><span className="text-emerald-300">P</span> Playoff</span>
+            <span className="flex items-center gap-1"><span className="text-yellow-300">PI</span> Play-In</span>
           </div>
         </div>
       </div>
