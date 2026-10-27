@@ -66,7 +66,7 @@ test("full generator uses only runner AI, authenticates the publisher, and verif
   assert.deepEqual(f.saved.games_covered, ["CHI 99–134 BOS"]);
   assert.match(f.saved.content, /League date: 2026-10-26/);
   assert.match(f.saved.content, /scoreboard\?dates=20261026/);
-  assert.equal(f.saved.metadata.model, "Qwen2.5-1.5B-Instruct (CPU, Q4_K_M)");
+  assert.equal(f.saved.metadata.model, "Qwen2.5-7B-Instruct (CPU, Q4_K_M)");
   assert.ok(f.saved.metadata.generation_time_ms >= 0);
   for (const { url, options } of f.calls) {
     assert.equal(options.headers?.Authorization, url.includes("/api/digest") && options.method === "POST" ? "Bearer publisher-secret" : undefined);
@@ -74,7 +74,7 @@ test("full generator uses only runner AI, authenticates the publisher, and verif
   }
   const request = JSON.parse(f.calls.find(({ url }) => url.startsWith("http://127.0.0.1")).options.body);
   assert.equal(request.response_format.schema.additionalProperties, false);
-  assert.equal(request.model, "qwen2.5-1.5b-instruct");
+  assert.equal(request.model, "qwen2.5-7b-instruct");
   assert.equal(request.max_tokens, 1200);
 });
 

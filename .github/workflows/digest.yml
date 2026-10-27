@@ -42,12 +42,15 @@ jobs:
             https://github.com/ggml-org/llama.cpp/releases/download/b11928/llama-b11928-bin-ubuntu-x64.tar.gz
           echo "c4fdc4b9913c3fc7b0ede9ed1970a43271aff7366889444797e05472f7c365da  $task_model_dir/llama.tar.gz" | sha256sum --check
           tar -xzf "$task_model_dir/llama.tar.gz" -C "$task_model_dir"
-          curl --fail --location --retry 3 --output "$task_model_dir/model.gguf" \
-            https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf
-          echo "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e  $task_model_dir/model.gguf" | sha256sum --check
-          "$task_model_dir/llama-b11928/llama-server" --model "$task_model_dir/model.gguf" \
+          for part in 00001 00002; do
+            curl --fail --location --retry 3 --output "$task_model_dir/qwen2.5-7b-instruct-q4_k_m-$part-of-00002.gguf" \
+              "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/bb5d59e06d9551d752d08b292a50eb208b07ab1f/qwen2.5-7b-instruct-q4_k_m-$part-of-00002.gguf"
+          done
+          echo "dfce12e3862a5283ccfb88221b48480e58745165de856439950d0f22590580db  $task_model_dir/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf" | sha256sum --check
+          echo "539cf93f78e887edea1c04e2d7d8cdaca9d01dae9c9025bcb8accbe29df3d72a  $task_model_dir/qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf" | sha256sum --check
+          "$task_model_dir/llama-b11928/llama-server" --model "$task_model_dir/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf" \
             --host 127.0.0.1 --port 8080 --threads 4 --ctx-size 4096 --parallel 1 \
-            --alias qwen2.5-1.5b-instruct > "$RUNNER_TEMP/digest-model.log" 2>&1 &
+            --alias qwen2.5-7b-instruct > "$RUNNER_TEMP/digest-model.log" 2>&1 &
           echo "$!" > "$RUNNER_TEMP/digest-model.pid"
           for attempt in {1..60}; do
             if curl --silent --fail http://127.0.0.1:8080/health; then exit 0; fi

@@ -15,18 +15,18 @@ removed. Never commit env files, print the token or upload credential files.
 
 ## Free inference
 
-Qwen2.5-1.5B-Instruct (Apache-2.0), quantized Q4_K_M, runs on the standard GitHub
+Qwen2.5-7B-Instruct (Apache-2.0), quantized Q4_K_M, runs on the standard GitHub
 Ubuntu 24.04 runner's CPU through llama.cpp. Inference listens only on
 `127.0.0.1:8080`; no prompt or credential is sent to a model provider.
 The workflow pins the runtime release and model revision, checks both SHA-256
 hashes, and discards the temporary model/server after the job. No model weights
-are committed or uploaded as artifacts. The roughly 1.1 GB model download happens
+are committed or uploaded as artifacts. The roughly 4.7 GB model download happens
 inside the cloud runner, not on the owner's computer.
 
 [Standard Actions runners are free for public repositories](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 This depends on the repository remaining public and using a standard runner.
-The small CPU model has less writing capacity than a large paid model; validation
-rejects malformed/incomplete outputs, while scores and source references come from code.
+Validation rejects malformed/incomplete outputs, while matchup scores, margin
+statistics and source references come from code.
 
 ## Each run
 
