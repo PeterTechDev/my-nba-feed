@@ -86,6 +86,20 @@ test("repeat runs skip generation; replacement requires an explicit manual optio
   assert.equal(f.saved.title, output.title);
 });
 
+test("model context separates the completed opponent from the next scheduled matchup", async () => {
+  const f = fixture({ celtics: { ...boston, nextGame: {
+    date: "2026-10-27", startTime: "2026-10-27T23:30:00Z",
+    homeTeam: { full_name: "Boston Celtics" }, awayTeam: { full_name: "Brooklyn Nets" },
+  } } });
+  await run(f);
+  const request = JSON.parse(f.calls.find(({ url }) => url.startsWith("http://127.0.0.1")).options.body);
+  const context = JSON.parse(request.messages[1].content);
+  assert.match(context.completed_games[0], /Chicago Bulls 99 at Boston Celtics 134/);
+  assert.equal(context.next_celtics_game.away, "Brooklyn Nets");
+  assert.equal(context.next_celtics_game.tipoff_utc, "2026-10-27T23:30:00Z");
+  assert.ok(!JSON.stringify(context.next_celtics_game).includes("Chicago"));
+});
+
 test("source disagreement, invalid generation, incomplete responses and model errors never publish", async () => {
   for (const config of [{ celtics: { error: "Unavailable" } },
     { celtics: { ...boston, lastGame: { ...boston.lastGame, homeScore: 100 } } },

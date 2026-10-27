@@ -75,5 +75,16 @@ GitHub automatically disables scheduled workflows in a public repository after
 60 days without repository activity. Check the Actions workflow status and re-enable
 it if GitHub disables it; there is no hidden keepalive commit. See
 [GitHub schedule behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
-The previous local Codex automation should stay disabled after cloud verification,
-so there is only one daily generator.
+The previous local Codex automation **Publicar Phantom Digest** is disabled
+(PAUSED) after cloud verification on October 27, 2026. There is one active daily
+generator, hosted by GitHub.
+
+## Production verification
+
+[Cloud run on October 27, 2026](https://github.com/PeterTechDev/my-nba-feed/actions/runs/40508335180)
+completed generation, authenticated publication and fresh read verification in
+1 minute 49 seconds. The published edition identifies Qwen2.5-7B-Instruct and covers
+the nine completed games on October 26. Browser verification passed 24 checks,
+including spoilers, reload persistence, date/archive reads, four viewport sizes,
+axe accessibility, My Teams identities and retained favorites. No production test
+reactions were submitted. The next scheduled daily trigger was not awaited.
