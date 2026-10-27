@@ -5,6 +5,9 @@
 :root {
   --team-primary: #007A33;
   --team-secondary: #BA9653;
+  --motion-quick: 140ms;
+  --motion-enter: 240ms;
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 body {
@@ -35,9 +38,91 @@ body {
   color: #0a0a0a;
 }
 
+@layer base {
+  :where(button, a, summary, select, input) {
+    transition: color var(--motion-quick), background-color var(--motion-quick),
+      border-color var(--motion-quick), opacity var(--motion-quick),
+      transform var(--motion-quick) var(--motion-ease);
+  }
+}
+
+@keyframes content-in {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+@keyframes dialog-in {
+  from { opacity: 0.6; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes score-uncover {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0); }
+}
+
+@keyframes navigation-in {
+  from { opacity: 0.6; clip-path: inset(0 0 100% 0); }
+  to { opacity: 1; clip-path: inset(0); }
+}
+
+@keyframes selection-in {
+  from { transform: scale(0.5); }
+  to { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  main {
+    animation: content-in 180ms var(--motion-ease);
+  }
+
+  button:enabled:active {
+    transform: scale(0.98);
+  }
+
+  dialog[open] {
+    animation: dialog-in var(--motion-enter) var(--motion-ease);
+  }
+
+  dialog[open]::backdrop {
+    animation: backdrop-in 180ms ease-out;
+  }
+
+  #mobile-navigation:not([hidden]) {
+    animation: navigation-in 180ms var(--motion-ease);
+  }
+
+  .score-reveal {
+    animation: score-uncover 300ms var(--motion-ease);
+  }
+
+  .team-selection-indicator {
+    animation: selection-in 180ms var(--motion-ease);
+  }
+
+  details[open] > :not(summary),
+  .disclosure-panel:not([hidden]),
+  .content-reveal {
+    animation: content-in var(--motion-enter) var(--motion-ease);
+  }
+
+  summary svg {
+    transition: transform var(--motion-quick) var(--motion-ease);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
     transition: none !important;
+  }
+
+  :where(button, a, summary, select, input) {
+    transition: color 100ms, background-color 100ms, border-color 100ms !important;
   }
 }

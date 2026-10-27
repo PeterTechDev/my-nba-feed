@@ -12,7 +12,7 @@ function ProtectedScore({ label, children }: { label: string; children: React.Re
         {revealed ? "Hide" : "Reveal"} {label}
       </button>
     </div>
-    {revealed && children}
+    {revealed && <div className="score-reveal">{children}</div>}
   </div>;
 }
 

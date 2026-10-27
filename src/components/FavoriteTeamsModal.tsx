@@ -78,7 +78,7 @@ export default function FavoriteTeamsModal({ onClose }: FavoriteTeamsModalProps)
                     </span>
                     {selected && (
                       <span
-                        className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full flex items-center justify-center"
+                        className="team-selection-indicator absolute top-1 right-1 w-2.5 h-2.5 rounded-full flex items-center justify-center"
                         style={{ backgroundColor: team.primaryColor }}
                       />
                     )}

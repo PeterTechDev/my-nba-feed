@@ -106,9 +106,12 @@ Set `BALLDONTLIE_KEY` in your environment before starting the app.
 
 Connect a **private Vercel Blob store** to the project. Production uses the
 automatically configured `BLOB_STORE_ID` and Vercel OIDC; no browser receives a
-storage credential. For local development Blob access, pull development credentials
+storage credential. Include **Development** in the store's project connections;
+a Production/Preview-only connection leaves local digest APIs returning 503.
+For local development Blob access, pull development credentials
 with `vercel env pull .env.development.local`. Keep all secrets in ignored environment
 files and preserve the publisher token in `.env.local` when pulling development values.
+Refresh the pulled credentials when the short-lived local OIDC token expires.
 
 Set a server-only `DIGEST_PUBLISH_TOKEN` for the external digest publisher.
 Publish to `POST /api/digest` with `Authorization: Bearer <DIGEST_PUBLISH_TOKEN>`
@@ -137,6 +140,10 @@ JSON, then its RSS feed, then a clearly identified news index of Reddit links.
 Missing votes/comments are omitted rather than presented as zero.
 
 ### Regression checks
+
+Run `node scripts/test-digest-writes.mjs` with development Blob credentials to
+check publishing, replacement, validation and concurrent reactions against real
+storage. It uses a unique test folder and deletes its documents afterward.
 
 Highlights use full-game videos from the NBA's official YouTube channel, with an
 inline player loaded only after clicking Play. A daily GitHub Actions job uses the

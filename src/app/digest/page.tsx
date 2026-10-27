@@ -58,7 +58,7 @@ function DigestCard({ digest, feedback, reaction, pending, reactionError, onReac
           </button>
         </div>
       )}
-      {!hidden && <>
+      {!hidden && <div className="content-reveal">
         <MarkdownContent content={presentation.content} className="mb-5 break-words" />
         {digest.stats_highlighted.length > 0 && <div className="mb-4">
           <h3 className="font-semibold mb-2">Key stats</h3>
@@ -89,7 +89,7 @@ function DigestCard({ digest, feedback, reaction, pending, reactionError, onReac
           {reaction && <span role="status" className="text-xs text-white/70">Reaction saved</span>}
         </div>
         {reactionError && <p role="alert" className="mt-2 text-sm text-red-300">{reactionError}</p>}
-      </>}
+      </div>}
     </div>
   );
 }
@@ -113,7 +113,7 @@ function ArchiveItem(props: DigestCardProps) {
       </div>
       {open ? <ChevronUp className="w-4 h-4 text-white/70 shrink-0" aria-hidden="true" /> : <ChevronDown className="w-4 h-4 text-white/70 shrink-0" aria-hidden="true" />}
     </button>
-    <div id={panelId} hidden={!open}>{open && <div className="border-t border-white/10"><DigestCard {...props} /></div>}</div>
+    <div id={panelId} hidden={!open} className="disclosure-panel">{open && <div className="border-t border-white/10"><DigestCard {...props} /></div>}</div>
   </div>;
 }
 

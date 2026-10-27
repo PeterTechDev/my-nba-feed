@@ -15,6 +15,6 @@ export default function SpoilerGuard({ label, children }: { label: string; child
         {revealed ? `Hide ${label}` : `Reveal ${label}`}
       </button>
     </div>}
-    {(!hideScores || revealed) && children}
+    {(!hideScores || revealed) && <div className="content-reveal">{children}</div>}
   </>;
 }
