@@ -32,6 +32,7 @@ export default async function runPagesRegression(page) {
       { ...game, id: 3, date: "2026-10-28", status: "Postponed" },
       { ...game, id: 4, date: "2026-10-29", status: "Scheduled", startTime: "2026-10-29T23:30:00Z" },
     ] };
+    else if (key === "highlights") body = { videos: { "2026-10-26": { id: "77", thumbnail: "https://a.espncdn.com/video/77.jpg", url: "https://www.espn.com/video/clip/_/id/77", duration: 71 } }, failedDates: [] };
     else if (key === "players") body = { players: [{ id: 1, firstName: "Current", lastName: "Player", jerseyNumber: "7", position: "G", height: "6-4", weight: "200" }], source: "ESPN" };
     else if (key === "standings") body = { standings: Array.from({ length: 10 }, (_, i) => ({ id: i + 1, name: "Team " + i, abbreviation: i === 0 ? "BOS" : "BKN", conference: "East", wins: 10 - i, losses: i })) };
     else if (key === "compare") body = { team1: { wins: 2, losses: 1, ppg: "110", oppg: "105", gamesPlayed: 3 }, team2: { wins: 3, losses: 1, ppg: "120", oppg: "105", gamesPlayed: 4 }, headToHead: { team1Wins: 0, team2Wins: 0 } };
@@ -94,9 +95,10 @@ export default async function runPagesRegression(page) {
     check(await p.getByText("Final/OT", { exact: true }).filter({ visible: true }).count() === 1, "Schedule recognizes overtime finals");
     check(await p.getByText(/8:30 PM/).count() >= 1, "Schedule shows local tipoff with timezone");
     await go("/highlights"); await p.getByText("Mon, Oct 26", { exact: true }).waitFor();
-    const video = p.getByRole("link").filter({ hasText: "vs Nets" }).first();
-    check(decodeURIComponent(await video.getAttribute("href")).includes("Oct 26, 2026"), "Highlights preserve the league day in both label and video query");
-    check((await p.getByRole("link", { name: "More on YouTube" }).boundingBox()).height >= 44, "Highlights footer has a 44px target");
+    await p.getByRole("button", { name: "Reveal video preview vs Nets", exact: true }).click();
+    const video = p.getByRole("link", { name: "Watch highlights vs Nets on ESPN (opens in a new tab)", exact: true });
+    check((await video.getAttribute("href")) === "https://www.espn.com/video/clip/_/id/77", "Highlights link directly to the real video");
+    check((await p.getByRole("link", { name: "Search more highlights" }).boundingBox()).height >= 44, "Highlights footer has a 44px target");
     await go("/compare"); await p.getByText("120", { exact: true }).waitFor();
     check(await p.locator("main .rounded-r").first().evaluate((el) => getComputedStyle(el).backgroundColor !== "rgb(0, 0, 0)"), "Nets chart uses a visible color");
     check((await p.getByLabel("Team 1", { exact: true }).boundingBox()).height >= 44, "Comparison selects have 44px targets");

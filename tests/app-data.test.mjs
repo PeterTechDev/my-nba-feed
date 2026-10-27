@@ -30,6 +30,82 @@ const imports = {
   "@/lib/news": newsTools,
 };
 
+test("highlights match completed team games and accept only real, safe video media", async () => {
+  const now = new Date("2026-10-27T14:00:00Z");
+  class FixedDate extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now.getTime(); } }
+  const clip = { id: 77, headline: "Bulls vs. Celtics: Game Highlights", thumbnail: "https://a.espncdn.com/video/77.jpg", duration: 71 };
+  const competition = { status: { type: { completed: true } }, competitors: [{ team: { abbreviation: "BOS" } }, { team: { abbreviation: "CHI" } }], headlines: [{ video: [clip] }] };
+  let events = [{ date: "2026-10-26T23:30Z", competitions: [competition] }];
+  let failedDate = "", calls = 0;
+  const route = load("app/api/highlights/route.ts", { Date: FixedDate, fetch: async (url) => {
+    calls++;
+    return { ok: !url.includes(failedDate || "never-fail"), json: async () => ({ events }) };
+  } }, imports).exports;
+  const get = (query = "teamId=2&dates=2026-10-26") => route.GET({ nextUrl: new URL("http://localhost/api/highlights?" + query) });
+  let result = await get();
+  assert.equal(result.body.videos["2026-10-26"].url, "https://www.espn.com/video/clip/_/id/77");
+  assert.equal(result.body.videos["2026-10-26"].thumbnail, clip.thumbnail);
+  assert.equal(result.body.videos["2026-10-26"].duration, 71);
+  for (const invalid of ["", "teamId=999&dates=2026-10-26", "teamId=2&dates=2026-02-30", "teamId=2&dates=2026-10-28", "teamId=2&dates=2026-09-01", "teamId=2&dates=" + Array.from({ length: 16 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`).join(",")]) {
+    const before = calls;
+    assert.equal((await get(invalid)).status, 400);
+    assert.equal(calls, before, "Invalid requests never reach the video source");
+  }
+  for (const change of [
+    { status: { type: { completed: false } } },
+    { competitors: [{ team: { abbreviation: "LAL" } }] },
+    { headlines: [{ video: [{ ...clip, thumbnail: "javascript:alert(1)" }] }] },
+    { headlines: [{ video: [{ ...clip, thumbnail: "https://a.espncdn.com.evil.test/spoiler.jpg" }] }] },
+    { headlines: [{ video: [{ ...clip, headline: "Single dunk" }] }] },
+    { headlines: [{ video: [{ ...clip, id: -1 }] }] },
+  ]) {
+    events = [{ date: "2026-10-26T23:30Z", competitions: [{ ...competition, ...change }] }];
+    assert.equal(Object.keys((await get()).body.videos).length, 0);
+  }
+  events = [{ date: "2026-10-27T02:00Z", competitions: [competition] }];
+  assert.equal((await get()).body.videos["2026-10-26"].id, "77", "Overnight games use the NBA calendar day");
+  failedDate = "20261023";
+  result = await get("teamId=2&dates=2026-10-26,2026-10-23");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.failedDates.join(), "2026-10-23");
+  assert.equal(result.body.videos["2026-10-26"].id, "77");
+  assert.equal((await get("teamId=2&dates=2026-10-23")).status, 502);
+  events = [{ date: "2026-10-26T23:30Z", competitions: [{ ...competition, competitors: [{ team: { abbreviation: "GS" } }] }] }];
+  assert.equal((await get("teamId=10&dates=2026-10-26")).body.videos["2026-10-26"].id, "77", "Provider abbreviations map to the selected team");
+});
+
+test("highlight thumbnails and direct video links respect both spoiler settings", () => {
+  let hideScores = true, hideHeadlines = true;
+  const games = [{ id: 1, date: "2026-10-26", status: "Final", homeTeam: teams.getCeltics(), awayTeam: { name: "Bulls", abbreviation: "CHI" }, homeScore: 134, awayScore: 99 }];
+  const video = { id: "77", thumbnail: "https://a.espncdn.com/video/77.jpg", url: "https://www.espn.com/video/clip/_/id/77", duration: 71 };
+  const remote = { data: { videos: { "2026-10-26": video }, failedDates: [] }, loading: false, error: false, retry() {} };
+  const mocked = { ...imports,
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: teams.getCeltics() }) },
+    "@/hooks/useRemoteData": { useRemoteData: (url) => url?.includes("/api/schedule") ? { data: { games }, loading: false, error: false, retry() {} } : remote },
+    "@/components/SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores, hideHeadlines }) },
+    "@/components/TeamSelector": { default: () => null },
+    "@/components/DataError": load("components/DataError.tsx").exports,
+  };
+  const Page = load("app/highlights/page.tsx", {}, mocked).exports.default;
+  const render = () => renderToStaticMarkup(createElement(Page));
+  for ([hideScores, hideHeadlines] of [[true, true], [false, true], [true, false]]) {
+    assert.match(render(), /Reveal video preview/);
+    assert.doesNotMatch(render(), /src="https:\/\/a.espncdn.com\/video|href="https:\/\/www.espn.com\/video/);
+  }
+  hideScores = false; hideHeadlines = false;
+  let html = render();
+  assert.match(html, /src="https:\/\/a.espncdn.com\/video\/77.jpg/);
+  assert.match(html, /href="https:\/\/www.espn.com\/video\/clip\/_\/id\/77/);
+  assert.match(html, /1:11/);
+  assert.match(html, /134-99/);
+  remote.data.videos = {};
+  assert.match(render(), /Video not available yet/);
+  assert.match(render(), /Search on YouTube/);
+  remote.error = true;
+  assert.match(render(), /Unable to load highlight videos/);
+  assert.match(render(), /Try again/);
+});
+
 test("news selection is fresh, team-specific, deduplicated and newest first", () => {
   const item = (id, title, pubDate = "2026-10-27T12:00:00Z") => ({ title, source: "ESPN", safeTitle: "Protected", isSpoiler: false, category: "analysis", pubDate, link: `https://example.com/${id}` });
   for (const [title, team] of [["Sixers injury report", "76ers"], ["PHI starting lineup", "76ers"], ["Rip City preview", "Trail Blazers"], ["Boston Celtics news", "Celtics"]]) assert.equal(newsTools.isTeamNews(title, team), true);

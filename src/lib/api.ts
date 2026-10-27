@@ -37,6 +37,18 @@ export interface NewsItem {
 
 export type NewsFeeds = Record<string, { items: NewsItem[]; error: boolean }>;
 
+export interface HighlightVideo {
+  id: string;
+  thumbnail: string;
+  url: string;
+  duration: number | null;
+}
+
+export interface HighlightsResponse {
+  videos: Record<string, HighlightVideo>;
+  failedDates: string[];
+}
+
 export function getNewsTitle(item: NewsItem, hideHeadlines: boolean): string {
   const title = hideHeadlines && item.isSpoiler ? item.safeTitle : item.title;
   if (!item.source) return title;

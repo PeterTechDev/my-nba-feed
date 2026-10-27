@@ -22,6 +22,7 @@ export default async function runUiRegression(page) {
   const fixtures = {
     games: { lastGame: game, currentGame: null, nextGame: null, record: { wins: 27, losses: 14 }, error: null },
     schedule: { games: [game] },
+    highlights: { videos: {}, failedDates: [] },
     players: { players: [{ id: 1, firstName: "Test", lastName: "Player", position: "F", jerseyNumber: "0", height: "6-8", weight: "210" }] },
     standings: { standings: [{ ...team, ...stats, conference: "East", division: "Atlantic" }] },
     compare: { team1: stats, team2: { ...stats, wins: 18 }, headToHead: { team1Wins: 2, team2Wins: 1 } },

@@ -138,6 +138,11 @@ Missing votes/comments are omitted rather than presented as zero.
 
 ### Regression checks
 
+Highlights show ESPN video thumbnails and link directly to the clip when one is
+available. Previews stay hidden under spoiler protection until explicitly revealed.
+YouTube search remains a fallback for games without a published clip. No extra API
+key is needed; video lookup uses ESPN's public scoreboard, cached for 10 minutes.
+
 Run `npm run lint`, `npm run build` and `node --experimental-strip-types --test tests/*.test.mjs`.
 The `tests/*regression.mjs` browser suites export functions that accept a
 Playwright page, with the app running on port 3000. Their API fixtures exercise
