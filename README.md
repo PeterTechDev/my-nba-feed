@@ -118,10 +118,13 @@ or storyteller), `title`, `content` (Markdown), and optional `games_covered`,
 Digests and aggregated reactions persist in private Blob documents; conditional
 writes prevent concurrent updates from silently overwriting each other.
 
-The external generator runs as a Codex scheduled follow-up at 08:00 America/Bahia.
-It generates a sourced daily edition and publishes with `npm run digest:publish --
-data/digest-YYYY-MM-DD.json` (Node 22.18+). The computer must be on and Codex running.
-See [the publisher runbook](docs/digest-publisher.md) for the full workflow and recovery.
+The [Daily NBA Digest cloud workflow](https://github.com/PeterTechDev/my-nba-feed/actions/workflows/digest.yml)
+runs on GitHub Actions at 08:00 America/Bahia, using OpenAI and the authenticated
+publisher. It needs no local computer or Codex session. Configure `OPENAI_API_KEY`
+and `DIGEST_PUBLISH_TOKEN` as repository Actions secrets. Existing daily editions
+are preserved unless a manual recovery run explicitly replaces today's edition.
+See [the publisher runbook](docs/digest-publisher.md) for verification, API billing,
+key expiry and GitHub's 60-day inactivity limitation for public repositories.
 Empty content is shown only after a successful read; storage failures have a retry action.
 
 ### Data fallbacks

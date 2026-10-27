@@ -2,11 +2,11 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { parseDigest } from "../src/lib/digest.ts";
 
-const endpoint = "https://my-nba-feed.vercel.app/api/digest";
+export const endpoint = "https://my-nba-feed.vercel.app/api/digest";
 const fields = ["date", "style", "title", "content", "games_covered", "stats_highlighted", "metadata"];
 const sameDigest = (a, b) => fields.every((field) => JSON.stringify(a?.[field]) === JSON.stringify(b?.[field]));
 
-export async function publishDigest(payload, token, fetcher = fetch) {
+export async function publishDigest(payload, token, fetcher = fetch, replaceExisting = false) {
   if (!token?.trim()) throw new Error("DIGEST_PUBLISH_TOKEN is missing");
   const digest = parseDigest(payload);
   const read = async () => {
@@ -17,9 +17,9 @@ export async function publishDigest(payload, token, fetcher = fetch) {
     return (await response.json()).digest;
   };
   const existing = await read();
-  if (existing) {
-    if (!sameDigest(existing, digest)) throw new Error("An edition already exists for this date; refusing to overwrite it");
-    return { status: "already-published", date: digest.date };
+  if (existing && sameDigest(existing, digest)) return { status: "already-published", date: digest.date };
+  if (existing && !replaceExisting) {
+    throw new Error("An edition already exists for this date; refusing to overwrite it");
   }
   const response = await fetcher(endpoint, {
     method: "POST", redirect: "error", signal: AbortSignal.timeout(20000),

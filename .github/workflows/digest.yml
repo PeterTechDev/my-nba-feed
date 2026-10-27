@@ -1,0 +1,40 @@
+name: Daily NBA Digest
+
+on:
+  schedule:
+    # 08:00 America/Bahia (UTC-3).
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+    inputs:
+      replace_today:
+        description: 'Regenerate and replace today’s edition (manual recovery only)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-nba-digest
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.21.1'
+      - name: Check generator and publisher
+        run: node --experimental-strip-types --test tests/digest-generator.test.mjs tests/digest-publisher.test.mjs
+      - name: Generate, publish and verify the daily edition
+        run: npm run digest:generate
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DIGEST_PUBLISH_TOKEN: ${{ secrets.DIGEST_PUBLISH_TOKEN }}
+          DIGEST_REPLACE_TODAY: ${{ github.event_name == 'workflow_dispatch' && inputs.replace_today && 'true' || 'false' }}
