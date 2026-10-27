@@ -1,4 +1,6 @@
-# 🏀 NBA Feed
+# 🏀 My NBA Feed
+
+<img src="public/branding/my-nba-feed-logo-stacked-dark.png" alt="My NBA Feed — amber basketball feed mark and stacked wordmark" width="480">
 
 **Live →** [my-nba-feed.vercel.app](https://my-nba-feed.vercel.app)
 
@@ -32,6 +34,20 @@ Just basketball, on your terms.
 - **Social Feed** — Reddit-powered fan feed per team (r/lakers, r/bostonceltics, etc.)
 - **Spoiler-Free Mode** — Hide scores until you're ready to see them. Remembered across sessions.
 - **Team Selector** — Switch between all 30 NBA teams. Picks up the team's colors automatically.
+
+---
+
+## Brand and Logo
+
+**Option C — The Feed** is the approved logo direction, selected on October 27, 2026:
+an amber basketball/feed mark with a condensed **My NBA Feed** wordmark. The primary
+logo and horizontal, light-background and standalone-mark variations are saved in
+[`public/branding/`](public/branding/). See the [brand guide](docs/branding.md) for
+asset links, intended uses, generation prompts and current limitations.
+
+The shared navigation displays the primary stacked logo, and the standalone mark
+is encoded as the browser favicon. Application copy continues to use **NBA Feed**
+as its short name.
 
 ---
 

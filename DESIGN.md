@@ -82,6 +82,12 @@ An implementation-derived description of the incumbent interface, not a new visu
 
 Sources: `src/app/globals.css`, `tailwind.config.ts`, root layout, shared navigation, TeamHeader, TeamSelector, MorningBriefingCard, GameDayHero, ScoreReveal, Modal, roster, comparison and digest views. Surface-specific About composition remains in `.impeccable/surfaces/src-app-about-page-tsx.md`.
 
+## Brand Identity
+
+The user approved **Option C — The Feed** for the **My NBA Feed** logo on October 27, 2026. Its mark combines three horizontal amber feed bars with curved basketball seams, paired with a condensed bold wordmark. The stacked dark version is the primary asset; horizontal dark, stacked light and standalone-mark variations are saved alongside it in `public/branding/`. See [docs/branding.md](docs/branding.md) for the asset inventory, usage guidance and generation provenance.
+
+The logo's intended colors are amber `#FBBF24`, off-white `#FAFAFA` and near-black `#0A0A0A`. These raster assets do not change application color tokens, Inter typography or contextual team colors. The condensed lettering belongs to the logo only. The shared navigation displays the primary stacked logo; a 64px ICO encoded from the standalone mark supplies the browser favicon. Application copy retains NBA Feed as its short name.
+
 ## Colors
 
 ### Primary
@@ -99,7 +105,7 @@ Inter is loaded through `next/font/google` and exposed by `--font-inter`; Tailwi
 
 ## Layout
 
-Page containers are centered at a maximum width of 1152px, generally with 16px padding that becomes 32px at the 640px breakpoint. Dashboard gaps are commonly 16px, with 24px/32px between sections. Cards use 16px–24px internal padding. Dashboard columns expand at 768px and 1024px; roster cards collapse to divided disclosure rows on mobile. Navigation uses a menu below 1280px and a second link row above it. Main controls generally provide a minimum 44px height.
+Page containers are centered at a maximum width of 1152px, generally with 16px padding that becomes 32px at the 640px breakpoint. Dashboard gaps are commonly 16px, with 24px/32px between sections. Cards use 16px–24px internal padding. Dashboard columns expand at 768px and 1024px; roster cards collapse to divided disclosure rows on mobile. Navigation uses a menu below 1280px and a single row above it. Main controls generally provide a minimum 44px height.
 
 ## Elevation & Depth
 
@@ -114,7 +120,7 @@ Controls have 8px corners, cards and selectable team tiles 12px, dialogs and tea
 - **Buttons:** subdued white-tint fill for focus-team selection and retry; outlined reveal controls; transparent navigation actions. Hover strengthens the fill or foreground. Keep the global focus treatment.
 - **Cards:** dark panel, quiet border and 12px corners. Use the existing flat section/list patterns where the surface already calls for them.
 - **Fields:** comparison uses native selects with a dark field fill, 8px corners and a 44px minimum height. Spoiler settings use native amber-accented checkboxes.
-- **Navigation:** sticky canvas-colored shell, 64px minimum top row, 14px medium links and 16px icons. Active links use a white-tint fill and `aria-current`; the small-screen menu uses a two-column link grid.
+- **Navigation:** sticky canvas-colored shell, 64px minimum row and the approved stacked logo in a 112px × 44px frame that hides its canvas margins. The home link's image has the accessible name My NBA Feed. Desktop uses 14px text links and a separate utility group with a thin divider. Active links use a white-tint fill and `aria-current`. Protection uses amber text; followed teams use an emerald heart with an inline neutral count. Below 640px, compact utilities keep accessible names and tooltips while their text labels are hidden. The small-screen menu uses a two-column link grid with 16px icons.
 - **Badges:** compact fully rounded digest category labels; selected-team counts and live dots remain small status treatments.
 - **Team header:** a team-colored band with a contrast-selected foreground, real team logo and a neutral inset for controls.
 

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Home, Users, BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
 import Modal from "./Modal";
@@ -35,8 +36,8 @@ export default function NavBar() {
     const Icon = link.icon;
     return (
       <Link key={link.href} href={link.href} onClick={() => setMenuOpen(false)} aria-current={active ? "page" : undefined}
-        className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${active ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
-        <Icon aria-hidden="true" className="h-4 w-4" />{link.label}
+        className={`flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition xl:px-1.5 ${active ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
+        <Icon aria-hidden="true" className="h-4 w-4 xl:hidden" />{link.label}
       </Link>
     );
   });
@@ -44,36 +45,39 @@ export default function NavBar() {
   return (
     <>
     <nav aria-label="Main navigation" className="sticky top-0 z-40 border-b border-white/10 bg-[#0a0a0a]">
-      <div className="mx-auto max-w-6xl px-4">
-        <div className="flex min-h-16 items-center gap-0 sm:gap-2">
-          <Link href="/" className="mr-auto flex min-h-11 shrink-0 items-center text-base font-bold text-white">
-            NBA Feed
+      <div className="mx-auto max-w-6xl px-4 sm:px-8">
+        <div className="flex min-h-16 items-center gap-1 sm:gap-2">
+          <Link href="/" className="relative mr-auto block h-11 w-28 shrink-0 overflow-hidden xl:mr-0">
+            <Image src="/branding/my-nba-feed-logo-stacked-dark.png" alt="My NBA Feed" fill sizes="192px" preload className="scale-[1.65] object-cover" />
           </Link>
+          <div className="hidden xl:flex xl:items-center">{navigationLinks}</div>
+          <div className="flex items-center gap-1 xl:ml-auto xl:border-l xl:border-white/10 xl:pl-3">
           <button type="button" onClick={toggleSpoiler}
             aria-label={`${protection}. ${spoilerFree ? "Show scores and headlines by default" : "Hide scores and headlines by default"}`}
-            title="Default spoiler protection. Individual items can be revealed."
+            title={`${protection}. Individual items can be revealed.`}
             aria-pressed={spoilerFree ? true : hideScores || hideHeadlines ? "mixed" : false}
-            className={`flex min-h-11 min-w-11 justify-center shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs min-[360px]:text-sm font-medium sm:px-3 ${hideScores || hideHeadlines ? "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
-            {hideScores || hideHeadlines ? <EyeOff aria-hidden="true" className="hidden h-4 w-4 min-[360px]:block" /> : <Eye aria-hidden="true" className="hidden h-4 w-4 min-[360px]:block" />}
-            <span className="max-w-[4rem] leading-tight sm:hidden">{mobileProtection}</span>
-            <span className="hidden sm:inline">{protection}</span>
+            className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium ${hideScores || hideHeadlines ? "text-amber-300 hover:bg-amber-500/10" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
+            {hideScores || hideHeadlines ? <EyeOff aria-hidden="true" className="h-4 w-4" /> : <Eye aria-hidden="true" className="h-4 w-4" />}
+            <span className="hidden whitespace-nowrap sm:inline">{mobileProtection}</span>
           </button>
           <button type="button" onClick={() => setMyTeamsOpen(true)} aria-label={`My Teams (${favoriteTeamIds.length} selected)`}
-            className={`relative flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-2 text-xs min-[360px]:text-sm sm:px-3 ${favoriteTeamIds.length ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
-            <Heart aria-hidden="true" className="hidden h-4 w-4 min-[360px]:block" />
-            <span>My Teams</span>
-            {favoriteTeamIds.length > 0 && <span aria-hidden="true" className="absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-900 px-1 text-xs text-emerald-200">{favoriteTeamIds.length}</span>}
+            title={`My Teams (${favoriteTeamIds.length} selected)`}
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm text-white/70 hover:bg-white/5 hover:text-white">
+            <Heart aria-hidden="true" className={`h-4 w-4 ${favoriteTeamIds.length ? "text-emerald-300" : ""}`} />
+            <span className="hidden whitespace-nowrap sm:inline">My Teams</span>
+            {favoriteTeamIds.length > 0 && <span aria-hidden="true" className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white/10 px-1 text-xs tabular-nums text-white/70">{favoriteTeamIds.length}</span>}
           </button>
           <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Spoiler settings"
-            className="hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-2 text-sm text-white/70 hover:bg-white/5 hover:text-white sm:flex sm:px-3">
-            <Settings aria-hidden="true" className="h-4 w-4" /><span className="hidden sm:inline">Settings</span>
+            title="Spoiler settings"
+            className="hidden min-h-11 min-w-11 items-center justify-center rounded-lg text-white/70 hover:bg-white/5 hover:text-white sm:flex">
+            <Settings aria-hidden="true" className="h-4 w-4" />
           </button>
           <button type="button" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} aria-controls="mobile-navigation"
             onClick={() => setMenuOpen((open) => !open)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-white/80 hover:bg-white/10 xl:hidden">
             {menuOpen ? <X aria-hidden="true" className="h-5 w-5" /> : <Menu aria-hidden="true" className="h-5 w-5" />}
           </button>
+          </div>
         </div>
-        <div className="hidden border-t border-white/10 py-1 xl:flex xl:items-center xl:gap-1">{navigationLinks}</div>
         <div id="mobile-navigation" hidden={!menuOpen} className="border-t border-white/10 pb-3 pt-2 xl:hidden"
           onKeyDown={(event) => { if (event.key === "Escape") { setMenuOpen(false); document.querySelector<HTMLButtonElement>('[aria-controls="mobile-navigation"]')?.focus(); } }}>
           <div className="grid grid-cols-2 gap-1">{navigationLinks}</div>
