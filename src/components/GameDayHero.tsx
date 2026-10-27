@@ -24,13 +24,13 @@ function getCountdown(dateStr?: string | null): string {
 export default function GameDayHero() {
   const { selectedTeam } = useTeam();
   const { currentGame, nextGame, loading, error, retry } = useGameData();
-  const { hideScores } = useSpoilerContext();
+  const { hideScores, hideHeadlines } = useSpoilerContext();
 
   if (error) return <DataError subject="game data" retry={retry} />;
   if (loading) return null;
 
   const heroGame = currentGame ?? nextGame;
-  if (!heroGame || gameDaysAgo(heroGame.startTime || heroGame.date) !== 0) return null;
+  if (!heroGame || (!currentGame && gameDaysAgo(heroGame.startTime || heroGame.date) !== 0)) return null;
 
   const opponent = getOpponent(heroGame);
   const isLive = Boolean(currentGame);
@@ -50,16 +50,15 @@ export default function GameDayHero() {
       <div className="absolute inset-y-0 right-0 w-40 opacity-20 blur-3xl" style={{ background: selectedTeam.secondaryColor }} />
       <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-3">
-          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.2em] ${
-            isLive
-              ? "border-red-400/30 bg-red-500/10 text-red-300"
-              : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-          }`}>
-            {isLive ? "Live Now" : "Game Day"}
-          </span>
-          <div>
-            <p className="text-sm text-white/70">{isLive ? "Live focus" : "Tonight's focus"}</p>
+          <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-2xl font-bold sm:text-3xl">{matchupLabel}</h2>
+            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
+              isLive
+                ? "border-red-400/30 bg-red-500/10 text-red-300"
+                : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+            }`}>
+              {isLive ? "Live Now" : "Game Day"}
+            </span>
           </div>
           <div className="flex flex-wrap gap-2 text-sm text-white/60">
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
@@ -79,22 +78,25 @@ export default function GameDayHero() {
             )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href="/schedule"
-            className="inline-flex min-h-11 items-center rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
-          >
-            Open schedule
-          </Link>
-          <a
-            href={`https://www.google.com/search?q=${encodeURIComponent(searchContext)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center rounded-lg px-4 py-2 text-sm font-medium transition"
-            style={{ background: selectedTeam.secondaryColor, color: getContrastColor(selectedTeam.secondaryColor) }}
-          >
-            {isLive ? "Live context" : "Matchup context"}
-          </a>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/schedule"
+              className="inline-flex min-h-11 items-center rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+            >
+              Open schedule
+            </Link>
+            <a
+              href={`https://www.google.com/search?q=${encodeURIComponent(searchContext)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center rounded-lg px-4 py-2 text-sm font-medium transition"
+              style={{ background: selectedTeam.secondaryColor, color: getContrastColor(selectedTeam.secondaryColor) }}
+            >
+              Search matchup on Google ↗
+            </a>
+          </div>
+          {(hideScores || hideHeadlines) && <p className="text-xs text-white/70">Google results may contain spoilers.</p>}
         </div>
       </div>
     </section>

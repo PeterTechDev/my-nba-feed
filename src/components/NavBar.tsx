@@ -58,11 +58,11 @@ export default function NavBar() {
           <button type="button" onClick={() => setMyTeamsOpen(true)} aria-label={`My Teams (${favoriteTeamIds.length} selected)`}
             className={`relative flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-2 text-sm sm:px-3 ${favoriteTeamIds.length ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
             <Heart aria-hidden="true" className="h-4 w-4" />
-            <span className="hidden sm:inline">My Teams</span>
-            {favoriteTeamIds.length > 0 && <span aria-hidden="true" className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-900 px-1 text-[10px] text-emerald-200">{favoriteTeamIds.length}</span>}
+            <span>My Teams</span>
+            {favoriteTeamIds.length > 0 && <span aria-hidden="true" className="absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-900 px-1 text-xs text-emerald-200">{favoriteTeamIds.length}</span>}
           </button>
           <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Spoiler settings"
-            className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-2 text-sm text-white/70 hover:bg-white/5 hover:text-white sm:px-3">
+            className="hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-2 text-sm text-white/70 hover:bg-white/5 hover:text-white sm:flex sm:px-3">
             <Settings aria-hidden="true" className="h-4 w-4" /><span className="hidden sm:inline">Settings</span>
           </button>
           <button type="button" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} aria-controls="mobile-navigation"
@@ -74,6 +74,10 @@ export default function NavBar() {
         <div id="mobile-navigation" hidden={!menuOpen} className="border-t border-white/10 pb-3 pt-2 xl:hidden"
           onKeyDown={(event) => { if (event.key === "Escape") { setMenuOpen(false); document.querySelector<HTMLButtonElement>('[aria-controls="mobile-navigation"]')?.focus(); } }}>
           <div className="grid grid-cols-2 gap-1">{navigationLinks}</div>
+          <button type="button" onClick={() => setSettingsOpen(true)}
+            className="mt-2 flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-white/70 hover:bg-white/5 hover:text-white sm:hidden">
+            <Settings aria-hidden="true" className="h-4 w-4" />Spoiler settings
+          </button>
         </div>
       </div>
     </nav>
@@ -83,8 +87,8 @@ export default function NavBar() {
           <div className="mt-5 space-y-3">
             <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
               <div>
-                <p className="text-sm font-medium">Hide scores</p>
-                <p className="text-xs text-white/70 mt-1">Applies to live, last game, schedule, and highlights.</p>
+                <p className="text-sm font-medium">Hide scores and records</p>
+                <p className="text-xs text-white/70 mt-1">Applies to game scores and your focus team&apos;s season record.</p>
               </div>
               <input
                 type="checkbox"
@@ -106,6 +110,7 @@ export default function NavBar() {
               />
             </label>
           </div>
+          <p className="mt-4 text-xs text-white/70">Protection applies inside NBA Feed. External sites and search results may contain spoilers.</p>
       </Modal>
     )}
     {myTeamsOpen && <FavoriteTeamsModal onClose={() => setMyTeamsOpen(false)} />}

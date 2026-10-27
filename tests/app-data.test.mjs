@@ -26,6 +26,77 @@ const imports = {
   "@/lib/nbaDate": dates, "@/lib/gameStatus": status, "@/lib/teams": teams, "@/lib/digest": digest,
 };
 
+test("homepage shows a matchup once, including live games that cross midnight", () => {
+  const api = load("lib/api.ts").exports;
+  const game = { date: "2026-10-27", startTime: "2026-10-27T23:30:00Z", isHome: true,
+    homeTeam: { name: "Celtics", abbreviation: "BOS" }, awayTeam: { name: "Nets", abbreviation: "BKN" },
+    status: "Scheduled", homeScore: 80, awayScore: 70 };
+  const state = { currentGame: null, nextGame: game, loading: false, error: null };
+  let daysAgo = 0;
+  const mocked = { ...imports,
+    "next/link": { default: "a" }, "@/lib/api": api,
+    "@/lib/nbaDate": { ...dates, gameDaysAgo: () => daysAgo },
+    "@/hooks/useGameData": { useGameData: () => state },
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: teams.getCeltics() }) },
+    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }) },
+    "./DataError": load("components/DataError.tsx").exports,
+  };
+  const Hero = load("components/GameDayHero.tsx", {}, mocked).exports.default;
+  const NextGame = load("components/GameSection.tsx", {}, mocked).exports.NextGameCard;
+  assert.match(renderToStaticMarkup(Hero()), /vs Nets/);
+  assert.equal(renderToStaticMarkup(NextGame()), "");
+  daysAgo = -1;
+  assert.equal(renderToStaticMarkup(Hero()), "");
+  assert.match(renderToStaticMarkup(NextGame()), /vs Nets/);
+  daysAgo = 1;
+  state.currentGame = { ...game, status: "4th Qtr" };
+  state.nextGame = null;
+  const live = renderToStaticMarkup(Hero());
+  assert.match(live, /Live Now/);
+  assert.match(live, /Score hidden/);
+  assert.doesNotMatch(live, /BOS 80/);
+  assert.equal(renderToStaticMarkup(NextGame()), "");
+  state.currentGame = null;
+  assert.equal(renderToStaticMarkup(Hero()), "");
+  assert.match(renderToStaticMarkup(NextGame()), /No upcoming game found/);
+});
+
+test("spoiler protection hides season records as well as scores", () => {
+  let hideScores = true;
+  const Record = load("components/RecordBadge.tsx", {}, {
+    "@/hooks/useGameData": { useGameData: () => ({ record: { wins: 3, losses: 1 }, loading: false, error: null }) },
+    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores }) },
+  }).exports.default;
+  assert.equal(renderToStaticMarkup(Record()), "");
+  hideScores = false;
+  assert.match(renderToStaticMarkup(Record()), /3-1/);
+});
+
+test("briefing preserves protected headlines and offers loading, empty and retry states", () => {
+  const response = { data: [{ title: "Celtics win", safeTitle: "Celtics recap", isSpoiler: true,
+    source: "NBA", link: "https://www.nba.com/news/recap" }], loading: false, error: false, retry: () => {} };
+  let hideHeadlines = true;
+  const Briefing = load("components/MorningBriefingCard.tsx", {}, {
+    "@/hooks/useRemoteData": { useRemoteData: () => response },
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: teams.getCeltics() }) },
+    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideHeadlines, hideScores: false }) },
+    "./DataError": load("components/DataError.tsx").exports,
+  }).exports.default;
+  const protectedHtml = renderToStaticMarkup(Briefing());
+  assert.match(protectedHtml, /Celtics recap/);
+  assert.doesNotMatch(protectedHtml, /Celtics win/);
+  assert.match(protectedHtml, /source site may contain spoilers/);
+  hideHeadlines = false;
+  assert.match(renderToStaticMarkup(Briefing()), /Celtics win/);
+  response.loading = true;
+  assert.match(renderToStaticMarkup(Briefing()), /role="status"/);
+  response.loading = false;
+  response.data = [];
+  assert.match(renderToStaticMarkup(Briefing()), /No recent Celtics stories/);
+  response.error = true;
+  assert.match(renderToStaticMarkup(Briefing()), /Try again/);
+});
+
 test("Markdown always terminates, preserves inline emphasis and escapes HTML", () => {
   const module = load("components/MarkdownContent.tsx");
   for (const content of ["**Celtics recap**", "*italic opening*", "#### Fourth-level heading", "-10 point differential", ">quote without space", "#", "*", "-", "Plain paragraph"]) {

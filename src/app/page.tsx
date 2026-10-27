@@ -16,8 +16,8 @@ function FeedContent() {
   return (
     <>
       <TeamHeader />
-      <MorningBriefingCard />
       <GameDayHero />
+      <MorningBriefingCard />
 
       {hasPersonalized ? (
         /* Personalized layout: My Teams first, then league content */

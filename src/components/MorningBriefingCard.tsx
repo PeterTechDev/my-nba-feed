@@ -1,287 +1,47 @@
 "use client";
-import { formatGameDate, formatTipoff, gameDaysAgo } from "@/lib/nbaDate";
-import { fetchRemoteData, useRemoteData } from "@/hooks/useRemoteData";
-import { useEffect, useState } from "react";
-import { useGameData } from "@/hooks/useGameData";
+import { Sun } from "lucide-react";
+import { useRemoteData } from "@/hooks/useRemoteData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
-import { NewsItem, getOpponent, getTeamScore, getOpponentScore, GamesResponse, GameInfo } from "@/lib/api";
-import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
-import { teams } from "@/lib/teams";
-
-function formatDate(value: string): string {
-  return formatGameDate(value, { weekday: "short", month: "short", day: "numeric" });
-}
+import DataError from "./DataError";
+import { NewsItem } from "@/lib/api";
 
 export default function MorningBriefingCard() {
   const { selectedTeam } = useTeam();
-  const { lastGame, currentGame, nextGame, loading, error } = useGameData();
-  const { hideScores, hideHeadlines } = useSpoilerContext();
-  const { favoriteTeamIds } = useFavoriteTeams();
-  const { data: news, loading: newsLoading, error: newsError } = useRemoteData<NewsItem[]>(`/api/news?team=${encodeURIComponent(selectedTeam.name)}`);
-  const topStory = news?.[0] || null;
-  const favoriteKey = favoriteTeamIds.join(",");
-  const [favoriteGames, setFavoriteGames] = useState<{
-    key: string; game: GameInfo | null; teamId: number | null; loading: boolean; error: boolean;
-  }>({ key: "", game: null, teamId: null, loading: false, error: false });
-  const currentFavorites = favoriteGames.key === favoriteKey;
-  const favGamesLoading = favoriteTeamIds.length > 0 && (!currentFavorites || favoriteGames.loading);
-  const favLastNightGame = currentFavorites && favoriteGames.game && favoriteGames.teamId
-    ? { game: favoriteGames.game, teamId: favoriteGames.teamId } : null;
-
-  useEffect(() => {
-    if (favoriteTeamIds.length === 0) return;
-    const key = favoriteTeamIds.join(",");
-    let cancelled = false;
-    setFavoriteGames({ key, game: null, teamId: null, loading: true, error: false });
-    Promise.allSettled(favoriteTeamIds.map(async (teamId) => ({
-      teamId, data: await fetchRemoteData<GamesResponse>(`/api/games?teamId=${teamId}`),
-    }))).then((results) => {
-      if (cancelled) return;
-      const hit = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : [])
-        .find((result) => result.data.lastGame && gameDaysAgo(result.data.lastGame.date) === 1);
-      setFavoriteGames({ key, game: hit?.data.lastGame || null, teamId: hit?.teamId || null,
-        loading: false, error: results.some((result) => result.status === "rejected") });
-    });
-    return () => { cancelled = true; };
-  }, [favoriteTeamIds]);
-
-  if (error) return null;
-
-  if (loading) {
-    return (
-      <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a] animate-pulse">
-        <div className="p-5 space-y-4">
-          <div className="h-3 w-32 bg-white/10 rounded" />
-          <div className="h-5 w-48 bg-white/10 rounded" />
-          <div className="h-4 w-full bg-white/10 rounded" />
-          <div className="h-4 w-3/4 bg-white/10 rounded" />
-        </div>
-      </div>
-    );
-  }
-
-  const todayGame =
-    currentGame ??
-    (nextGame && gameDaysAgo(nextGame.startTime || nextGame.date) === 0 ? nextGame : null);
-
-  // If a favorite team played last night, prioritize that over the default selectedTeam game
-  const lastNightGame: GameInfo | null = (() => {
-    if (favoriteTeamIds.length > 0) {
-      if (favLastNightGame) return favLastNightGame.game;
-      return null; // favorites selected but none played last night
-    }
-    return lastGame && gameDaysAgo(lastGame.date) === 1 ? lastGame : null;
-  })();
-
-  // Which team do we treat as "ours" for the last-night display?
-  const lastNightTeamId: number = (() => {
-    if (favLastNightGame) return favLastNightGame.teamId;
-    return selectedTeam.id;
-  })();
-  const lastNightTeam = teams.find((t) => t.id === lastNightTeamId) ?? selectedTeam;
-
-  const hasContent = todayGame || lastNightGame || topStory;
-  if (!hasContent && !newsLoading) return null;
+  const { hideHeadlines, hideScores } = useSpoilerContext();
+  const { data: news, loading, error, retry } = useRemoteData<NewsItem[]>(`/api/news?team=${encodeURIComponent(selectedTeam.name)}`);
+  const topStory = news?.[0];
 
   return (
-    <section className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
-      <div className="p-5">
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-base">☀️</span>
-          <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest">
-            Morning Briefing
-          </h2>
-          <span className="text-xs text-white/70 ml-auto">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "short",
-              day: "numeric",
-            })}
-          </span>
-        </div>
-
-        <div className="space-y-5">
-          {/* TODAY'S GAME */}
-          <div>
-            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-1.5">
-              Today&apos;s Game
-            </p>
-            {todayGame ? (
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-white">
-                    {selectedTeam.abbreviation}{" "}
-                    <span className="text-white/70">
-                      {todayGame.isHome ? "vs" : "@"}
-                    </span>{" "}
-                    {getOpponent(todayGame).abbreviation}
-                  </p>
-                  <p className="text-xs text-white/70 mt-0.5">
-                    {currentGame
-                      ? currentGame.status || "In progress"
-                      : formatTipoff(todayGame.startTime, todayGame.status)}
-                    {" · "}
-                    {todayGame.isHome ? "Home" : "Away"}
-                  </p>
-                </div>
-                {currentGame && !hideScores && (
-                  <div className="text-right">
-                    <p className="text-lg font-extrabold tabular-nums tracking-tight text-white">
-                      {getTeamScore(currentGame)}
-                      <span className="text-white/70 mx-1">–</span>
-                      {getOpponentScore(currentGame)}
-                    </p>
-                    <p className="text-[10px] text-red-400 font-bold uppercase tracking-wide">
-                      Live
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-white/70 italic">No games today</p>
-            )}
-          </div>
-
-          <div className="border-t border-white/[0.06]" />
-
-          {/* LAST NIGHT */}
-          <div>
-            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-1.5">
-              Last Night
-            </p>
-            {lastNightGame ? (
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  {/* Show which favorite team if different from selectedTeam */}
-                  {favLastNightGame && lastNightTeam.id !== selectedTeam.id && (
-                    <div className="flex items-center gap-1.5 mb-1">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={lastNightTeam.logo} alt={lastNightTeam.name} className="w-4 h-4 object-contain" />
-                      <span className="text-[10px] text-white/70 uppercase tracking-widest">
-                        {lastNightTeam.city} {lastNightTeam.name}
-                      </span>
-                    </div>
-                  )}
-                  {hideScores ? (
-                    <p className="text-sm text-white/60 italic">
-                      Score hidden · {formatDate(lastNightGame.date)} vs{" "}
-                      {(() => {
-                        const isHome = lastNightGame.homeTeam.id === lastNightTeam.id;
-                        return isHome ? lastNightGame.awayTeam.name : lastNightGame.homeTeam.name;
-                      })()}
-                    </p>
-                  ) : (
-                    <>
-                      <p className="text-sm font-semibold text-white">
-                        {lastNightTeam.abbreviation}{" "}
-                        <span className="text-lg font-extrabold tabular-nums">
-                          {lastNightGame.homeTeam.id === lastNightTeam.id
-                            ? lastNightGame.homeScore
-                            : lastNightGame.awayScore}
-                        </span>
-                        <span className="text-white/70 mx-1.5">–</span>
-                        <span className="text-lg font-extrabold tabular-nums">
-                          {lastNightGame.homeTeam.id === lastNightTeam.id
-                            ? lastNightGame.awayScore
-                            : lastNightGame.homeScore}
-                        </span>{" "}
-                        {lastNightGame.homeTeam.id === lastNightTeam.id
-                          ? lastNightGame.awayTeam.abbreviation
-                          : lastNightGame.homeTeam.abbreviation}
-                      </p>
-                      <p className="text-xs text-white/70 mt-0.5">
-                        {lastNightGame.won !== undefined && (
-                          <span
-                            className={
-                              (lastNightGame.homeTeam.id === lastNightTeam.id
-                                ? lastNightGame.homeScore > lastNightGame.awayScore
-                                : lastNightGame.awayScore > lastNightGame.homeScore)
-                                ? "text-emerald-400 font-semibold"
-                                : "text-red-400 font-semibold"
-                            }
-                          >
-                            {(lastNightGame.homeTeam.id === lastNightTeam.id
-                              ? lastNightGame.homeScore > lastNightGame.awayScore
-                              : lastNightGame.awayScore > lastNightGame.homeScore)
-                              ? "Win"
-                              : "Loss"}
-                            {" · "}
-                          </span>
-                        )}
-                        {formatDate(lastNightGame.date)}
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-            ) : favGamesLoading ? (
-              <p className="text-sm text-white/70">Loading favorite games…</p>
-            ) : favoriteTeamIds.length > 0 && favoriteGames.error ? (
-              <p className="text-sm text-white/70">Favorite game data is unavailable.</p>
-            ) : lastGame ? (
-              <p className="text-sm text-white/70 italic">
-                Last game was{" "}
-                {formatDate(lastGame.date)} —{" "}
-                {gameDaysAgo(lastGame.date)}{" "}
-                {gameDaysAgo(lastGame.date) === 1 ? "day" : "days"} ago
-              </p>
-            ) : (
-              <p className="text-sm text-white/70 italic">No recent games</p>
-            )}
-          </div>
-
-          <div className="border-t border-white/[0.06]" />
-
-          {/* HOT TAKE */}
-          <div>
-            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-1.5">
-              🔥 Hot Take
-            </p>
-            {newsLoading ? (
-              <div className="h-4 w-3/4 bg-white/10 rounded animate-pulse" />
-            ) : topStory ? (
-              <a
-                href={topStory.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group block"
-              >
-                <p className="text-sm font-medium text-white/85 group-hover:text-white transition-colors line-clamp-2">
-                  {hideHeadlines && topStory.isSpoiler
-                    ? topStory.safeTitle
-                    : topStory.title}
-                </p>
-                <p className="text-xs text-white/70 mt-1">
-                  {topStory.source && (
-                    <span className="text-white/70">{topStory.source}</span>
-                  )}
-                  {topStory.source && topStory.pubDate && (
-                    <span> · </span>
-                  )}
-                  {topStory.pubDate && (
-                    <span>
-                      {(() => {
-                        const diff =
-                          Date.now() -
-                          new Date(topStory.pubDate).getTime();
-                        const mins = Math.floor(diff / 60000);
-                        if (mins < 60) return `${mins}m ago`;
-                        const hrs = Math.floor(mins / 60);
-                        if (hrs < 24) return `${hrs}h ago`;
-                        return `${Math.floor(hrs / 24)}d ago`;
-                      })()}
-                    </span>
-                  )}
-                </p>
-              </a>
-            ) : (
-              <p className="text-sm text-white/70 italic">{newsError ? "Top story unavailable" : "No stories right now"}</p>
-            )}
-          </div>
-        </div>
+    <section className="rounded-xl bg-[#161616] border border-[#2a2a2a] p-5">
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <Sun aria-hidden="true" className="h-4 w-4 text-amber-300" />
+        <h2 className="text-sm font-semibold">Morning Briefing</h2>
+        <span className="ml-auto text-xs text-white/70">
+          {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+        </span>
       </div>
+      {error ? (
+        <DataError subject="top story" retry={retry} />
+      ) : loading ? (
+        <p role="status" className="text-sm text-white/70">Loading {selectedTeam.name} news…</p>
+      ) : topStory ? (
+        <>
+          <p className="mb-1 text-xs font-medium text-white/70">Top story · {selectedTeam.city} {selectedTeam.name}</p>
+          <a href={topStory.link} target="_blank" rel="noopener noreferrer"
+            className="block rounded-lg hover:bg-white/5 transition-colors">
+            <p className="text-base font-medium leading-relaxed text-white/90">
+              {hideHeadlines && topStory.isSpoiler ? topStory.safeTitle : topStory.title}
+            </p>
+            <span className="inline-flex min-h-11 items-center text-sm text-emerald-400">
+              Read on {topStory.source || "source site"} ↗
+            </span>
+          </a>
+          {(hideHeadlines || hideScores) && <p className="text-xs text-white/70">The source site may contain spoilers.</p>}
+        </>
+      ) : (
+        <p className="text-sm text-white/70">No recent {selectedTeam.name} stories. Check back later.</p>
+      )}
     </section>
   );
 }

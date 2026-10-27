@@ -40,7 +40,7 @@ function timeUntil(dateStr?: string | null): string {
 export function LastGameCard() {
   const { selectedTeam } = useTeam();
   const { lastGame, loading, error } = useGameData();
-  const { hideScores } = useSpoilerContext();
+  const { hideScores, hideHeadlines } = useSpoilerContext();
 
   if (loading) return <SkeletonCard label="Last Game" />;
   if (error) return null;
@@ -88,8 +88,9 @@ export function LastGameCard() {
         rel="noopener noreferrer"
         className="inline-flex min-h-11 items-center mt-3 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
       >
-        Watch Highlights →
+        Find highlights on YouTube ↗
       </a>
+      {(hideScores || hideHeadlines) && <p className="text-xs text-white/70">YouTube results may contain spoilers.</p>}
     </Card>
   );
 }
@@ -99,21 +100,7 @@ export function NextGameCard() {
 
   if (loading) return <SkeletonCard label="Next Game" />;
   if (error) return null;
-  if (currentGame) return (
-    <Card>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest">Current Game</h2>
-        <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-red-400">
-          Live
-        </span>
-      </div>
-      <p className="text-2xl font-bold">{currentGame.isHome ? "vs" : "at"} {getOpponent(currentGame).name}</p>
-      <p className="text-white/60 text-sm mt-1">{currentGame.status || "In progress"}</p>
-      <p className="text-xs text-white/70 mt-3">
-        Follow this matchup until the final buzzer.
-      </p>
-    </Card>
-  );
+  if (currentGame || (nextGame && gameDaysAgo(nextGame.startTime || nextGame.date) === 0)) return null;
   if (!nextGame) return (
     <Card>
       <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest mb-3">Next Game</h2>
@@ -122,7 +109,6 @@ export function NextGameCard() {
   );
 
   const opponent = getOpponent(nextGame);
-  const isGameDay = gameDaysAgo(nextGame.startTime || nextGame.date) === 0;
   const date = formatGameDate(nextGame.date, { weekday: "short", month: "short", day: "numeric" });
   const time = formatTipoff(nextGame.startTime, nextGame.status);
 
@@ -130,24 +116,14 @@ export function NextGameCard() {
     <Card>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest">Next Game</h2>
-        {isGameDay && (
-          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-            Tonight
-          </span>
-        )}
       </div>
       <p className="text-2xl font-bold">{nextGame.isHome ? "vs" : "at"} {opponent.name}</p>
       <p className="text-white/60 text-sm mt-1">
         {date} · {time} · {nextGame.isHome ? "Home" : "Away"}
       </p>
-      <p className={`text-sm mt-2 font-medium ${isGameDay ? "text-white" : "text-emerald-400"}`}>
+      <p className="text-sm mt-2 font-medium text-emerald-400">
         {timeUntil(nextGame.startTime)}
       </p>
-      {isGameDay && (
-        <p className="text-xs text-white/70 mt-3">
-          The dashboard is in game day mode, so tonight&apos;s matchup is front and center.
-        </p>
-      )}
     </Card>
   );
 }

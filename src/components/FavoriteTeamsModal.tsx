@@ -15,11 +15,12 @@ export default function FavoriteTeamsModal({ onClose }: FavoriteTeamsModalProps)
 
   return (
     <Modal title="My Teams" onClose={onClose} wide>
+      <p className="mb-3 text-sm text-white/70">Follow teams for news. Your focus team still controls the games and briefing.</p>
       <div className="mb-5 flex items-start justify-between gap-3">
         <p className="text-sm text-white/70">
           {favoriteTeamIds.length === 0
-            ? "No teams selected — showing the full league feed."
-            : `${favoriteTeamIds.length} team${favoriteTeamIds.length > 1 ? "s" : ""} selected — your feed is personalized.`}
+            ? "No teams followed — showing news for your focus team."
+            : `${favoriteTeamIds.length} team${favoriteTeamIds.length > 1 ? "s" : ""} followed for news.`}
         </p>
         {favoriteTeamIds.length > 0 && <button type="button" onClick={clearFavorites} className="min-h-11 shrink-0 rounded-lg px-3 text-sm text-white/80 hover:bg-white/10">Clear all</button>}
       </div>
@@ -29,7 +30,7 @@ export default function FavoriteTeamsModal({ onClose }: FavoriteTeamsModalProps)
             <h3 className="text-xs font-semibold text-white/70 uppercase tracking-wider mb-3">
               {conf}ern Conference
             </h3>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
               {(conf === "East" ? east : west).map((team) => {
                 const selected = favoriteTeamIds.includes(team.id);
                 return (
@@ -70,10 +71,10 @@ export default function FavoriteTeamsModal({ onClose }: FavoriteTeamsModalProps)
                       className="w-9 h-9 object-contain"
                     />
                     <span
-                      className="text-[10px] text-center leading-tight font-medium"
+                      className="text-xs text-center leading-tight font-medium"
                       style={{ color: "rgba(255,255,255,0.8)" }}
                     >
-                      {team.abbreviation}
+                      {team.name}
                     </span>
                     {selected && (
                       <span
@@ -90,7 +91,7 @@ export default function FavoriteTeamsModal({ onClose }: FavoriteTeamsModalProps)
 
         <div className="mt-2 pt-4 border-t border-white/5">
           <p className="text-xs text-white/70 text-center">
-            Selections are saved automatically · No teams selected shows the full league
+            Saved automatically · Clear all returns to focus-team news
           </p>
         </div>
     </Modal>

@@ -45,7 +45,7 @@ function relativeVisitTime(isoStr: string): string {
 
 export default function NewsFeed({ limit = 3 }: { limit?: number }) {
   const { selectedTeam } = useTeam();
-  const { hideHeadlines } = useSpoilerContext();
+  const { hideHeadlines, hideScores } = useSpoilerContext();
   const { data, loading, error, retry } = useRemoteData<NewsItem[]>(`/api/news?team=${encodeURIComponent(selectedTeam.name)}`);
   const news = data || [];
   const [revealedTeam, setRevealedTeam] = useState<number | null>(null);
@@ -158,8 +158,9 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
                   rel="noopener noreferrer"
                   className="inline-flex min-h-11 items-center text-sm text-white/70 hover:text-white/80 transition-colors"
                 >
-                  View all →
+                  More {selectedTeam.name} news on Google ↗
                 </a>
+                {(hideScores || hideHeadlines) && <p className="text-xs text-white/70">Google results may contain spoilers.</p>}
               </div>
             )}
           </>
