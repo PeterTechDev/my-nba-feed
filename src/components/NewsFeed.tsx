@@ -1,7 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useRemoteData } from "@/hooks/useRemoteData";
+import DataError from "./DataError";
+import { Fragment, useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
-import { NewsItem, getNews } from "@/lib/api";
+import { NewsItem } from "@/lib/api";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 import { useLastVisit } from "@/hooks/useLastVisit";
 
@@ -44,16 +46,11 @@ function relativeVisitTime(isoStr: string): string {
 export default function NewsFeed({ limit = 3 }: { limit?: number }) {
   const { selectedTeam } = useTeam();
   const { hideHeadlines } = useSpoilerContext();
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [revealed, setRevealed] = useState(false);
+  const { data, loading, error, retry } = useRemoteData<NewsItem[]>(`/api/news?team=${encodeURIComponent(selectedTeam.name)}`);
+  const news = data || [];
+  const [revealedTeam, setRevealedTeam] = useState<number | null>(null);
+  const revealed = revealedTeam === selectedTeam.id;
   const { lastVisitAt, ready: visitReady } = useLastVisit();
-
-  useEffect(() => {
-    setLoading(true);
-    setRevealed(false);
-    getNews(selectedTeam.name).then((n) => { setNews(n); setLoading(false); });
-  }, [selectedTeam.name]);
 
   const displayNews = news.slice(0, limit);
   const hasMore = news.length > limit;
@@ -75,7 +72,7 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
       <div className="p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest">News</h3>
+            <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest">News</h2>
             {hideHeadlines && hiddenCount > 0 && (
               <p className="text-[11px] text-amber-400/80 mt-1">
                 {hiddenCount} headline{hiddenCount > 1 ? "s" : ""} hidden to avoid spoilers
@@ -85,14 +82,16 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
           {hideHeadlines && displayNews.some((item) => item.isSpoiler) && (
             <button
               type="button"
-              onClick={() => setRevealed((prev) => !prev)}
-              className="shrink-0 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-medium text-white/60 hover:bg-white/5 hover:text-white/80 transition"
+              onClick={() => setRevealedTeam(revealed ? null : selectedTeam.id)}
+              className="min-h-11 shrink-0 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-medium text-white/60 hover:bg-white/5 hover:text-white/80 transition"
             >
               {revealed ? "Hide spoilers" : "Reveal headlines"}
             </button>
           )}
         </div>
-        {loading ? (
+        {error ? (
+          <DataError subject="news" retry={retry} />
+        ) : loading ? (
           <div className="space-y-4 animate-pulse">
             {[...Array(limit)].map((_, i) => (
               <div key={i} className="space-y-2">
@@ -103,18 +102,18 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
           </div>
         ) : news.length === 0 ? (
           <div className="text-center py-4">
-            <p className="text-white/30 text-sm">No news found</p>
-            <p className="text-white/20 text-xs mt-1">Check back later</p>
+            <p className="text-white/70 text-sm">No news found</p>
+            <p className="text-white/70 text-xs mt-1">Check back later</p>
           </div>
         ) : (
           <>
             <ul className="divide-y divide-white/5">
               {displayNews.map((item, i) => (
-                <>
+                <Fragment key={item.link}>
                   {separatorIndex !== null && i === separatorIndex && (
                     <li key={`separator-${i}`} className="py-3 -mx-2 px-2 flex items-center gap-3 select-none">
                       <div className="flex-1 border-t border-dashed border-white/15" />
-                      <span className="text-[10px] font-medium text-white/30 whitespace-nowrap shrink-0">
+                      <span className="text-[10px] font-medium text-white/70 whitespace-nowrap shrink-0">
                         Since your last visit ({relativeVisitTime(lastVisitAt!)})
                       </span>
                       <div className="flex-1 border-t border-dashed border-white/15" />
@@ -133,22 +132,22 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
                     >
                       {hideHeadlines && item.isSpoiler && !revealed ? item.safeTitle : item.title}
                     </a>
-                    <p className="text-xs text-white/40 mt-1">
+                    <p className="text-xs text-white/70 mt-1">
                       {categoryLabel(item.category) && (
                         <>
                           <span className="text-emerald-400/80">{categoryLabel(item.category)}</span>
                           <span> · </span>
                         </>
                       )}
-                      {item.source && <span className="text-white/50">{item.source}</span>}
+                      {item.source && <span className="text-white/70">{item.source}</span>}
                       {item.source && item.pubDate && <span> · </span>}
                       {item.pubDate && relativeTime(item.pubDate)}
                     </p>
                     {hideHeadlines && item.isSpoiler && !revealed && (
-                      <p className="text-[11px] text-white/25 mt-1">Tap reveal to view the original headline</p>
+                      <p className="text-[11px] text-white/70 mt-1">Tap reveal to view the original headline</p>
                     )}
                   </li>
-                </>
+                </Fragment>
               ))}
             </ul>
             {hasMore && (
@@ -157,7 +156,7 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
                   href={`https://www.google.com/search?q=${encodeURIComponent(selectedTeam.name + " NBA news")}&tbm=nws`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-white/50 hover:text-white/80 transition-colors"
+                  className="text-sm text-white/70 hover:text-white/80 transition-colors"
                 >
                   View all →
                 </a>

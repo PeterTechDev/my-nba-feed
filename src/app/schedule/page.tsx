@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useRemoteData } from "@/hooks/useRemoteData";
+import DataError from "@/components/DataError";
+import { useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
 
@@ -24,8 +26,6 @@ function getFirstDayOfWeek(year: number, month: number) {
 export default function SchedulePage() {
   const { selectedTeam } = useTeam();
   const { hideScores } = useSpoilerContext();
-  const [games, setGames] = useState<ScheduleGame[]>([]);
-  const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const year = currentDate.getFullYear();
@@ -33,16 +33,12 @@ export default function SchedulePage() {
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfWeek(year, month);
 
-  useEffect(() => {
-    setLoading(true);
-    const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
-    const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
-
-    fetch(`/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`)
-      .then((r) => r.json())
-      .then((d) => { setGames(d.games || []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [selectedTeam.id, year, month, daysInMonth]);
+  const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+  const { data, loading, error, retry } = useRemoteData<{ games: ScheduleGame[] }>(
+    `/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`
+  );
+  const games = data?.games || [];
 
   const getGameForDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -61,23 +57,24 @@ export default function SchedulePage() {
         <img src={selectedTeam.logo} alt="" className="w-10 h-10" />
         <div>
           <h1 className="text-2xl font-bold">{selectedTeam.name} Schedule</h1>
-          <p className="text-sm text-white/40">Season games calendar</p>
+          <p className="text-sm text-white/70">Season games calendar</p>
         </div>
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm">
+        <button onClick={prevMonth} className="min-h-11 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm">
           Prev
         </button>
         <h2 className="text-lg font-bold">{monthLabel}</h2>
-        <button onClick={nextMonth} className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm">
+        <button onClick={nextMonth} className="min-h-11 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm">
           Next
         </button>
       </div>
 
+      {error ? <DataError subject="the schedule" retry={retry} /> : <>
       {/* Desktop: Calendar grid */}
       <div className="hidden sm:block rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
-        <div className="grid grid-cols-7 text-center text-xs text-white/40 font-medium border-b border-white/5">
+        <div className="grid grid-cols-7 text-center text-xs text-white/70 font-medium border-b border-white/5">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
             <div key={d} className="py-2">{d}</div>
           ))}
@@ -85,7 +82,7 @@ export default function SchedulePage() {
 
         {loading ? (
           <div className="h-64 flex items-center justify-center">
-            <div className="text-white/20 animate-pulse">Loading...</div>
+            <div className="text-white/70 animate-pulse">Loading...</div>
           </div>
         ) : (
           <div className="grid grid-cols-7">
@@ -111,7 +108,7 @@ export default function SchedulePage() {
                   key={day}
                   className={`min-h-[80px] border-b border-r border-white/5 p-1.5 ${isToday ? "bg-white/5" : ""}`}
                 >
-                  <span className={`text-xs ${isToday ? "text-white font-bold" : "text-white/30"}`}>{day}</span>
+                  <span className={`text-xs ${isToday ? "text-white font-bold" : "text-white/70"}`}>{day}</span>
                   {game && opponent && (
                     <div className={`mt-1 rounded p-1 text-[10px] ${
                       isFinal && !hideScores
@@ -129,7 +126,7 @@ export default function SchedulePage() {
                         </div>
                       )}
                       {isFinal && hideScores && (
-                        <div className="text-white/30">Final</div>
+                        <div className="text-white/70">Final</div>
                       )}
                     </div>
                   )}
@@ -144,7 +141,7 @@ export default function SchedulePage() {
       <div className="sm:hidden rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
         {loading ? (
           <div className="h-64 flex items-center justify-center">
-            <div className="text-white/20 animate-pulse">Loading...</div>
+            <div className="text-white/70 animate-pulse">Loading...</div>
           </div>
         ) : (() => {
           const gamesThisMonth = [...Array(daysInMonth)].map((_, i) => {
@@ -165,34 +162,34 @@ export default function SchedulePage() {
           }).filter(Boolean) as { day: number; game: ScheduleGame; isHome: boolean; opponent: { id: number; name: string; abbreviation: string }; isFinal: boolean; won: boolean; isToday: boolean }[];
 
           return gamesThisMonth.length === 0 ? (
-            <p className="text-white/40 text-center py-8 text-sm">No games this month</p>
+            <p className="text-white/70 text-center py-8 text-sm">No games this month</p>
           ) : (
             <div className="divide-y divide-white/5">
               {gamesThisMonth.map(({ day, game, isHome, opponent, isFinal, won, isToday }) => (
                 <div key={day} className={`flex items-center justify-between px-4 py-3 ${isToday ? "bg-white/5" : ""}`}>
                   <div className="flex items-center gap-3">
-                    <span className={`text-sm font-mono w-6 text-center ${isToday ? "text-white font-bold" : "text-white/40"}`}>
+                    <span className={`text-sm font-mono w-6 text-center ${isToday ? "text-white font-bold" : "text-white/70"}`}>
                       {day}
                     </span>
                     <div>
                       <p className="text-sm font-medium">
                         {isHome ? "vs" : "@"} {opponent.name}
                       </p>
-                      <p className="text-xs text-white/40">
+                      <p className="text-xs text-white/70">
                         {new Date(year, month, day).toLocaleDateString("en-US", { weekday: "short" })}
                       </p>
                     </div>
                   </div>
                   {isFinal ? (
                     hideScores ? (
-                      <span className="text-xs text-white/30">Final</span>
+                      <span className="text-xs text-white/70">Final</span>
                     ) : (
                       <span className={`text-sm font-bold ${won ? "text-emerald-400" : "text-red-400"}`}>
                         {won ? "W" : "L"} {isHome ? game.homeScore : game.awayScore}-{isHome ? game.awayScore : game.homeScore}
                       </span>
                     )
                   ) : (
-                    <span className="text-xs text-white/30">Scheduled</span>
+                    <span className="text-xs text-white/70">Scheduled</span>
                   )}
                 </div>
               ))}
@@ -200,6 +197,7 @@ export default function SchedulePage() {
           );
         })()}
       </div>
+      </>}
     </main>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
+import { fetchRemoteData, useRemoteData } from "@/hooks/useRemoteData";
 import { useEffect, useState } from "react";
 import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
-import { NewsItem, getNews, getOpponent, getTeamScore, getOpponentScore, fetchGameData, GameInfo } from "@/lib/api";
-import { useFavoriteTeams, useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
+import { NewsItem, getOpponent, getTeamScore, getOpponentScore, GamesResponse, GameInfo } from "@/lib/api";
+import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { teams } from "@/lib/teams";
 
 function isSameLocalDay(dateStr: string): boolean {
@@ -45,47 +46,40 @@ function formatDate(dateStr: string): string {
 
 export default function MorningBriefingCard() {
   const { selectedTeam } = useTeam();
-  const { lastGame, currentGame, nextGame, loading } = useGameData();
+  const { lastGame, currentGame, nextGame, loading, error } = useGameData();
   const { hideScores, hideHeadlines } = useSpoilerContext();
   const { favoriteTeamIds } = useFavoriteTeams();
-  const favoriteTeamObjects = useFavoriteTeamObjects();
-  const [topStory, setTopStory] = useState<NewsItem | null>(null);
-  const [newsLoading, setNewsLoading] = useState(true);
-
-  // For favorite teams: track which favorite played last night
-  const [favLastNightGame, setFavLastNightGame] = useState<{ game: GameInfo; teamId: number } | null>(null);
-  const [favGamesLoading, setFavGamesLoading] = useState(false);
+  const { data: news, loading: newsLoading, error: newsError } = useRemoteData<NewsItem[]>(`/api/news?team=${encodeURIComponent(selectedTeam.name)}`);
+  const topStory = news?.[0] || null;
+  const favoriteKey = favoriteTeamIds.join(",");
+  const [favoriteGames, setFavoriteGames] = useState<{
+    key: string; game: GameInfo | null; teamId: number | null; loading: boolean; error: boolean;
+  }>({ key: "", game: null, teamId: null, loading: false, error: false });
+  const currentFavorites = favoriteGames.key === favoriteKey;
+  const favGamesLoading = favoriteTeamIds.length > 0 && (!currentFavorites || favoriteGames.loading);
+  const favLastNightGame = currentFavorites && favoriteGames.game && favoriteGames.teamId
+    ? { game: favoriteGames.game, teamId: favoriteGames.teamId } : null;
 
   useEffect(() => {
-    setNewsLoading(true);
-    getNews(selectedTeam.name).then((news) => {
-      setTopStory(news[0] || null);
-      setNewsLoading(false);
-    });
-  }, [selectedTeam.name]);
+    if (favoriteTeamIds.length === 0) return;
+    const key = favoriteTeamIds.join(",");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    let cancelled = false;
+    setFavoriteGames({ key, game: null, teamId: null, loading: true, error: false });
+    Promise.allSettled(favoriteTeamIds.map(async (teamId) => ({
+      teamId, data: await fetchRemoteData<GamesResponse>(`/api/games?teamId=${teamId}`, controller.signal),
+    }))).then((results) => {
+      if (cancelled) return;
+      const hit = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : [])
+        .find((result) => result.data.lastGame && isYesterday(result.data.lastGame.date));
+      setFavoriteGames({ key, game: hit?.data.lastGame || null, teamId: hit?.teamId || null,
+        loading: false, error: results.some((result) => result.status === "rejected") });
+    }).finally(() => clearTimeout(timer));
+    return () => { cancelled = true; clearTimeout(timer); controller.abort(); };
+  }, [favoriteTeamIds]);
 
-  // Fetch last-night game for all favorites to find the best one to surface
-  useEffect(() => {
-    if (favoriteTeamIds.length === 0) {
-      setFavLastNightGame(null);
-      return;
-    }
-    setFavGamesLoading(true);
-    Promise.all(
-      favoriteTeamIds.map((id) =>
-        fetchGameData(id).then((data) => ({ teamId: id, lastGame: data.lastGame }))
-      )
-    ).then((results) => {
-      // Find first favorite that played last night
-      const hit = results.find(
-        (r) => r.lastGame && isYesterday(r.lastGame.date)
-      );
-      setFavLastNightGame(
-        hit && hit.lastGame ? { game: hit.lastGame, teamId: hit.teamId } : null
-      );
-      setFavGamesLoading(false);
-    });
-  }, [favoriteTeamIds.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (error) return null;
 
   if (loading) {
     return (
@@ -106,7 +100,7 @@ export default function MorningBriefingCard() {
 
   // If a favorite team played last night, prioritize that over the default selectedTeam game
   const lastNightGame: GameInfo | null = (() => {
-    if (favoriteTeamIds.length > 0 && !favGamesLoading) {
+    if (favoriteTeamIds.length > 0) {
       if (favLastNightGame) return favLastNightGame.game;
       return null; // favorites selected but none played last night
     }
@@ -132,7 +126,7 @@ export default function MorningBriefingCard() {
           <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest">
             Morning Briefing
           </h2>
-          <span className="text-xs text-white/30 ml-auto">
+          <span className="text-xs text-white/70 ml-auto">
             {new Date().toLocaleDateString("en-US", {
               weekday: "long",
               month: "short",
@@ -144,7 +138,7 @@ export default function MorningBriefingCard() {
         <div className="space-y-5">
           {/* TODAY'S GAME */}
           <div>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5">
+            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-1.5">
               Today&apos;s Game
             </p>
             {todayGame ? (
@@ -152,12 +146,12 @@ export default function MorningBriefingCard() {
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-white">
                     {selectedTeam.abbreviation}{" "}
-                    <span className="text-white/50">
+                    <span className="text-white/70">
                       {todayGame.isHome ? "vs" : "@"}
                     </span>{" "}
                     {getOpponent(todayGame).abbreviation}
                   </p>
-                  <p className="text-xs text-white/50 mt-0.5">
+                  <p className="text-xs text-white/70 mt-0.5">
                     {currentGame
                       ? currentGame.status || "In progress"
                       : formatTipoff(todayGame.date)}
@@ -169,7 +163,7 @@ export default function MorningBriefingCard() {
                   <div className="text-right">
                     <p className="text-lg font-extrabold tabular-nums tracking-tight text-white">
                       {getTeamScore(currentGame)}
-                      <span className="text-white/40 mx-1">–</span>
+                      <span className="text-white/70 mx-1">–</span>
                       {getOpponentScore(currentGame)}
                     </p>
                     <p className="text-[10px] text-red-400 font-bold uppercase tracking-wide">
@@ -179,7 +173,7 @@ export default function MorningBriefingCard() {
                 )}
               </div>
             ) : (
-              <p className="text-sm text-white/35 italic">No games today</p>
+              <p className="text-sm text-white/70 italic">No games today</p>
             )}
           </div>
 
@@ -187,7 +181,7 @@ export default function MorningBriefingCard() {
 
           {/* LAST NIGHT */}
           <div>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5">
+            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-1.5">
               Last Night
             </p>
             {lastNightGame ? (
@@ -198,7 +192,7 @@ export default function MorningBriefingCard() {
                     <div className="flex items-center gap-1.5 mb-1">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={lastNightTeam.logo} alt={lastNightTeam.name} className="w-4 h-4 object-contain" />
-                      <span className="text-[10px] text-white/40 uppercase tracking-widest">
+                      <span className="text-[10px] text-white/70 uppercase tracking-widest">
                         {lastNightTeam.city} {lastNightTeam.name}
                       </span>
                     </div>
@@ -220,7 +214,7 @@ export default function MorningBriefingCard() {
                             ? lastNightGame.homeScore
                             : lastNightGame.awayScore}
                         </span>
-                        <span className="text-white/40 mx-1.5">–</span>
+                        <span className="text-white/70 mx-1.5">–</span>
                         <span className="text-lg font-extrabold tabular-nums">
                           {lastNightGame.homeTeam.id === lastNightTeam.id
                             ? lastNightGame.awayScore
@@ -230,7 +224,7 @@ export default function MorningBriefingCard() {
                           ? lastNightGame.awayTeam.abbreviation
                           : lastNightGame.homeTeam.abbreviation}
                       </p>
-                      <p className="text-xs text-white/50 mt-0.5">
+                      <p className="text-xs text-white/70 mt-0.5">
                         {lastNightGame.won !== undefined && (
                           <span
                             className={
@@ -255,8 +249,12 @@ export default function MorningBriefingCard() {
                   )}
                 </div>
               </div>
+            ) : favGamesLoading ? (
+              <p className="text-sm text-white/70">Loading favorite games…</p>
+            ) : favoriteTeamIds.length > 0 && favoriteGames.error ? (
+              <p className="text-sm text-white/70">Favorite game data is unavailable.</p>
             ) : lastGame ? (
-              <p className="text-sm text-white/35 italic">
+              <p className="text-sm text-white/70 italic">
                 Last game was{" "}
                 {formatDate(lastGame.date)} —{" "}
                 {Math.floor(
@@ -266,7 +264,7 @@ export default function MorningBriefingCard() {
                 days ago
               </p>
             ) : (
-              <p className="text-sm text-white/35 italic">No recent games</p>
+              <p className="text-sm text-white/70 italic">No recent games</p>
             )}
           </div>
 
@@ -274,7 +272,7 @@ export default function MorningBriefingCard() {
 
           {/* HOT TAKE */}
           <div>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5">
+            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-1.5">
               🔥 Hot Take
             </p>
             {newsLoading ? (
@@ -291,9 +289,9 @@ export default function MorningBriefingCard() {
                     ? topStory.safeTitle
                     : topStory.title}
                 </p>
-                <p className="text-xs text-white/35 mt-1">
+                <p className="text-xs text-white/70 mt-1">
                   {topStory.source && (
-                    <span className="text-white/50">{topStory.source}</span>
+                    <span className="text-white/70">{topStory.source}</span>
                   )}
                   {topStory.source && topStory.pubDate && (
                     <span> · </span>
@@ -315,7 +313,7 @@ export default function MorningBriefingCard() {
                 </p>
               </a>
             ) : (
-              <p className="text-sm text-white/35 italic">No stories right now</p>
+              <p className="text-sm text-white/70 italic">{newsError ? "Top story unavailable" : "No stories right now"}</p>
             )}
           </div>
         </div>

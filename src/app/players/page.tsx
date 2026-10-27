@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useRemoteData } from "@/hooks/useRemoteData";
+import DataError from "@/components/DataError";
+
 import { useTeam } from "@/hooks/useTeam";
 
 interface Player {
@@ -19,16 +21,8 @@ interface Player {
 
 export default function PlayersPage() {
   const { selectedTeam } = useTeam();
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    fetch(`/api/players?teamId=${selectedTeam.id}`)
-      .then((r) => r.json())
-      .then((d) => { setPlayers(d.players || []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [selectedTeam.id]);
+  const { data, loading, error, retry } = useRemoteData<{ players: Player[] }>(`/api/players?teamId=${selectedTeam.id}`);
+  const players = data?.players || [];
 
   return (
     <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto">
@@ -37,11 +31,13 @@ export default function PlayersPage() {
         <img src={selectedTeam.logo} alt="" className="w-10 h-10" />
         <div>
           <h1 className="text-2xl font-bold">{selectedTeam.name} Roster</h1>
-          <p className="text-sm text-white/40">Current season players</p>
+          <p className="text-sm text-white/70">Current season players</p>
         </div>
       </div>
 
-      {loading ? (
+      {error ? (
+        <DataError subject="players" retry={retry} />
+      ) : loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(12)].map((_, i) => (
             <div key={i} className="rounded-xl bg-[#161616] border border-[#2a2a2a] p-5 animate-pulse">
@@ -51,7 +47,7 @@ export default function PlayersPage() {
           ))}
         </div>
       ) : players.length === 0 ? (
-        <p className="text-white/40 text-center py-16">No players found for this team</p>
+        <p className="text-white/70 text-center py-16">No players found for this team</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {players.map((p) => (
@@ -61,13 +57,13 @@ export default function PlayersPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-lg font-bold">{p.firstName} {p.lastName}</p>
-                    <p className="text-sm text-white/50">{p.position || "N/A"}</p>
+                    <p className="text-sm text-white/70">{p.position || "N/A"}</p>
                   </div>
                   {p.jerseyNumber && (
                     <span className="text-2xl font-extrabold text-white/10">#{p.jerseyNumber}</span>
                   )}
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-white/40">
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-white/70">
                   {p.height && <div><span className="text-white/60">Height:</span> {p.height}</div>}
                   {p.weight && <div><span className="text-white/60">Weight:</span> {p.weight} lbs</div>}
                   {p.college && <div className="col-span-2"><span className="text-white/60">College:</span> {p.college}</div>}

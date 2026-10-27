@@ -1,6 +1,7 @@
 "use client";
 import { teams, Team } from "@/lib/teams";
 import { useTeam } from "@/hooks/useTeam";
+import Modal from "./Modal";
 import { useState } from "react";
 
 export default function TeamSelector() {
@@ -19,32 +20,28 @@ export default function TeamSelector() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm font-medium w-full sm:w-auto"
+        className="min-h-11 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm font-medium w-full sm:w-auto"
       >
         Change Team
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)}>
-          <div
-            className="bg-[#141414] border border-white/10 rounded-2xl p-6 max-w-3xl w-full mx-4 max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold mb-4">Select Your Team</h2>
+        <Modal title="Select Your Team" onClose={() => setOpen(false)} wide>
             {(["East", "West"] as const).map((conf) => (
               <div key={conf} className="mb-6">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">
+                <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">
                   {conf}ern Conference
                 </h3>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
                   {(conf === "East" ? east : west).map((team) => (
                     <button
                       key={team.id}
+                      aria-pressed={selectedTeam.id === team.id}
                       onClick={() => handleSelect(team)}
                       className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-white/10 transition"
                       style={
                         selectedTeam.id === team.id
-                          ? { boxShadow: `0 0 20px ${team.primaryColor}60`, border: `2px solid ${team.primaryColor}` }
+                          ? { border: `2px solid ${team.primaryColor}` }
                           : { border: "2px solid transparent" }
                       }
                     >
@@ -56,8 +53,7 @@ export default function TeamSelector() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
+        </Modal>
       )}
     </>
   );

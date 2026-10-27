@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import DataError from "./DataError";
 import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
@@ -35,10 +36,11 @@ function getCountdown(dateStr: string): string {
 
 export default function GameDayHero() {
   const { selectedTeam } = useTeam();
-  const { currentGame, nextGame, loading, error } = useGameData();
+  const { currentGame, nextGame, loading, error, retry } = useGameData();
   const { hideScores } = useSpoilerContext();
 
-  if (loading || error) return null;
+  if (error) return <DataError subject="game data" retry={retry} />;
+  if (loading) return null;
 
   const heroGame = currentGame ?? nextGame;
   if (!heroGame || !isSameLocalDay(heroGame.date)) return null;
@@ -69,7 +71,7 @@ export default function GameDayHero() {
             {isLive ? "Live Now" : "Game Day"}
           </span>
           <div>
-            <p className="text-sm text-white/45">{isLive ? "Live focus" : "Tonight&apos;s focus"}</p>
+            <p className="text-sm text-white/70">{isLive ? "Live focus" : "Tonight&apos;s focus"}</p>
             <h2 className="text-2xl font-bold sm:text-3xl">{matchupLabel}</h2>
           </div>
           <div className="flex flex-wrap gap-2 text-sm text-white/60">

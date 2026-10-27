@@ -8,7 +8,7 @@ export default function TeamHeader() {
 
   return (
     <div
-      className="relative rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 overflow-hidden text-center sm:text-left"
+      className="relative rounded-2xl p-4 sm:p-8 grid grid-cols-[4rem_minmax(0,1fr)] sm:flex items-center gap-3 sm:gap-6 overflow-hidden text-left"
       style={{
         background: `linear-gradient(135deg, ${team.primaryColor}40, ${team.secondaryColor}20, #0a0a0a)`,
       }}
@@ -20,17 +20,17 @@ export default function TeamHeader() {
         width={112}
         height={112}
         loading="eager"
-        className="w-20 h-20 sm:w-28 sm:h-28 object-contain relative z-10"
+        className="w-16 h-16 sm:w-28 sm:h-28 object-contain relative z-10"
       />
       <div className="flex-1 relative z-10">
-        <p className="text-sm text-white/50 font-medium">{team.city}</p>
-        <h1 className="text-3xl sm:text-4xl font-bold">{team.name}</h1>
-        <div className="flex items-center gap-2 mt-1 justify-center sm:justify-start">
-          <p className="text-sm text-white/40">{team.conference}ern Conference · {team.division}</p>
+        <p className="text-sm text-white/70 font-medium">{team.city}</p>
+        <h1 className="text-2xl sm:text-4xl font-bold">{team.name}</h1>
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <p className="text-sm text-white/70">{team.conference}ern Conference · {team.division}</p>
           <RecordBadge />
         </div>
       </div>
-      <div className="relative z-10 w-full sm:w-auto">
+      <div className="relative z-10 col-span-2 w-full sm:w-auto">
         <TeamSelector />
       </div>
     </div>

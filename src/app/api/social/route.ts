@@ -121,6 +121,7 @@ export async function GET(req: NextRequest) {
     const keywords = getTeamKeywords(team);
 
     const allPosts: RedditPost[] = [];
+    let availableSources = 0;
 
     for (const sub of subs) {
       try {
@@ -131,6 +132,7 @@ export async function GET(req: NextRequest) {
 
         if (!res.ok) continue;
         const json = await res.json();
+        availableSources++;
         const posts = ((json.data?.children || []) as RedditListingChild[]).map((c) => ({
           id: c.data.id,
           title: c.data.title,
@@ -153,6 +155,8 @@ export async function GET(req: NextRequest) {
         // Skip failed subreddit
       }
     }
+
+    if (availableSources === 0) return NextResponse.json({ posts: [], error: "Social sources unavailable" }, { status: 502 });
 
     const dedupedPosts = Array.from(new Map(allPosts.map((post) => [post.id, post])).values());
 

@@ -19,3 +19,25 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+:root {
+  color-scheme: dark;
+  accent-color: #fbbf24;
+}
+
+:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 4px;
+}
+
+::selection {
+  background: #fbbf24;
+  color: #0a0a0a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

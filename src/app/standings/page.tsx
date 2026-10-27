@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useRemoteData } from "@/hooks/useRemoteData";
+import DataError from "@/components/DataError";
+
 import { teams } from "@/lib/teams";
 
 interface Standing {
@@ -13,15 +15,8 @@ interface Standing {
 }
 
 export default function StandingsPage() {
-  const [standings, setStandings] = useState<Standing[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/standings")
-      .then((r) => r.json())
-      .then((d) => { setStandings(d.standings || []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+  const { data, loading, error, retry } = useRemoteData<{ standings: Standing[] }>("/api/standings");
+  const standings = data?.standings || [];
 
   const getLogoUrl = (abbr: string) => {
     const team = teams.find((t) => t.abbreviation === abbr);
@@ -50,7 +45,7 @@ export default function StandingsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-white/40 text-xs uppercase tracking-wider border-b border-white/5">
+                <tr className="text-white/70 text-xs uppercase tracking-wider border-b border-white/5">
                   <th className="text-left p-3 pl-4">#</th>
                   <th className="text-left p-3">Team</th>
                   <th className="text-center p-3">W</th>
@@ -73,7 +68,7 @@ export default function StandingsPage() {
                         i === 5 ? "border-b-2 border-b-emerald-500/30" : i === 9 ? "border-b-2 border-b-yellow-500/30" : ""
                       }`}
                     >
-                      <td className="p-3 pl-4 text-white/40 tabular-nums">{i + 1}</td>
+                      <td className="p-3 pl-4 text-white/70 tabular-nums">{i + 1}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -86,14 +81,14 @@ export default function StandingsPage() {
                       <td className="text-center p-3 tabular-nums font-medium">{team.wins}</td>
                       <td className="text-center p-3 tabular-nums text-white/60">{team.losses}</td>
                       <td className="text-center p-3 tabular-nums">{pct.toFixed(3).replace("0.", ".")}</td>
-                      <td className="text-center p-3 pr-4 tabular-nums text-white/50">{gb === 0 ? "—" : gb.toFixed(1)}</td>
+                      <td className="text-center p-3 pr-4 tabular-nums text-white/70">{gb === 0 ? "—" : gb.toFixed(1)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-2 flex gap-4 text-[10px] text-white/30 border-t border-white/5">
+          <div className="px-4 py-2 flex gap-4 text-[10px] text-white/70 border-t border-white/5">
             <span className="flex items-center gap-1"><span className="text-emerald-400">●</span> Playoff</span>
             <span className="flex items-center gap-1"><span className="text-yellow-400">●</span> Play-In</span>
           </div>
@@ -105,12 +100,14 @@ export default function StandingsPage() {
   return (
     <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Standings</h1>
-      {loading ? (
+      {error ? (
+        <DataError subject="standings" retry={retry} />
+      ) : loading ? (
         <div className="space-y-4 animate-pulse">
           {[...Array(6)].map((_, i) => <div key={i} className="h-12 bg-white/5 rounded-lg" />)}
         </div>
       ) : standings.length === 0 ? (
-        <p className="text-white/40 text-center py-16">No standings data available</p>
+        <p className="text-white/70 text-center py-16">No standings data available</p>
       ) : (
         <>
           {renderConference("East", "Eastern Conference")}

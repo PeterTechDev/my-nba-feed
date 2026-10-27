@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useRemoteData } from "@/hooks/useRemoteData";
+import DataError from "@/components/DataError";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
 
@@ -28,55 +29,28 @@ interface ScheduleGame {
 export default function HighlightsPage() {
   const { selectedTeam } = useTeam();
   const { hideScores } = useSpoilerContext();
-  const [highlights, setHighlights] = useState<HighlightGame[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    fetch(`/api/games?teamId=${selectedTeam.id}`)
-      .then((r) => r.json())
-      .then(() => {
-        const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
-        const start = thirtyDaysAgo.toISOString().slice(0, 10);
-        const end = now.toISOString().slice(0, 10);
-
-        fetch(`/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`)
-          .then((r) => r.json())
-          .then((d) => {
-            const finishedGames = ((d.games || []) as ScheduleGame[])
-              .filter((g) => g.status === "Final")
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .slice(0, 15);
-
-            const items = finishedGames.map((g) => {
-              const isHome = g.homeTeam.id === selectedTeam.id;
-              const opp = isHome ? g.awayTeam : g.homeTeam;
-              const teamScore = isHome ? g.homeScore : g.awayScore;
-              const oppScore = isHome ? g.awayScore : g.homeScore;
-              const dateFormatted = new Date(g.date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-              const q = encodeURIComponent(`${selectedTeam.city} ${selectedTeam.name} vs ${opp.name} ${dateFormatted} highlights`);
-
-              return {
-                id: g.id,
-                date: g.date,
-                opponent: opp.name,
-                opponentAbbr: opp.abbreviation,
-                isHome,
-                teamScore,
-                oppScore,
-                won: teamScore > oppScore,
-                youtubeUrl: `https://www.youtube.com/results?search_query=${q}`,
-              };
-            });
-
-            setHighlights(items);
-            setLoading(false);
-          })
-          .catch(() => setLoading(false));
-      })
-      .catch(() => setLoading(false));
-  }, [selectedTeam]);
+  const now = new Date();
+  const start = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+  const end = now.toISOString().slice(0, 10);
+  const { data, loading, error, retry } = useRemoteData<{ games: ScheduleGame[] }>(
+    `/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`
+  );
+  const highlights: HighlightGame[] = (data?.games || [])
+    .filter((game) => game.status === "Final")
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 15)
+    .map((game) => {
+      const isHome = game.homeTeam.id === selectedTeam.id;
+      const opponent = isHome ? game.awayTeam : game.homeTeam;
+      const teamScore = isHome ? game.homeScore : game.awayScore;
+      const oppScore = isHome ? game.awayScore : game.homeScore;
+      const date = new Date(game.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      return {
+        id: game.id, date: game.date, opponent: opponent.name, opponentAbbr: opponent.abbreviation,
+        isHome, teamScore, oppScore, won: teamScore > oppScore,
+        youtubeUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${selectedTeam.city} ${selectedTeam.name} vs ${opponent.name} ${date} highlights`)}`,
+      };
+    });
 
   return (
     <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto">
@@ -85,11 +59,13 @@ export default function HighlightsPage() {
         <img src={selectedTeam.logo} alt="" className="w-10 h-10" />
         <div>
           <h1 className="text-2xl font-bold">{selectedTeam.name} Highlights</h1>
-          <p className="text-sm text-white/40">Recent game highlights on YouTube</p>
+          <p className="text-sm text-white/70">Recent game highlights on YouTube</p>
         </div>
       </div>
 
-      {loading ? (
+      {error ? (
+        <DataError subject="recent games" retry={retry} />
+      ) : loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="rounded-xl bg-[#161616] border border-[#2a2a2a] p-5 animate-pulse">
@@ -99,7 +75,7 @@ export default function HighlightsPage() {
           ))}
         </div>
       ) : highlights.length === 0 ? (
-        <p className="text-white/40 text-center py-16">No recent games found</p>
+        <p className="text-white/70 text-center py-16">No recent games found</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {highlights.map((h) => {
@@ -129,7 +105,7 @@ export default function HighlightsPage() {
                   <p className="font-medium text-sm group-hover:text-white transition">
                     {h.isHome ? "vs" : "@"} {h.opponent}
                   </p>
-                  <p className="text-xs text-white/40 mt-1">{date}</p>
+                  <p className="text-xs text-white/70 mt-1">{date}</p>
                 </div>
               </a>
             );
@@ -139,7 +115,7 @@ export default function HighlightsPage() {
 
       <div className="mt-8 text-center">
         <a
-          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedTeam.city + " " + selectedTeam.name + " highlights 2025")}`}
+          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedTeam.city + " " + selectedTeam.name + " highlights " + new Date().getFullYear())}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition text-sm font-medium"

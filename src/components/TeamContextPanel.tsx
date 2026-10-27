@@ -113,8 +113,8 @@ function hasBackToBack(upcoming: ScheduleGame[]): boolean {
 
 function StatTile({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "accent" }) {
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
-      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">{label}</p>
+    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
+      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">{label}</p>
       <p className={`mt-1.5 text-xl font-bold ${tone === "accent" ? "text-emerald-400" : "text-white"}`}>{value}</p>
     </div>
   );
@@ -221,8 +221,8 @@ export default function TeamContextPanel() {
   return (
     <section className="rounded-2xl border border-[#2a2a2a] bg-[#161616] p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/35">Quick context</p>
-        <Link href="/standings" className="text-sm text-white/45 transition hover:text-white/75">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/70">Quick context</p>
+        <Link href="/standings" className="text-sm text-white/70 transition hover:text-white/75">
           Standings →
         </Link>
       </div>
@@ -236,7 +236,7 @@ export default function TeamContextPanel() {
         <StatTile label="Record" value={record.wins + record.losses > 0 ? `${record.wins}-${record.losses}` : "—"} />
       </div>
       {hasBackToBack(nextFive) && (
-        <p className="mt-3 text-xs text-white/35">Back-to-back coming up in the next two games.</p>
+        <p className="mt-3 text-xs text-white/70">Back-to-back coming up in the next two games.</p>
       )}
     </section>
   );

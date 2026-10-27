@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "nba-feed-last-visit";
+// All feed sections share one previous-visit timestamp for this page session.
+let previousVisit: string | null | undefined;
 
 interface LastVisitState {
   /** ISO string of the previous visit, null on first visit */
@@ -22,10 +24,11 @@ export function useLastVisit(): LastVisitState {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      // Update last-visit to now for the NEXT session
-      localStorage.setItem(STORAGE_KEY, new Date().toISOString());
-      setState({ lastVisitAt: stored, ready: true });
+      if (previousVisit === undefined) {
+        previousVisit = localStorage.getItem(STORAGE_KEY);
+        localStorage.setItem(STORAGE_KEY, new Date().toISOString());
+      }
+      setState({ lastVisitAt: previousVisit, ready: true });
     } catch {
       // localStorage unavailable (SSR or private mode)
       setState({ lastVisitAt: null, ready: true });

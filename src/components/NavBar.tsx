@@ -2,10 +2,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff, BookOpen } from "lucide-react";
-import { useSpoilerContext } from "./SpoilerModeProvider";
-import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
+import { Home, Users, BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart } from "lucide-react";
+import Modal from "./Modal";
 import FavoriteTeamsModal from "./FavoriteTeamsModal";
+import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
+import { useSpoilerContext } from "./SpoilerModeProvider";
 
 const links = [
   { href: "/", label: "Home", icon: Home },
@@ -24,92 +25,66 @@ export default function NavBar() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [myTeamsOpen, setMyTeamsOpen] = useState(false);
   const { favoriteTeamIds } = useFavoriteTeams();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const protection = spoilerFree ? "Spoiler-free" : hideScores || hideHeadlines ? "Custom protection" : "Spoilers visible";
+
+  const navigationLinks = links.map((link) => {
+    const active = pathname === link.href;
+    const Icon = link.icon;
+    return (
+      <Link key={link.href} href={link.href} onClick={() => setMenuOpen(false)} aria-current={active ? "page" : undefined}
+        className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${active ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
+        <Icon aria-hidden="true" className="h-4 w-4" />{link.label}
+      </Link>
+    );
+  });
 
   return (
     <>
-    <nav className="sticky top-0 z-40 bg-[#0a0a0a]/90 backdrop-blur-md border-b border-white/5">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide py-2">
-          <Link href="/" className="text-lg font-bold mr-4 shrink-0" style={{ color: "var(--team-primary)" }}>
+    <nav aria-label="Main navigation" className="sticky top-0 z-40 border-b border-white/10 bg-[#0a0a0a]">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="flex min-h-16 items-center gap-0 sm:gap-2">
+          <Link href="/" className="mr-auto flex min-h-11 shrink-0 items-center text-base font-bold text-white">
             NBA Feed
           </Link>
-          {links.map((link) => {
-            const active = pathname === link.href;
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition shrink-0 ${
-                  active
-                    ? "bg-white/10 text-white"
-                    : "text-white/50 hover:text-white/80 hover:bg-white/5"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {link.label}
-              </Link>
-            );
-          })}
-          <button
-            onClick={toggleSpoiler}
-            className={`ml-auto shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-              spoilerFree
-                ? "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25"
-                : "text-white/50 hover:text-white/80 hover:bg-white/5"
-            }`}
-            title={spoilerFree ? "Spoiler-free mode ON" : "Spoiler-free mode OFF"}
-          >
-            {spoilerFree ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            <span className="hidden sm:inline">{spoilerFree ? "Spoiler-free" : "Scores visible"}</span>
+          <button type="button" onClick={toggleSpoiler}
+            aria-label={`${protection}. ${spoilerFree ? "Show spoilers" : "Hide scores and headlines"}`}
+            aria-pressed={spoilerFree ? true : hideScores || hideHeadlines ? "mixed" : false}
+            className={`flex min-h-11 min-w-11 justify-center shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium sm:px-3 ${hideScores || hideHeadlines ? "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
+            {hideScores || hideHeadlines ? <EyeOff aria-hidden="true" className="h-4 w-4" /> : <Eye aria-hidden="true" className="h-4 w-4" />}
+            <span className="sm:hidden"><span className="hidden min-[360px]:inline">{spoilerFree ? "Safe" : hideScores || hideHeadlines ? "Custom" : "Visible"}</span></span>
+            <span className="hidden sm:inline">{protection}</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setMyTeamsOpen(true)}
-            className={`shrink-0 flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
-              favoriteTeamIds.length > 0
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                : "border-white/10 text-white/50 hover:bg-white/5 hover:text-white/80"
-            }`}
-            title="My Teams"
-          >
-            ⚙️ <span className="hidden sm:inline">My Teams</span>
-            {favoriteTeamIds.length > 0 && (
-              <span className="ml-0.5 text-xs bg-emerald-500/20 text-emerald-400 rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                {favoriteTeamIds.length}
-              </span>
-            )}
+          <button type="button" onClick={() => setMyTeamsOpen(true)} aria-label={`My Teams (${favoriteTeamIds.length} selected)`}
+            className={`relative flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-2 text-sm sm:px-3 ${favoriteTeamIds.length ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
+            <Heart aria-hidden="true" className="h-4 w-4" />
+            <span className="hidden sm:inline">My Teams</span>
+            {favoriteTeamIds.length > 0 && <span aria-hidden="true" className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-900 px-1 text-[10px] text-emerald-200">{favoriteTeamIds.length}</span>}
           </button>
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="shrink-0 rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-white/50 transition hover:bg-white/5 hover:text-white/80"
-          >
-            Settings
+          <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Spoiler settings"
+            className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-2 text-sm text-white/70 hover:bg-white/5 hover:text-white sm:px-3">
+            <Settings aria-hidden="true" className="h-4 w-4" /><span className="hidden sm:inline">Settings</span>
           </button>
+          <button type="button" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} aria-controls="mobile-navigation"
+            onClick={() => setMenuOpen((open) => !open)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-white/80 hover:bg-white/10 xl:hidden">
+            {menuOpen ? <X aria-hidden="true" className="h-5 w-5" /> : <Menu aria-hidden="true" className="h-5 w-5" />}
+          </button>
+        </div>
+        <div className="hidden border-t border-white/10 py-1 xl:flex xl:items-center xl:gap-1">{navigationLinks}</div>
+        <div id="mobile-navigation" hidden={!menuOpen} className="border-t border-white/10 pb-3 pt-2 xl:hidden"
+          onKeyDown={(event) => { if (event.key === "Escape") { setMenuOpen(false); document.querySelector<HTMLButtonElement>('[aria-controls="mobile-navigation"]')?.focus(); } }}>
+          <div className="grid grid-cols-2 gap-1">{navigationLinks}</div>
         </div>
       </div>
     </nav>
     {settingsOpen && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setSettingsOpen(false)}>
-        <div
-          className="w-full max-w-md rounded-2xl border border-white/10 bg-[#141414] p-6 mx-4"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold">Spoiler settings</h2>
-              <p className="text-sm text-white/40 mt-1">Choose whether scores and result-heavy headlines stay hidden.</p>
-            </div>
-            <button type="button" onClick={() => setSettingsOpen(false)} className="text-white/35 hover:text-white/70 transition">
-              Close
-            </button>
-          </div>
+      <Modal title="Spoiler settings" onClose={() => setSettingsOpen(false)}>
+          <p className="text-sm text-white/70">Choose whether scores and result-heavy headlines stay hidden.</p>
           <div className="mt-5 space-y-3">
-            <label className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+            <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Hide scores</p>
-                <p className="text-xs text-white/40 mt-1">Applies to live, last game, schedule, and highlights.</p>
+                <p className="text-xs text-white/70 mt-1">Applies to live, last game, schedule, and highlights.</p>
               </div>
               <input
                 type="checkbox"
@@ -118,10 +93,10 @@ export default function NavBar() {
                 className="h-4 w-4 accent-amber-500"
               />
             </label>
-            <label className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+            <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Hide result headlines</p>
-                <p className="text-xs text-white/40 mt-1">Masks recap and outcome-heavy news headlines until reveal.</p>
+                <p className="text-xs text-white/70 mt-1">Protects news headlines and all social titles and images until reveal.</p>
               </div>
               <input
                 type="checkbox"
@@ -131,8 +106,7 @@ export default function NavBar() {
               />
             </label>
           </div>
-        </div>
-      </div>
+      </Modal>
     )}
     {myTeamsOpen && <FavoriteTeamsModal onClose={() => setMyTeamsOpen(false)} />}
     </>

@@ -114,6 +114,7 @@ export async function GET(req: NextRequest) {
   try {
     const url = `https://news.google.com/rss/search?q=${encodeURIComponent(team + " NBA")}&hl=en-US&gl=US&ceid=US:en`;
     const res = await fetch(url, { next: { revalidate: 600 } });
+    if (!res.ok) return NextResponse.json([], { status: 502 });
     const xml = await res.text();
 
     const items: NewsItem[] = [];

@@ -1,7 +1,8 @@
 "use client";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext } from "react";
+import { useRemoteData } from "./useRemoteData";
 import { useTeam } from "./useTeam";
-import { fetchGameData, GameInfo, TeamRecord } from "@/lib/api";
+import { GameInfo, TeamRecord, GamesResponse } from "@/lib/api";
 
 interface GameDataState {
   lastGame: GameInfo | null;
@@ -10,6 +11,7 @@ interface GameDataState {
   record: TeamRecord;
   loading: boolean;
   error: string | null;
+  retry: () => void;
 }
 
 const defaultState: GameDataState = {
@@ -19,6 +21,7 @@ const defaultState: GameDataState = {
   record: { wins: 0, losses: 0 },
   loading: true,
   error: null,
+  retry: () => {},
 };
 
 const GameDataContext = createContext<GameDataState>(defaultState);
@@ -29,29 +32,14 @@ export function useGameData() {
 
 export { GameDataContext };
 
-// Hook for the provider to use
 export function useGameDataFetcher(): GameDataState {
   const { selectedTeam } = useTeam();
-  const [state, setState] = useState<GameDataState>(defaultState);
-
-  useEffect(() => {
-    let cancelled = false;
-    setState((s) => ({ ...s, loading: true, error: null }));
-
-    fetchGameData(selectedTeam.id).then((data) => {
-      if (cancelled) return;
-      setState({
-        lastGame: data.lastGame,
-        currentGame: data.currentGame,
-        nextGame: data.nextGame,
-        record: data.record,
-        loading: false,
-        error: data.error,
-      });
-    });
-
-    return () => { cancelled = true; };
-  }, [selectedTeam.id]);
-
-  return state;
+  const { data, loading, error, retry } = useRemoteData<GamesResponse>(`/api/games?teamId=${selectedTeam.id}`);
+  return {
+    ...defaultState,
+    ...data,
+    loading,
+    error: error ? "Game data is unavailable" : null,
+    retry,
+  };
 }

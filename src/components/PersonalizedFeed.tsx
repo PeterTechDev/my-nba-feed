@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Fragment } from "react";
+import { useRemoteData } from "@/hooks/useRemoteData";
+import DataError from "./DataError";
 import { useFavoriteTeams, useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
-import { useTeam } from "@/hooks/useTeam";
 import { teams, Team } from "@/lib/teams";
-import { NewsItem, getNews, fetchGameData, GameInfo } from "@/lib/api";
+import { NewsItem, GamesResponse } from "@/lib/api";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 import { useLastVisit } from "@/hooks/useLastVisit";
 
@@ -42,23 +43,12 @@ interface TeamNewsSectionProps {
 }
 
 function TeamNewsSection({ team }: TeamNewsSectionProps) {
-  const { hideHeadlines } = useSpoilerContext();
+  const { hideHeadlines, hideScores } = useSpoilerContext();
   const { lastVisitAt, ready: visitReady } = useLastVisit();
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [lastGame, setLastGame] = useState<GameInfo | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      getNews(team.name),
-      fetchGameData(team.id),
-    ]).then(([newsItems, gameData]) => {
-      setNews(newsItems.slice(0, 3));
-      setLastGame(gameData.lastGame);
-      setLoading(false);
-    });
-  }, [team.id, team.name]);
+  const { data, loading, error, retry } = useRemoteData<NewsItem[]>(`/api/news?team=${encodeURIComponent(team.name)}`);
+  const { data: gameData, error: gameError, retry: retryGame } = useRemoteData<GamesResponse>(`/api/games?teamId=${team.id}`);
+  const news = (data || []).slice(0, 3);
+  const lastGame = gameData?.lastGame;
 
   const lastNightGame = lastGame && isYesterday(lastGame.date) ? lastGame : null;
 
@@ -87,7 +77,7 @@ function TeamNewsSection({ team }: TeamNewsSectionProps) {
         <div>
           <p className="text-sm font-bold text-white">{team.city} {team.name}</p>
           {lastNightGame && (
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-white/70">
               Played last night
             </p>
           )}
@@ -95,13 +85,15 @@ function TeamNewsSection({ team }: TeamNewsSectionProps) {
       </div>
 
       <div className="p-4 space-y-3">
+        {gameError && <DataError subject={`${team.name} games`} retry={retryGame} />}
         {/* Last night result */}
-        {lastNightGame && (
+        {lastNightGame && hideScores && <p className="text-sm text-white/70">Last night: score hidden · {formatDate(lastNightGame.date)}</p>}
+        {lastNightGame && !hideScores && (
           <div
             className="rounded-lg px-3 py-2.5 border"
             style={{ backgroundColor: `${team.primaryColor}12`, borderColor: `${team.primaryColor}25` }}
           >
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Last Night</p>
+            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-1">Last Night</p>
             {(() => {
               const isHome = lastNightGame.homeTeam.id === team.id;
               const opponentTeam = isHome
@@ -118,7 +110,7 @@ function TeamNewsSection({ team }: TeamNewsSectionProps) {
                   <p className="text-sm font-semibold text-white">
                     {team.abbreviation}{" "}
                     <span className="text-lg font-extrabold tabular-nums">{teamScore}</span>
-                    <span className="text-white/40 mx-1.5">–</span>
+                    <span className="text-white/70 mx-1.5">–</span>
                     <span className="text-lg font-extrabold tabular-nums">{oppScore}</span>{" "}
                     {opponentTeam.abbreviation}
                   </p>
@@ -126,7 +118,7 @@ function TeamNewsSection({ team }: TeamNewsSectionProps) {
                     <span className={won ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
                       {won ? "Win" : "Loss"}
                     </span>
-                    <span className="text-white/40"> · {formatDate(lastNightGame.date)}</span>
+                    <span className="text-white/70"> · {formatDate(lastNightGame.date)}</span>
                   </p>
                 </>
               );
@@ -135,7 +127,9 @@ function TeamNewsSection({ team }: TeamNewsSectionProps) {
         )}
 
         {/* News */}
-        {loading ? (
+        {error ? (
+          <DataError subject={`${team.name} news`} retry={retry} />
+        ) : loading ? (
           <div className="space-y-3 animate-pulse">
             {[0, 1, 2].map((i) => (
               <div key={i} className="space-y-1.5">
@@ -145,15 +139,15 @@ function TeamNewsSection({ team }: TeamNewsSectionProps) {
             ))}
           </div>
         ) : news.length === 0 ? (
-          <p className="text-sm text-white/30 italic">No recent news</p>
+          <p className="text-sm text-white/70 italic">No recent news</p>
         ) : (
           <ul className="divide-y divide-white/5">
             {news.map((item, i) => (
-              <>
+              <Fragment key={item.link}>
                 {separatorIndex !== null && i === separatorIndex && (
                   <li key={`sep-${i}`} className="py-2 flex items-center gap-2">
                     <div className="flex-1 border-t border-dashed border-white/15" />
-                    <span className="text-[10px] text-white/30 whitespace-nowrap shrink-0">Older</span>
+                    <span className="text-[10px] text-white/70 whitespace-nowrap shrink-0">Older</span>
                     <div className="flex-1 border-t border-dashed border-white/15" />
                   </li>
                 )}
@@ -166,12 +160,12 @@ function TeamNewsSection({ team }: TeamNewsSectionProps) {
                   >
                     {hideHeadlines && item.isSpoiler ? item.safeTitle : item.title}
                   </a>
-                  <p className="text-xs text-white/35 mt-0.5">
+                  <p className="text-xs text-white/70 mt-0.5">
                     {item.source && <span>{item.source} · </span>}
                     {item.pubDate && relativeTime(item.pubDate)}
                   </p>
                 </li>
-              </>
+              </Fragment>
             ))}
           </ul>
         )}
@@ -182,28 +176,20 @@ function TeamNewsSection({ team }: TeamNewsSectionProps) {
 
 // ---- League-wide news (Around the League) ----
 
-function LeagueNewsSection({ excludeTeamIds }: { excludeTeamIds: number[] }) {
+function LeagueNewsSection() {
   const { hideHeadlines } = useSpoilerContext();
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    getNews("NBA").then((items) => {
-      // Rough filter: exclude news that is heavily team-specific to the favorite teams
-      // (we can't do this perfectly without ML, so just show all league news here)
-      setNews(items.slice(0, 6));
-      setLoading(false);
-    });
-  }, [excludeTeamIds.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data, loading, error, retry } = useRemoteData<NewsItem[]>("/api/news?team=NBA");
+  const news = (data || []).slice(0, 6);
 
   return (
     <div className="rounded-xl overflow-hidden bg-[#161616] border border-[#2a2a2a]">
       <div className="p-5">
-        <h3 className="text-xs font-bold text-white/60 uppercase tracking-widest mb-4">
+        <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest mb-4">
           🌐 Around the League
-        </h3>
-        {loading ? (
+        </h2>
+        {error ? (
+          <DataError subject="league news" retry={retry} />
+        ) : loading ? (
           <div className="space-y-4 animate-pulse">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="space-y-1.5">
@@ -213,7 +199,7 @@ function LeagueNewsSection({ excludeTeamIds }: { excludeTeamIds: number[] }) {
             ))}
           </div>
         ) : news.length === 0 ? (
-          <p className="text-sm text-white/30 italic">No league news right now</p>
+          <p className="text-sm text-white/70 italic">No league news right now</p>
         ) : (
           <ul className="divide-y divide-white/5">
             {news.map((item, i) => (
@@ -226,7 +212,7 @@ function LeagueNewsSection({ excludeTeamIds }: { excludeTeamIds: number[] }) {
                 >
                   {hideHeadlines && item.isSpoiler ? item.safeTitle : item.title}
                 </a>
-                <p className="text-xs text-white/35 mt-0.5">
+                <p className="text-xs text-white/70 mt-0.5">
                   {item.source && <span>{item.source} · </span>}
                   {item.pubDate && relativeTime(item.pubDate)}
                 </p>
@@ -255,7 +241,7 @@ export default function PersonalizedFeed() {
         <div className="flex items-center gap-2 mb-4">
           <div className="w-1 h-5 rounded-full bg-emerald-500" />
           <h2 className="text-sm font-bold text-white/70 uppercase tracking-widest">My Teams</h2>
-          <span className="text-xs text-white/30">({favoriteTeamIds.length})</span>
+          <span className="text-xs text-white/70">({favoriteTeamIds.length})</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {favoriteTeams.map((team) => (
@@ -265,7 +251,7 @@ export default function PersonalizedFeed() {
       </section>
 
       {/* AROUND THE LEAGUE section */}
-      <LeagueNewsSection excludeTeamIds={favoriteTeamIds} />
+      <LeagueNewsSection />
     </div>
   );
 }
