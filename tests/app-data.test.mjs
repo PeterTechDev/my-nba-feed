@@ -66,15 +66,17 @@ test("all team identities and legacy preferences remain one-to-one", () => {
   for (const color of colors) assert.ok((luminance(color) + .05) / (luminance("#161616") + .05) >= 3);
 });
 
-test("Blob document updates retry conflicts without losing concurrent writes", async () => {
+test("Blob updates use origin ETags and retry conflicts without losing concurrent writes", async () => {
   const blobs = new Map();
   let version = 0;
   class Conflict extends Error {}
   const sdk = {
     BlobPreconditionFailedError: Conflict,
+    BlobNotFoundError: class extends Error {},
+    head: async (name) => blobs.has(name) ? { etag: blobs.get(name).etag } : null,
     get: async (name) => {
       const value = blobs.get(name);
-      return value ? { statusCode: 200, stream: new Response(JSON.stringify(value.data)).body, blob: { etag: value.etag } } : null;
+      return value ? { statusCode: 200, stream: new Response(JSON.stringify(value.data)).body, blob: { etag: "delivery-" + value.etag } } : null;
     },
     put: async (name, body, options) => {
       const previous = blobs.get(name);
