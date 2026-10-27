@@ -92,6 +92,7 @@ export async function GET(req: NextRequest) {
       team1: stats1,
       team2: stats2,
       headToHead: { team1Wins: h2hTeam1Wins, team2Wins: h2hTeam2Wins },
+      season,
       error: null,
     });
   } catch {

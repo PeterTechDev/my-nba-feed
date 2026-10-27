@@ -277,7 +277,7 @@ test("community API recovers with RSS or a labeled index and reports total outag
   });
   const socialImports = { ...imports, "@/lib/reddit": { teamSubreddits: { Celtics: "bostonceltics" } },
     "@/lib/communityFeed": load("lib/communityFeed.ts").exports };
-  const route = load("app/api/social/route.ts", { fetch }, socialImports).exports;
+  const route = load("app/api/social/route.ts", { fetch, Date: class extends Date { static now() { return Date.parse("2026-10-27T14:00:00Z"); } } }, socialImports).exports;
   const request = { nextUrl: new URL("http://localhost/api/social?team=Celtics") };
   let result = await route.GET(request);
   assert.equal(result.body.source, "reddit");
@@ -329,4 +329,107 @@ test("schedule preserves tipoff/postponement and comparison counts overtime fina
   const standings = load("app/api/standings/route.ts", globals, imports).exports;
   const table = await standings.GET();
   assert.equal(table.body.standings.find((team) => team.id === 2).wins, 1);
+  assert.equal(table.body.season, dates.getNBASeason());
+  assert.equal(table.body.asOf, dates.formatNBADate());
+  assert.equal(compared.body.season, dates.getNBASeason());
+});
+
+test("standings and comparison omit all result content until scores are revealed", () => {
+  let hideScores = true;
+  const snapshot = { season: 2026, asOf: "2026-10-27", standings: [{ id: 2, name: "Boston Celtics", abbreviation: "BOS", conference: "East", wins: 17, losses: 9 }],
+    team1: { wins: 17, losses: 9, gamesPlayed: 26, ppg: "111.3", oppg: "109.2" },
+    team2: { wins: 14, losses: 11, gamesPlayed: 25, ppg: "107.2", oppg: "106.1" }, headToHead: { team1Wins: 2, team2Wins: 1 } };
+  const remote = { data: snapshot, loading: false, error: false, retry() {} };
+  const mocked = { ...imports,
+    "@/hooks/useRemoteData": { useRemoteData: () => remote },
+    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores }) },
+    "@/components/DataError": load("components/DataError.tsx").exports,
+  };
+  mocked["@/components/SpoilerGuard"] = load("components/SpoilerGuard.tsx", {}, mocked).exports;
+  const Standings = load("app/standings/page.tsx", {}, mocked).exports.default;
+  const Compare = load("app/compare/page.tsx", {}, mocked).exports.default;
+  const render = (Page) => renderToStaticMarkup(createElement(Page));
+  assert.match(render(Standings), /Reveal standings/);
+  assert.doesNotMatch(render(Standings), /<table|Playoff position|\.654/);
+  assert.match(render(Compare), /Reveal comparison/);
+  assert.doesNotMatch(render(Compare), /17-9|111\.3|Head-to-head|Points per game/);
+  hideScores = false;
+  assert.match(render(Standings), /<table/);
+  assert.match(render(Standings), /\.654/);
+  assert.match(render(Compare), /17-9/);
+  assert.match(render(Compare), /26 completed games/);
+  assert.match(render(Compare), /Lower is better/);
+  hideScores = true;
+  remote.error = true;
+  assert.match(render(Standings), /Try again/);
+  assert.match(render(Compare), /Try again/);
+  remote.error = false;
+  remote.loading = true;
+  assert.match(render(Standings), /Loading standings/);
+  assert.match(render(Compare), /Loading comparison/);
+});
+
+test("community recency beats category and engagement, with precise injury labels", async () => {
+  const now = Date.parse("2026-10-27T14:00:00Z") / 1000;
+  const post = (id, title, age) => ({ data: { id, title, created_utc: now - age, permalink: `/r/nba/comments/${id}/post/`, subreddit: "nba", score: id === "old" ? 10000 : 1, num_comments: 3, author: "fan" } });
+  const children = [post("old", "Celtics injury report", 490 * 86400), post("week-old", "Celtics ruled out", 8 * 86400),
+    post("injury", "Celtics player questionable with ankle injury", 3600), post("performance", "Celtics played hard out there", 1800),
+    post("apron", "Celtics are out of the second apron", 900), post("thread", "Post game thread Celtics vs Nets", 300),
+    post("future", "Celtics update", -600), post("boundary", "Celtics fan discussion", 7 * 86400)];
+  const mocked = { ...imports, "@/lib/reddit": { teamSubreddits: { Celtics: "bostonceltics" } }, "@/lib/communityFeed": load("lib/communityFeed.ts").exports };
+  let mode = "direct";
+  const feed = "<rss>" + children.map(({ data: p }) => `<item><guid>${p.id}</guid><title>${p.title}</title><link>https://news.google.com/rss/articles/${p.id}</link><pubDate>${new Date(p.created_utc * 1000).toUTCString()}</pubDate></item>`).join("") + "</rss>";
+  const route = load("app/api/social/route.ts", {
+    Date: class extends Date { static now() { return now * 1000; } },
+    fetch: async (url) => ({ ok: mode === "direct" || url.includes("news.google"),
+      json: async () => ({ data: { children: url.includes("/r/nba/") ? children : [] } }), text: async () => feed }),
+  }, mocked).exports;
+  for (mode of ["direct", "index"]) {
+    const result = await route.GET({ nextUrl: new URL("http://localhost/api/social?team=Celtics") });
+    assert.equal(result.body.source, mode === "direct" ? "reddit" : "news-index");
+    assert.deepEqual(Array.from(result.body.posts, (p) => p.id), ["thread", "apron", "performance", "injury", "boundary"]);
+    const categories = Object.fromEntries(result.body.posts.map((p) => [p.id, p.category]));
+    assert.equal(categories.injury, "injury");
+    assert.equal(categories.thread, "postgame");
+    assert.notEqual(categories.apron, "injury");
+    assert.notEqual(categories.performance, "injury");
+  }
+});
+
+test("protected social posts cannot open an external result before reveal", () => {
+  let hideHeadlines = true;
+  const mocked = { ...imports,
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: teams.getCeltics() }) },
+    "@/lib/reddit": { teamSubreddits: { Celtics: "bostonceltics" } },
+    "@/components/TeamSelector": { default: () => null },
+    "@/components/SpoilerModeProvider": { useSpoilerContext: () => ({ hideHeadlines }) },
+    "@/components/DataError": load("components/DataError.tsx").exports,
+    "@/hooks/useRemoteData": { useRemoteData: () => ({ data: { posts: [{ id: "secret", title: "Secret final score - Reddit", created: Date.now() / 1000, subreddit: "nba", category: "postgame", url: "https://reddit.com/secret", score: 100, comments: 5 }] }, loading: false }) },
+  };
+  const Social = load("app/social/page.tsx", {}, mocked).exports.default;
+  let html = renderToStaticMarkup(createElement(Social));
+  assert.doesNotMatch(html, /Secret final score|href="https:\/\/reddit.com\/secret"/);
+  assert.match(html, /Reveal post and image/);
+  hideHeadlines = false;
+  html = renderToStaticMarkup(createElement(Social));
+  assert.match(html, /Secret final score/);
+  assert.match(html, /href="https:\/\/reddit.com\/secret"/);
+});
+
+test("digest presentation separates coverage, localizes old UTC prose and names safe source links", () => {
+  const { getDigestPresentation } = load("lib/digestPresentation.ts", {}, imports).exports;
+  const entry = { title: "NBA Morning Briefing: 2026-10-26", content: "## Next game\n\nBoston plays on 2026-10-27 at 23:30 UTC.\n\n## Sources\n\nLeague date: 2026-10-26. Retrieved 2026-10-27T11:00:00Z.\n\nESPN scoreboard: https://site.api.espn.com/scoreboard?dates=20261026\n\nBoston next game: https://example.com/next" };
+  const result = getDigestPresentation(entry);
+  assert.equal(result.title, "NBA Morning Briefing");
+  assert.equal(result.coverageDate, "2026-10-26");
+  assert.match(result.content, new RegExp(dates.formatTipoff("2026-10-27T23:30:00Z")));
+  assert.doesNotMatch(result.content, /Sources|Retrieved|23:30 UTC/);
+  const Markdown = load("components/MarkdownContent.tsx").exports.default;
+  const html = renderToStaticMarkup(Markdown({ content: result.sources + "\n\n[Unsafe](javascript:alert(1))\n\n<script>bad</script>" }));
+  assert.match(html, /href="https:\/\/site.api.espn.com\/scoreboard\?dates=20261026"/);
+  assert.match(html, />ESPN scoreboard<\/a>/);
+  assert.match(html, />ESPN scoreboard<\/a><\/p><p[^>]*><a[^>]*>Boston next game<\/a>/);
+  assert.doesNotMatch(html, /href="javascript:|<script>/);
+  assert.equal(getDigestPresentation({ title: "Special edition", content: "No source section" }).title, "Special edition");
+  assert.equal(getDigestPresentation({ ...entry, content: entry.content.replace("League date: 2026-10-26", "League date: 2026-02-30") }).coverageDate, null);
 });

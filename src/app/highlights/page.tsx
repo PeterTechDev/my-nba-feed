@@ -1,6 +1,8 @@
 "use client";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
+import TeamSelector from "@/components/TeamSelector";
+import { ExternalLink, Youtube } from "lucide-react";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
 import { formatGameDate } from "@/lib/nbaDate";
@@ -56,22 +58,26 @@ export default function HighlightsPage() {
 
   return (
     <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={selectedTeam.logo} alt="" className="w-10 h-10" />
+        <img src={selectedTeam.logo} alt="" className="w-10 h-10 shrink-0" />
         <div>
           <h1 className="text-2xl font-bold">{selectedTeam.name} Highlights</h1>
-          <p className="text-sm text-white/70">Recent game highlights on YouTube</p>
+          <p className="text-sm text-white/70">Find highlights from recent games</p>
         </div>
+        </div>
+        <TeamSelector />
       </div>
+      <p id="youtube-warning" className="text-sm text-white/70 mb-6">Links open YouTube search in a new tab. Search titles and thumbnails may reveal results.</p>
 
       {error ? (
         <DataError subject="recent games" retry={retry} />
       ) : loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div role="status" aria-label="Loading recent games" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="rounded-xl bg-[#161616] border border-[#2a2a2a] p-5 animate-pulse">
-              <div className="aspect-video bg-white/10 rounded-lg mb-3" />
+              <div className="h-5 w-48 bg-white/10 rounded mb-3" />
               <div className="h-4 w-32 bg-white/10 rounded" />
             </div>
           ))}
@@ -79,7 +85,7 @@ export default function HighlightsPage() {
       ) : highlights.length === 0 ? (
         <p className="text-white/70 text-center py-16">No recent games found</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {highlights.map((h) => {
             const date = formatGameDate(h.date, { weekday: "short", month: "short", day: "numeric" });
             return (
@@ -88,27 +94,19 @@ export default function HighlightsPage() {
                 href={h.youtubeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden hover:border-white/20 transition"
+                aria-describedby="youtube-warning"
+                className="group rounded-xl bg-[#161616] border border-[#2a2a2a] p-4 hover:bg-white/5 transition"
               >
-                <div className="aspect-video bg-gradient-to-br from-white/5 to-black flex items-center justify-center relative">
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 group-hover:bg-white/20 transition">
-                    <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                    <span className="text-sm font-medium text-white/80">Watch on YouTube</span>
-                  </div>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <p className="font-semibold">{h.isHome ? "vs" : "@"} {h.opponent}</p>
                   {!hideScores && (
-                    <div className="absolute top-2 right-2">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${h.won ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
+                      <span className={`text-sm font-medium shrink-0 ${h.won ? "text-emerald-300" : "text-red-300"}`}>
                         {h.won ? "W" : "L"} {h.teamScore}-{h.oppScore}
                       </span>
-                    </div>
                   )}
                 </div>
-                <div className="p-4">
-                  <p className="font-medium text-sm group-hover:text-white transition">
-                    {h.isHome ? "vs" : "@"} {h.opponent}
-                  </p>
-                  <p className="text-xs text-white/70 mt-1">{date}</p>
-                </div>
+                <p className="text-sm text-white/70 mb-3">{date}</p>
+                <span className="flex items-center gap-2 text-sm text-red-300"><Youtube aria-hidden="true" className="h-5 w-5 shrink-0" />Search highlights on YouTube<ExternalLink aria-hidden="true" className="h-4 w-4 shrink-0" /></span>
               </a>
             );
           })}
@@ -120,10 +118,11 @@ export default function HighlightsPage() {
           href={`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedTeam.city + " " + selectedTeam.name + " highlights " + new Date().getFullYear())}`}
           target="_blank"
           rel="noopener noreferrer"
+          aria-describedby="youtube-warning"
           className="inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-lg bg-red-600/20 text-red-300 hover:bg-red-600/30 transition text-sm font-medium"
         >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-          More on YouTube
+          <Youtube aria-hidden="true" className="w-4 h-4" />
+          Search more highlights
         </a>
       </div>
     </main>

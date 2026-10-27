@@ -1,7 +1,8 @@
 "use client";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
-
+import TeamSelector from "@/components/TeamSelector";
+import { ChevronDown } from "lucide-react";
 import { useTeam } from "@/hooks/useTeam";
 
 interface Player {
@@ -26,19 +27,22 @@ export default function PlayersPage() {
 
   return (
     <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={selectedTeam.logo} alt="" className="w-10 h-10" />
-        <div>
-          <h1 className="text-2xl font-bold">{selectedTeam.name} Roster</h1>
-          <p className="text-sm text-white/70">Current roster{data?.source ? ` · ${data.source}` : ""}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={selectedTeam.logo} alt="" className="w-10 h-10 shrink-0" />
+          <div>
+            <h1 className="text-2xl font-bold">{selectedTeam.name} Roster</h1>
+            <p className="text-sm text-white/70">Current roster{data?.source ? ` · ${data.source}` : ""}</p>
+          </div>
         </div>
+        <TeamSelector />
       </div>
 
       {error ? (
         <DataError subject="players" retry={retry} />
       ) : loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div role="status" aria-label="Loading roster" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(12)].map((_, i) => (
             <div key={i} className="rounded-xl bg-[#161616] border border-[#2a2a2a] p-5 animate-pulse">
               <div className="h-6 w-32 bg-white/10 rounded mb-2" />
@@ -49,32 +53,35 @@ export default function PlayersPage() {
       ) : players.length === 0 ? (
         <p className="text-white/70 text-center py-16">No players found for this team</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="divide-y divide-white/10 sm:divide-y-0 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
           {players.map((p) => (
-            <div key={p.id} className="rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
-              <div className="h-0.5" style={{ background: `linear-gradient(90deg, var(--team-primary), transparent)` }} />
-              <div className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-lg font-bold">{p.firstName} {p.lastName}</p>
-                    <p className="text-sm text-white/70">{p.position || "N/A"}</p>
-                  </div>
-                  {p.jerseyNumber && (
-                    <span className="text-2xl font-extrabold text-white/70">#{p.jerseyNumber}</span>
-                  )}
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-white/70">
-                  {p.height && <div><span className="text-white/60">Height:</span> {p.height}</div>}
-                  {p.weight && <div><span className="text-white/60">Weight:</span> {p.weight} lbs</div>}
-                  {p.college && <div className="col-span-2"><span className="text-white/60">College:</span> {p.college}</div>}
-                  {p.country && p.country !== "USA" && <div><span className="text-white/60">Country:</span> {p.country}</div>}
-                  {p.draftYear && <div><span className="text-white/60">Draft:</span> {p.draftYear} R{p.draftRound} #{p.draftNumber}</div>}
-                </div>
+            <article key={p.id} className="py-2 sm:p-5 sm:rounded-xl sm:bg-[#161616] sm:border sm:border-[#2a2a2a]">
+              <details className="group sm:hidden">
+                <summary className="min-h-11 cursor-pointer list-none flex items-center justify-between gap-3 py-2">
+                  <span className="min-w-0"><span className="block text-base font-semibold">{p.firstName} {p.lastName}</span><span className="text-sm text-white/70">{p.position || "Position unavailable"}{p.jerseyNumber ? ` · #${p.jerseyNumber}` : ""}</span></span>
+                  <span className="flex items-center gap-2 shrink-0 text-sm text-white/70"><span>Details</span><ChevronDown aria-hidden="true" className="h-4 w-4 group-open:rotate-180" /></span>
+                </summary>
+                <PlayerDetails player={p} />
+              </details>
+              <div className="hidden sm:block">
+                <h2 className="text-lg font-bold">{p.firstName} {p.lastName}</h2>
+                <p className="text-sm text-white/70">{p.position || "Position unavailable"}{p.jerseyNumber ? ` · #${p.jerseyNumber}` : ""}</p>
+                <PlayerDetails player={p} />
               </div>
-            </div>
+            </article>
           ))}
         </div>
       )}
     </main>
   );
+}
+
+function PlayerDetails({ player: p }: { player: Player }) {
+  return <div className="mt-3 mb-2 grid grid-cols-2 gap-2 text-sm text-white/70">
+    {p.height && <div>Height: {p.height}</div>}
+    {p.weight && <div>Weight: {p.weight} lbs</div>}
+    {p.college && <div className="col-span-2">College: {p.college}</div>}
+    {p.country && p.country !== "USA" && <div>Country: {p.country}</div>}
+    {Boolean(p.draftYear) && <div className="col-span-2">Draft: {p.draftYear} R{p.draftRound} #{p.draftNumber}</div>}
+  </div>;
 }

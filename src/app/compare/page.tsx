@@ -1,6 +1,7 @@
 "use client";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
+import SpoilerGuard from "@/components/SpoilerGuard";
 import { useState } from "react";
 import { teams, Team, getChartColor } from "@/lib/teams";
 
@@ -16,9 +17,10 @@ interface CompareData {
   team1: TeamStats;
   team2: TeamStats;
   headToHead: { team1Wins: number; team2Wins: number };
+  season: number;
 }
 
-function StatBar({ label, val1, val2, color1, color2, higher1Better }: { label: string; val1: number; val2: number; color1: string; color2: string; higher1Better?: boolean }) {
+function StatBar({ label, val1, val2, color1, color2, higher1Better, percentage = false }: { label: string; val1: number; val2: number; color1: string; color2: string; higher1Better?: boolean; percentage?: boolean }) {
   const max = Math.max(val1, val2, 1);
   const pct1 = (val1 / max) * 100;
   const pct2 = (val2 / max) * 100;
@@ -27,10 +29,10 @@ function StatBar({ label, val1, val2, color1, color2, higher1Better }: { label: 
 
   return (
     <div className="mb-4">
-      <div className="flex justify-between text-xs text-white/70 mb-1">
-        <span className={best1 ? "text-emerald-400 font-medium" : ""}>{label === "WIN %" ? `${(val1 * 100).toFixed(1)}%` : val1}</span>
-        <span className="uppercase tracking-wider">{label}</span>
-        <span className={best2 ? "text-emerald-400 font-medium" : ""}>{label === "WIN %" ? `${(val2 * 100).toFixed(1)}%` : val2}</span>
+      <div className="flex items-center justify-between gap-3 text-sm text-white/80 mb-2 tabular-nums">
+        <span className={best1 ? "text-emerald-300 font-medium" : ""}>{percentage ? `${(val1 * 100).toFixed(1)}%` : val1}</span>
+        <span className="text-center">{label}{higher1Better === false && <span className="block text-xs text-white/70">Lower is better</span>}</span>
+        <span className={best2 ? "text-emerald-300 font-medium" : ""}>{percentage ? `${(val2 * 100).toFixed(1)}%` : val2}</span>
       </div>
       <div className="flex gap-1 h-3">
         <div className="flex-1 flex justify-end">
@@ -81,9 +83,9 @@ export default function ComparePage() {
   return (
     <main className="min-h-screen p-4 sm:p-8 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-2">Team Comparison</h1>
-      <p className="text-sm text-white/70 mb-6">Head-to-head season stats</p>
+      <p className="text-sm text-white/70 mb-6">{data ? `${data.season}–${String(data.season + 1).slice(-2)} season · ` : ""}Completed games · BALLDONTLIE</p>
 
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <TeamSelect value={team1} onChange={setTeam1} label="Team 1" />
         <TeamSelect value={team2} onChange={setTeam2} label="Team 2" />
       </div>
@@ -93,50 +95,56 @@ export default function ComparePage() {
       ) : error ? (
         <DataError subject="team comparison" retry={retry} />
       ) : loading ? (
-        <div className="space-y-4 animate-pulse">
+        <div role="status" aria-label="Loading comparison" className="space-y-4 animate-pulse">
           {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-white/5 rounded-lg" />)}
         </div>
       ) : data ? (
+        <SpoilerGuard key={`${team1.id}:${team2.id}`} label="comparison">
         <div className="rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
           <div className="h-0.5" style={{ background: `linear-gradient(90deg, var(--team-primary), transparent)` }} />
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {/* Team headers */}
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={team1.logo} alt="" className="w-12 h-12" />
+                <img src={team1.logo} alt="" className="w-8 h-8 sm:w-12 sm:h-12" />
                 <div>
                   <p className="font-bold">{team1.abbreviation}</p>
                   <p className="text-sm text-white/70">{data.team1.wins}-{data.team1.losses}</p>
                 </div>
               </div>
               <div className="text-center">
-                <p className="text-xs text-white/70 uppercase tracking-wider">H2H</p>
+                <p className="text-sm text-white/70">Head-to-head</p>
                 <p className="text-lg font-bold tabular-nums">{data.headToHead.team1Wins} - {data.headToHead.team2Wins}</p>
               </div>
-              <div className="flex items-center gap-3 flex-row-reverse">
+              <div className="flex items-center gap-2 sm:gap-3 flex-row-reverse">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={team2.logo} alt="" className="w-12 h-12" />
+                <img src={team2.logo} alt="" className="w-8 h-8 sm:w-12 sm:h-12" />
                 <div className="text-right">
                   <p className="font-bold">{team2.abbreviation}</p>
                   <p className="text-sm text-white/70">{data.team2.wins}-{data.team2.losses}</p>
                 </div>
               </div>
             </div>
+            <p className="text-sm text-white/70 mb-6">{team1.abbreviation}: {data.team1.gamesPlayed} completed games · {team2.abbreviation}: {data.team2.gamesPlayed} completed games. Averages use only those games.</p>
 
             {/* Stats bars */}
+            {data.team1.gamesPlayed === 0 || data.team2.gamesPlayed === 0 ? <p className="text-white/80">Both teams need a completed game before averages can be compared.</p> : <>
             <StatBar label="Wins" val1={data.team1.wins} val2={data.team2.wins} color1={team1.primaryColor} color2={team2.primaryColor} />
-            <StatBar label="PPG" val1={parseFloat(data.team1.ppg)} val2={parseFloat(data.team2.ppg)} color1={team1.primaryColor} color2={team2.primaryColor} />
-            <StatBar label="OPP PPG" val1={parseFloat(data.team1.oppg)} val2={parseFloat(data.team2.oppg)} color1={team1.primaryColor} color2={team2.primaryColor} higher1Better={false} />
+            <StatBar label="Points per game" val1={parseFloat(data.team1.ppg)} val2={parseFloat(data.team2.ppg)} color1={team1.primaryColor} color2={team2.primaryColor} />
+            <StatBar label="Opponent points per game" val1={parseFloat(data.team1.oppg)} val2={parseFloat(data.team2.oppg)} color1={team1.primaryColor} color2={team2.primaryColor} higher1Better={false} />
             <StatBar
-              label="WIN %"
+              label="Winning percentage"
+              percentage
               val1={data.team1.wins / (data.team1.wins + data.team1.losses || 1)}
               val2={data.team2.wins / (data.team2.wins + data.team2.losses || 1)}
               color1={team1.primaryColor}
               color2={team2.primaryColor}
             />
+            </>}
           </div>
         </div>
+        </SpoilerGuard>
       ) : null}
     </main>
   );

@@ -88,7 +88,7 @@ export default function NavBar() {
             <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Hide scores and records</p>
-                <p className="text-xs text-white/70 mt-1">Applies to game scores and your focus team&apos;s season record.</p>
+                <p className="text-xs text-white/70 mt-1">Protects game scores, records, standings and comparison statistics until reveal.</p>
               </div>
               <input
                 type="checkbox"

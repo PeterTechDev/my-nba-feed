@@ -6,7 +6,7 @@ interface Props {
 }
 
 // Lightweight markdown renderer — handles the subset used by digest agents.
-// Supports headings, bold, italic, lists, blockquotes and paragraphs.
+// Supports headings, emphasis, safe links, lists, blockquotes and paragraphs.
 export default function MarkdownContent({ content, className = "" }: Props) {
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
@@ -17,10 +17,16 @@ export default function MarkdownContent({ content, className = "" }: Props) {
 
   const key = () => keyCounter++;
 
-  // Parse inline formatting (bold, italic)
   const parseInline = (text: string): React.ReactNode => {
-    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    const parts = text.split(/(\[[^\]\n]+\]\(https?:\/\/[^\s)]+\)|https?:\/\/[^\s<>]+|\*\*[^*]+\*\*|\*[^*]+\*)/g);
     return parts.map((part, idx) => {
+      const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+      if (link || /^https?:\/\//.test(part)) {
+        try {
+          const url = new URL(link?.[2] ?? part);
+          if (url.protocol === "https:" || url.protocol === "http:") return <a key={idx} href={url.href} target="_blank" rel="noopener noreferrer" className="text-amber-200 underline underline-offset-4 break-words hover:text-amber-100">{link?.[1] ?? url.hostname.replace(/^www\./, "")}</a>;
+        } catch { /* Malformed links stay readable as text. */ }
+      }
       if (part.startsWith("**") && part.endsWith("**")) {
         return <strong key={idx} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
       }

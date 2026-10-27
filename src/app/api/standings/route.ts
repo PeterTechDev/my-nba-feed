@@ -149,7 +149,7 @@ export async function GET() {
       return pctB - pctA;
     });
 
-    return NextResponse.json({ standings, error: null });
+    return NextResponse.json({ standings, season, asOf: seasonEnd, error: null });
   } catch {
     return NextResponse.json({ standings: [], error: "Failed to fetch" }, { status: 500 });
   }

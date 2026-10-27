@@ -1,6 +1,7 @@
 "use client";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
+import TeamSelector from "@/components/TeamSelector";
 import { useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
@@ -37,6 +38,7 @@ export default function SchedulePage() {
   const { selectedTeam } = useTeam();
   const { hideScores } = useSpoilerContext();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [view, setView] = useState<"calendar" | "list">("calendar");
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -59,31 +61,41 @@ export default function SchedulePage() {
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
 
   const monthLabel = currentDate.toLocaleString("en-US", { month: "long", year: "numeric" });
+  const today = new Date();
+  const currentMonth = year === today.getFullYear() && month === today.getMonth();
 
   return (
     <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={selectedTeam.logo} alt="" className="w-10 h-10" />
+        <img src={selectedTeam.logo} alt="" className="w-10 h-10 shrink-0" />
         <div>
           <h1 className="text-2xl font-bold">{selectedTeam.name} Schedule</h1>
           <p className="text-sm text-white/70">Season games calendar</p>
         </div>
+        </div>
+        <TeamSelector />
       </div>
 
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="min-h-11 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <h2 aria-live="polite" className="w-full text-lg font-bold mb-1">{monthLabel}</h2>
+        <button aria-label="Previous month" onClick={prevMonth} className="min-h-11 flex-1 sm:flex-none px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm">
           Prev
         </button>
-        <h2 className="text-lg font-bold">{monthLabel}</h2>
-        <button onClick={nextMonth} className="min-h-11 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm">
+        <button type="button" disabled={currentMonth} onClick={() => setCurrentDate(new Date())} className="min-h-11 flex-1 sm:flex-none px-4 py-2 rounded-lg border border-white/15 text-sm hover:bg-white/10 disabled:opacity-50 disabled:cursor-default">Today</button>
+        <button aria-label="Next month" onClick={nextMonth} className="min-h-11 flex-1 sm:flex-none px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm">
           Next
         </button>
+        <div role="group" aria-label="Schedule view" className="hidden md:flex gap-1 ml-auto">
+          {(["calendar", "list"] as const).map((option) => <button key={option} type="button" aria-pressed={view === option} onClick={() => setView(option)} className={`min-h-11 px-4 rounded-lg text-sm ${view === option ? "bg-white/15" : "text-white/70 hover:bg-white/10"}`}>{option === "calendar" ? "Calendar" : "Agenda"}</button>)}
+        </div>
       </div>
 
       {error ? <DataError subject="the schedule" retry={retry} /> : <>
       {/* Desktop: Calendar grid */}
-      <div className="hidden sm:block rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
+      {!loading && games.length === 0 && view === "calendar" && <p role="status" className="hidden md:block mb-4 text-sm text-white/70">No games scheduled this month. Choose another month or focus team.</p>}
+      <div className={`${view === "calendar" ? "hidden md:block" : "hidden"} rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden`}>
         <div className="grid grid-cols-7 text-center text-xs text-white/70 font-medium border-b border-white/5">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
             <div key={d} className="py-2">{d}</div>
@@ -92,7 +104,7 @@ export default function SchedulePage() {
 
         {loading ? (
           <div className="h-64 flex items-center justify-center">
-            <div className="text-white/70 animate-pulse">Loading...</div>
+            <div role="status" className="text-white/70 animate-pulse">Loading schedule…</div>
           </div>
         ) : (
           <div className="grid grid-cols-7">
@@ -116,11 +128,11 @@ export default function SchedulePage() {
               return (
                 <div
                   key={day}
-                  className={`min-h-[80px] border-b border-r border-white/5 p-1.5 ${isToday ? "bg-white/5" : ""}`}
+                  className={`min-h-[110px] border-b border-r border-white/5 p-2 ${isToday ? "bg-white/5" : ""}`}
                 >
                   <span className={`text-xs ${isToday ? "text-white font-bold" : "text-white/70"}`}>{day}</span>
                   {game && opponent && (
-                    <div className={`mt-1 rounded p-1 text-[10px] ${
+                    <div className={`mt-2 rounded p-1.5 text-xs lg:text-sm ${
                       isFinal && !hideScores
                         ? won
                           ? "bg-emerald-500/10 text-emerald-400"
@@ -149,10 +161,10 @@ export default function SchedulePage() {
       </div>
 
       {/* Mobile: List view */}
-      <div className="sm:hidden rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden">
+      <div className={`${view === "list" ? "block" : "md:hidden"} rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden`}>
         {loading ? (
           <div className="h-64 flex items-center justify-center">
-            <div className="text-white/70 animate-pulse">Loading...</div>
+            <div role="status" className="text-white/70 animate-pulse">Loading schedule…</div>
           </div>
         ) : (() => {
           const gamesThisMonth = [...Array(daysInMonth)].map((_, i) => {
@@ -173,17 +185,17 @@ export default function SchedulePage() {
           }).filter(Boolean) as { day: number; game: ScheduleGame; isHome: boolean; opponent: { id: number; name: string; abbreviation: string }; isFinal: boolean; won: boolean; isToday: boolean }[];
 
           return gamesThisMonth.length === 0 ? (
-            <p className="text-white/70 text-center py-8 text-sm">No games this month</p>
+            <p className="text-white/70 text-center py-8 px-4 text-sm">No games scheduled this month. Choose another month or focus team.</p>
           ) : (
             <div className="divide-y divide-white/5">
               {gamesThisMonth.map(({ day, game, isHome, opponent, isFinal, won, isToday }) => (
-                <div key={day} className={`flex items-center justify-between px-4 py-3 ${isToday ? "bg-white/5" : ""}`}>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-sm font-mono w-6 text-center ${isToday ? "text-white font-bold" : "text-white/70"}`}>
+                <div key={day} className={`flex items-center justify-between gap-3 px-4 py-4 ${isToday ? "bg-white/5" : ""}`}>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className={`text-sm tabular-nums w-6 shrink-0 text-center ${isToday ? "text-white font-bold" : "text-white/70"}`}>
                       {day}
                     </span>
-                    <div>
-                      <p className="text-sm font-medium">
+                    <div className="min-w-0">
+                      <p className="text-base font-medium">
                         {isHome ? "vs" : "@"} {opponent.name}
                       </p>
                       <p className="text-xs text-white/70">
@@ -193,14 +205,14 @@ export default function SchedulePage() {
                   </div>
                   {isFinal ? (
                     hideScores ? (
-                      <span className="text-xs text-white/70">{game.status}</span>
+                      <span className="text-sm text-white/70 shrink-0">{game.status}</span>
                     ) : (
-                      <span className={`text-sm font-bold ${won ? "text-emerald-400" : "text-red-400"}`}>
+                      <span className={`text-sm shrink-0 font-bold ${won ? "text-emerald-300" : "text-red-300"}`}>
                         {won ? "W" : "L"} {isHome ? game.homeScore : game.awayScore}-{isHome ? game.awayScore : game.homeScore}
                       </span>
                     )
                   ) : (
-                    <span className="text-xs text-white/70 text-right max-w-[45%]">{gameStatus(game)}</span>
+                    <span className="text-sm text-white/70 text-right max-w-[45%] shrink-0">{gameStatus(game)}</span>
                   )}
                 </div>
               ))}

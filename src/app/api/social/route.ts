@@ -66,49 +66,12 @@ function isRelevantToTeam(title: string, keywords: string[]): boolean {
 
 function getCategory(title: string): RedditPost["category"] {
   const normalizedTitle = normalizeText(title);
-  if (/\b(game thread|pregame|pre game)\b/.test(normalizedTitle)) return "game-thread";
   if (/\b(postgame|post game|post-game|serious post game thread)\b/.test(normalizedTitle)) return "postgame";
-  if (/\b(injury|injured|questionable|probable|available|out|return|returns|status)\b/.test(normalizedTitle)) return "injury";
+  if (/\b(game thread|pregame|pre game)\b/.test(normalizedTitle)) return "game-thread";
+  if (/\b(injury|injured|questionable|doubtful|probable|ruled out|sidelined|concussion|out with|out due to|return from injury|available to play|cleared to play)\b/.test(normalizedTitle)) return "injury";
   if (/\b(report|reports|trade|signed|waived|lineup|rotation|coach|practice|update)\b/.test(normalizedTitle)) return "news";
   if (/\b(highlight|clip|discussion|thoughts|takeaways|what are your|how are we feeling)\b/.test(normalizedTitle)) return "discussion";
   return "general";
-}
-
-function getQualityScore(post: RedditPost, subreddit: string): number {
-  let score = 0;
-
-  switch (post.category) {
-    case "game-thread":
-      score += 50;
-      break;
-    case "postgame":
-      score += 42;
-      break;
-    case "injury":
-      score += 34;
-      break;
-    case "news":
-      score += 24;
-      break;
-    case "discussion":
-      score += 12;
-      break;
-    case "general":
-      score += 4;
-      break;
-  }
-
-  if (subreddit !== "nba") score += 10;
-
-  const engagementScore = Math.min(20, Math.log10(Math.max(1, (post.score ?? 0) + (post.comments ?? 0))) * 6);
-  score += engagementScore;
-
-  const ageHours = Math.max(0, (Date.now() / 1000 - post.created) / 3600);
-  score -= Math.min(14, ageHours * 0.8);
-
-  if (/\b(meme|shitpost)\b/i.test(post.title)) score -= 12;
-
-  return score;
 }
 
 export async function GET(req: NextRequest) {
@@ -142,7 +105,7 @@ export async function GET(req: NextRequest) {
         if (!entries.length) throw new Error("Reddit RSS empty");
         return entries.map((entry) => ({ ...entry, score: null, comments: null, subreddit: sub, thumbnail: null, category: getCategory(entry.title) }));
       } catch {
-        const query = `site:reddit.com/r/${sub} ${team.city} ${team.name}`;
+        const query = `site:reddit.com/r/${sub} ${team.city} ${team.name} when:7d`;
         const response = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`, {
           next: { revalidate: 600 }, signal: AbortSignal.timeout(3500),
         });
@@ -157,9 +120,11 @@ export async function GET(req: NextRequest) {
   const results = await Promise.allSettled(subs.map(fetchSource));
   const fulfilled = results.filter((result) => result.status === "fulfilled");
   if (!fulfilled.length) return NextResponse.json({ posts: [], error: "Social sources unavailable" }, { status: 502 });
+  const now = Date.now() / 1000;
   const posts = fulfilled.flatMap((result) => result.value)
+    .filter((post) => Number.isFinite(post.created) && post.created <= now && post.created >= now - 7 * 86400)
     .filter((post) => post.subreddit !== "nba" || isRelevantToTeam(post.title, keywords));
   const deduped = Array.from(new Map(posts.map((post) => [new URL(post.url).pathname, post])).values());
-  deduped.sort((a, b) => getQualityScore(b, b.subreddit) - getQualityScore(a, a.subreddit) || b.created - a.created);
+  deduped.sort((a, b) => b.created - a.created);
   return NextResponse.json({ posts: deduped.slice(0, 50), source: usedIndex ? "news-index" : "reddit", partial: fulfilled.length < subs.length, error: null });
 }
