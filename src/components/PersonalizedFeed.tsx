@@ -5,7 +5,7 @@ import { useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
 import type { Team } from "@/lib/teams";
 import { getOpponent, getOpponentScore, getTeamScore, type GamesResponse, type NewsFeeds } from "@/lib/api";
 import DataError from "./DataError";
-import NewsList, { type NewsState } from "./NewsList";
+import NewsList, { NewsLinkWarning, type NewsState } from "./NewsList";
 import ScoreReveal from "./ScoreReveal";
 
 function TeamNewsSection({ team, ...newsState }: NewsState & { team: Team }) {
@@ -20,7 +20,7 @@ function TeamNewsSection({ team, ...newsState }: NewsState & { team: Team }) {
       <div><h3 className="text-base font-bold">{team.city} {team.name}</h3><p className="text-sm text-white/70">Newest first{lastNight ? " · Played last night" : ""}</p></div>
     </div>
     <div className="p-4 space-y-3">
-      <NewsList {...newsState} subject={`${team.name} stories`} />
+      <NewsList {...newsState} subject={`${team.name} stories`} showWarning={false} />
       {gameError && <DataError subject={`${team.name} games`} retry={retryGame} />}
       {lastNight && <div className="border-t border-white/10 pt-3 space-y-2">
         <p className="text-sm text-white/70">Last night · {formatGameDate(lastNight.date, { month: "short", day: "numeric" })}</p>
@@ -46,6 +46,7 @@ export default function PersonalizedFeed({ feeds, loading, error, retry }: { fee
   if (!favoriteTeams.length) return null;
   return <section aria-labelledby="my-teams-heading">
     <div className="flex items-center gap-2 mb-3 sm:mb-4"><h2 id="my-teams-heading" className="text-base font-semibold">My Teams</h2><span className="text-sm text-white/70">({favoriteTeams.length})</span></div>
+    <NewsLinkWarning />
     <div className="grid grid-cols-1 md:grid-cols-2 items-start gap-4">{favoriteTeams.map((team) => <TeamNewsSection key={team.id} team={team}
       news={feeds[team.name]?.items ?? []} loading={loading} error={error || Boolean(feeds[team.name]?.error)} retry={retry} />)}</div>
   </section>;

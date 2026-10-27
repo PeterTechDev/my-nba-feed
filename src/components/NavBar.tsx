@@ -26,7 +26,8 @@ export default function NavBar() {
   const [myTeamsOpen, setMyTeamsOpen] = useState(false);
   const { favoriteTeamIds } = useFavoriteTeams();
   const [menuOpen, setMenuOpen] = useState(false);
-  const protection = spoilerFree ? "Protection on by default" : hideScores || hideHeadlines ? "Custom protection defaults" : "Protection off by default";
+  const mobileProtection = spoilerFree ? "Spoilers hidden" : hideScores ? "Scores hidden" : hideHeadlines ? "Headlines hidden" : "Spoilers shown";
+  const protection = `${mobileProtection} by default`;
 
   const navigationLinks = links.map((link) => {
     const active = pathname === link.href;
@@ -48,12 +49,12 @@ export default function NavBar() {
             NBA Feed
           </Link>
           <button type="button" onClick={toggleSpoiler}
-            aria-label={`${protection}. ${spoilerFree ? "Turn default protection off" : "Hide scores and headlines by default"}`}
+            aria-label={`${protection}. ${spoilerFree ? "Show scores and headlines by default" : "Hide scores and headlines by default"}`}
             title="Default spoiler protection. Individual items can be revealed."
             aria-pressed={spoilerFree ? true : hideScores || hideHeadlines ? "mixed" : false}
             className={`flex min-h-11 min-w-11 justify-center shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs min-[360px]:text-sm font-medium sm:px-3 ${hideScores || hideHeadlines ? "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
             {hideScores || hideHeadlines ? <EyeOff aria-hidden="true" className="hidden h-4 w-4 min-[360px]:block" /> : <Eye aria-hidden="true" className="hidden h-4 w-4 min-[360px]:block" />}
-            <span className="sm:hidden">{spoilerFree ? "Default on" : hideScores || hideHeadlines ? "Custom" : "Default off"}</span>
+            <span className="max-w-[4rem] leading-tight sm:hidden">{mobileProtection}</span>
             <span className="hidden sm:inline">{protection}</span>
           </button>
           <button type="button" onClick={() => setMyTeamsOpen(true)} aria-label={`My Teams (${favoriteTeamIds.length} selected)`}

@@ -64,6 +64,61 @@ test("related injury coverage is grouped without discarding reports or their chr
   assert.equal(newsTools.groupNews([...items, { ...items[0], title: "Celtics Jaylen Brown cleared after wrist injury" }]).length, 2);
 });
 
+test("same-game analysis, highlights and reactions share a slot without merging other games", () => {
+  const story = (title, i, category = "general") => ({ title, category, source: "ESPN", pubDate: `2026-10-27T${13 - i}:00:00Z`, link: `https://example.com/game-${i}` });
+  const coverage = [
+    story("The Warriors were at their best against Denver. But is it repeatable?", 0, "analysis"),
+    story("HLs: GSW dominate Nuggets for first win of season", 1),
+    story("Steve Kerr, Warriors players react to Golden State's first win of NBA season", 2),
+  ];
+  const contract = story("Warriors sign young center to a contract", 3, "transaction");
+  const selected = newsTools.selectHomepageNews({ Warriors: { items: [...coverage, contract], error: false }, NBA: { items: coverage, error: false } }, ["Warriors", "NBA"]);
+  assert.deepEqual(Array.from(selected.Warriors.items, (item) => item.title), [coverage[0].title, contract.title]);
+  assert.deepEqual(Array.from(selected.Warriors.items[0].related, (item) => item.title), coverage.slice(1).map((item) => item.title));
+  assert.equal(selected.NBA.items.length, 0, "Grouped reports stay excluded from later sections");
+  const nextFeed = [
+    story("Warriors’ first win of the season shows how they can get more", 0),
+    story("Yaxel Lendeborg has 31 points, 12 rebounds as Warriors blow out Nuggets on road", 1),
+    story("Postgame Warriors Talk: Draymond Green - 10/26/2026", 2, "recap"),
+    story("Yaxel Lendeborg scores career-high 31 points in Warriors first win", 3),
+    story("Denver Nuggets vs. Golden State Warriors - 1st Quarter Highlights", 4),
+  ];
+  assert.equal(newsTools.groupNews(nextFeed).length, 1, "Opponent-free summaries and interviews join the sole recent matchup");
+  const ambiguous = [...coverage, story("Warriors beat Lakers for first win of season", 3)];
+  assert.equal(newsTools.groupNews(ambiguous).length, 3, "Opponent-free reactions stay separate when two matchups are possible");
+  assert.equal(newsTools.groupNews(ambiguous.toReversed()).length, 3);
+  for (const other of [
+    story("Warriors vs Denver Nuggets preview and predictions", 3, "analysis"),
+    story("Warriors injury report after Denver Nuggets win", 3, "injury"),
+    { ...coverage[1], pubDate: "2026-10-25T12:00:00Z" },
+  ]) {
+    assert.equal(newsTools.groupNews([...coverage, other]).length, 2, other.title);
+    assert.equal(newsTools.groupNews([other, ...coverage.toReversed()]).length, 2, "Input order must not bridge different matchups");
+  }
+  assert.equal(newsTools.groupNews([story("Warriors were at their best against Los Angeles", 0), coverage[1]]).length, 2, "An ambiguous city cannot identify the opponent");
+});
+
+test("spoiler labels name hidden content in both complete and mixed states", () => {
+  let settings;
+  const NavBar = load("components/NavBar.tsx", {}, {
+    "next/link": { default: "a" }, "next/navigation": { usePathname: () => "/" },
+    "./Modal": { default: () => null }, "./FavoriteTeamsModal": { default: () => null },
+    "@/hooks/useFavoriteTeams": { useFavoriteTeams: () => ({ favoriteTeamIds: [] }) },
+    "./SpoilerModeProvider": { useSpoilerContext: () => settings },
+  }).exports.default;
+  for (const [hideScores, hideHeadlines, label, pressed] of [
+    [true, true, "Spoilers hidden", "true"], [false, false, "Spoilers shown", "false"],
+    [true, false, "Scores hidden", "mixed"], [false, true, "Headlines hidden", "mixed"],
+  ]) {
+    settings = { hideScores, hideHeadlines, spoilerFree: hideScores && hideHeadlines };
+    const html = renderToStaticMarkup(createElement(NavBar));
+    assert.ok(html.includes(label));
+    assert.ok(html.includes(`aria-label="${label} by default.`));
+    assert.ok(html.includes(`aria-pressed="${pressed}"`));
+    assert.doesNotMatch(html, /Default on|Default off|Custom protection/);
+  }
+});
+
 test("news API preserves partial feeds and rejects invalid teams and total source failures", async () => {
   const fixture = (title, id, date = "Tue, 27 Oct 2026 12:00:00 GMT") => `<item><title>${title}</title><source>ESPN</source><link>https://news.google.com/rss/articles/${id}</link><pubDate>${date}</pubDate></item>`;
   let offline = false;
@@ -139,6 +194,7 @@ test("homepage prioritizes followed stories and shows the focus-team lead only o
   const focus = teams.getCeltics();
   const other = teams.teams.find((team) => team.name === "Lakers");
   let favorites = [focus.id];
+  let lastVisitAt = null;
   const story = (title) => ({ title: title + " - ESPN", safeTitle: "Protected recap", source: "ESPN",
     pubDate: "2026-10-27T05:00:00Z", link: "https://example.com/" + encodeURIComponent(title), isSpoiler: false });
   const news = ["Celtics lead", "Celtics second", "Celtics third", "Celtics fourth"].map(story);
@@ -152,7 +208,7 @@ test("homepage prioritizes followed stories and shows the focus-team lead only o
       useFavoriteTeamObjects: () => favorites.map((id) => teams.teams.find((team) => team.id === id)) },
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: focus }) },
     "@/hooks/useGameData": { useGameData: () => state },
-    "@/hooks/useLastVisit": { useLastVisit: () => ({ ready: true, lastVisitAt: null }) },
+    "@/hooks/useLastVisit": { useLastVisit: () => ({ ready: true, lastVisitAt }) },
     "@/hooks/useRemoteData": { useRemoteData: (url) => ({ loading: false, error: false, retry: () => {},
       data: url.includes("/api/games") ? state : { feeds: Object.fromEntries(new URL(url, "http://localhost").searchParams.get("teams").split(",").map((name) => [name, { items: name === "Celtics" ? news : [story(name === "NBA" ? "League update" : "Lakers latest")], error: false }])) } }) },
     "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }) },
@@ -170,6 +226,14 @@ test("homepage prioritizes followed stories and shows the focus-team lead only o
   assert.equal(html.split("Celtics lead").length - 1, 1);
   assert.ok(html.indexOf("Celtics lead") < html.indexOf("vs Nets"));
   assert.doesNotMatch(html, /Morning Briefing/);
+  favorites = [focus.id, other.id];
+  lastVisitAt = "2026-10-27T14:00:00Z";
+  html = renderToStaticMarkup(createElement(Home));
+  assert.equal(html.split("Article links open external sites and may contain spoilers.").length - 1, 2, "One warning covers followed news; another covers league news");
+  assert.doesNotMatch(html, /No new stories since your last visit|Earlier stories/);
+  lastVisitAt = "2026-10-27T04:00:00Z";
+  assert.match(renderToStaticMarkup(createElement(Home)), /3 new stories since your last visit/);
+  lastVisitAt = null;
   favorites = [other.id];
   html = renderToStaticMarkup(createElement(Home));
   assert.ok(html.indexOf("Lakers latest") < html.indexOf("vs Nets"));
