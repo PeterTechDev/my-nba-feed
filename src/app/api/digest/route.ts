@@ -46,7 +46,9 @@ export async function POST(req: NextRequest) {
     await updateDigestDocument<DigestEntry[]>("digests.json", [], (digests) =>
       [...digests.filter((digest) => digest.date !== entry.date), entry].sort((a, b) => b.date.localeCompare(a.date)));
     return NextResponse.json({ success: true, digest: entry }, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Digest could not be saved. Please retry." }, { status: 503 });
+  } catch (error) {
+    // Only authenticated publishers receive storage diagnostics; public reads stay generic.
+    return NextResponse.json({ error: "Digest could not be saved. Please retry.",
+      details: error instanceof Error ? error.message : "Unknown storage failure" }, { status: 503 });
   }
 }
