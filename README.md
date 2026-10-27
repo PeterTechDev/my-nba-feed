@@ -138,10 +138,11 @@ Missing votes/comments are omitted rather than presented as zero.
 
 ### Regression checks
 
-Highlights show ESPN video thumbnails and link directly to the clip when one is
-available. Previews stay hidden under spoiler protection until explicitly revealed.
-YouTube search remains a fallback for games without a published clip. No extra API
-key is needed; video lookup uses ESPN's public scoreboard, cached for 10 minutes.
+Highlights use full-game videos from the NBA's official YouTube channel, with an
+inline player loaded only after clicking Play. A daily GitHub Actions job uses the
+official API and saves matches in private Blob storage; page visits never call
+the YouTube Data API. Previews and players respect spoiler protection. Configure
+the `YOUTUBE_API_KEY` Actions secret using the [setup guide](docs/youtube-highlights.md).
 
 Run `npm run lint`, `npm run build` and `node --experimental-strip-types --test tests/*.test.mjs`.
 The `tests/*regression.mjs` browser suites export functions that accept a

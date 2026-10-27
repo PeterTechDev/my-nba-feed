@@ -23,61 +23,57 @@ const status = load("lib/gameStatus.ts").exports;
 const teams = load("lib/teams.ts").exports;
 const digest = load("lib/digest.ts").exports;
 const api = load("lib/api.ts").exports;
+const youtubeHighlights = load("lib/youtubeHighlights.ts").exports;
 const newsTools = load("lib/news.ts", { Date: class extends Date { static now() { return Date.parse("2026-10-27T14:00:00Z"); } } }, { "./api": api, "./teams": teams }).exports;
 const imports = {
   "next/server": { NextResponse: { json: (body, options) => ({ status: options?.status ?? 200, body }) } },
   "@/lib/nbaDate": dates, "@/lib/gameStatus": status, "@/lib/teams": teams, "@/lib/digest": digest, "@/lib/api": api,
   "@/lib/news": newsTools,
+  "@/lib/youtubeHighlights": youtubeHighlights,
 };
 
-test("highlights match completed team games and accept only real, safe video media", async () => {
+test("highlights read saved YouTube videos without calling YouTube, and authenticate publications", async () => {
   const now = new Date("2026-10-27T14:00:00Z");
   class FixedDate extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now.getTime(); } }
-  const clip = { id: 77, headline: "Bulls vs. Celtics: Game Highlights", thumbnail: "https://a.espncdn.com/video/77.jpg", duration: 71 };
-  const competition = { status: { type: { completed: true } }, competitors: [{ team: { abbreviation: "BOS" } }, { team: { abbreviation: "CHI" } }], headlines: [{ video: [clip] }] };
-  let events = [{ date: "2026-10-26T23:30Z", competitions: [competition] }];
-  let failedDate = "", calls = 0;
-  const route = load("app/api/highlights/route.ts", { Date: FixedDate, fetch: async (url) => {
-    calls++;
-    return { ok: !url.includes(failedDate || "never-fail"), json: async () => ({ events }) };
-  } }, imports).exports;
-  const get = (query = "teamId=2&dates=2026-10-26") => route.GET({ nextUrl: new URL("http://localhost/api/highlights?" + query) });
+  const clip = { id: "DTNqMLNVBC8", date: "2026-10-26", awayTeamId: 5, homeTeamId: 2,
+    title: "BULLS at CELTICS | FULL GAME HIGHLIGHTS | October 26, 2026", thumbnail: "https://i.ytimg.com/vi/DTNqMLNVBC8/hqdefault.jpg", duration: 600, retrievedAt: now.toISOString() };
+  let state = { syncedAt: now.toISOString(), videos: [clip] }, unavailable = false, reads = 0;
+  const route = load("app/api/highlights/route.ts", { Date: FixedDate, process: { env: { DIGEST_PUBLISH_TOKEN: "publisher" } },
+    fetch: () => { throw new Error("A page read must never call YouTube"); } }, { ...imports,
+    "@/lib/youtubeHighlights": load("lib/youtubeHighlights.ts", { Date: FixedDate }).exports,
+    "@/lib/digestStorage": {
+      readDigestDocument: async () => { reads++; if (unavailable) throw new Error("offline"); return state; },
+      updateDigestDocument: async (_name, _empty, update) => { state = update(state); return state; },
+    },
+  }).exports;
+  const get = (query = "teamId=2&dates=2026-10-26", token = "") => route.GET({ nextUrl: new URL("http://localhost/api/highlights?" + query), headers: new Headers({ authorization: `Bearer ${token}` }) });
   let result = await get();
-  assert.equal(result.body.videos["2026-10-26"].url, "https://www.espn.com/video/clip/_/id/77");
+  assert.equal(result.body.videos["2026-10-26"].url, "https://www.youtube.com/watch?v=DTNqMLNVBC8");
   assert.equal(result.body.videos["2026-10-26"].thumbnail, clip.thumbnail);
-  assert.equal(result.body.videos["2026-10-26"].duration, 71);
+  assert.equal((await get("teamId=5&dates=2026-10-26")).body.videos["2026-10-26"].id, clip.id, "One saved game serves both teams");
+  assert.equal(Object.keys((await get("teamId=14&dates=2026-10-26")).body.videos).length, 0);
   for (const invalid of ["", "teamId=999&dates=2026-10-26", "teamId=2&dates=2026-02-30", "teamId=2&dates=2026-10-28", "teamId=2&dates=2026-09-01", "teamId=2&dates=" + Array.from({ length: 16 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`).join(",")]) {
-    const before = calls;
+    const before = reads;
     assert.equal((await get(invalid)).status, 400);
-    assert.equal(calls, before, "Invalid requests never reach the video source");
+    assert.equal(reads, before, "Invalid requests never reach storage");
   }
-  for (const change of [
-    { status: { type: { completed: false } } },
-    { competitors: [{ team: { abbreviation: "LAL" } }] },
-    { headlines: [{ video: [{ ...clip, thumbnail: "javascript:alert(1)" }] }] },
-    { headlines: [{ video: [{ ...clip, thumbnail: "https://a.espncdn.com.evil.test/spoiler.jpg" }] }] },
-    { headlines: [{ video: [{ ...clip, headline: "Single dunk" }] }] },
-    { headlines: [{ video: [{ ...clip, id: -1 }] }] },
-  ]) {
-    events = [{ date: "2026-10-26T23:30Z", competitions: [{ ...competition, ...change }] }];
-    assert.equal(Object.keys((await get()).body.videos).length, 0);
-  }
-  events = [{ date: "2026-10-27T02:00Z", competitions: [competition] }];
-  assert.equal((await get()).body.videos["2026-10-26"].id, "77", "Overnight games use the NBA calendar day");
-  failedDate = "20261023";
-  result = await get("teamId=2&dates=2026-10-26,2026-10-23");
-  assert.equal(result.status, 200);
-  assert.equal(result.body.failedDates.join(), "2026-10-23");
-  assert.equal(result.body.videos["2026-10-26"].id, "77");
-  assert.equal((await get("teamId=2&dates=2026-10-23")).status, 502);
-  events = [{ date: "2026-10-26T23:30Z", competitions: [{ ...competition, competitors: [{ team: { abbreviation: "GS" } }] }] }];
-  assert.equal((await get("teamId=10&dates=2026-10-26")).body.videos["2026-10-26"].id, "77", "Provider abbreviations map to the selected team");
+  assert.equal((await get("sync=1")).status, 401);
+  assert.equal((await get("sync=1", "publisher")).body.videos[0].id, clip.id);
+  const post = (payload, token) => route.POST({ headers: new Headers({ authorization: `Bearer ${token}` }), text: async () => JSON.stringify(payload) });
+  assert.equal((await post({}, "wrong")).status, 401);
+  assert.equal((await post({ syncedAt: now.toISOString(), videos: [{ ...clip, id: "bad" }] }, "publisher")).status, 400);
+  assert.equal((await post({ syncedAt: now.toISOString(), videos: [] }, "publisher")).status, 201);
+  assert.equal(state.videos.length, 1, "An incremental sync preserves previously saved games");
+  unavailable = true;
+  result = await get();
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /storage unavailable/);
 });
 
 test("highlight thumbnails and direct video links respect both spoiler settings", () => {
   let hideScores = true, hideHeadlines = true;
   const games = [{ id: 1, date: "2026-10-26", status: "Final", homeTeam: teams.getCeltics(), awayTeam: { name: "Bulls", abbreviation: "CHI" }, homeScore: 134, awayScore: 99 }];
-  const video = { id: "77", thumbnail: "https://a.espncdn.com/video/77.jpg", url: "https://www.espn.com/video/clip/_/id/77", duration: 71 };
+  const video = { id: "DTNqMLNVBC8", thumbnail: "https://i.ytimg.com/vi/DTNqMLNVBC8/hqdefault.jpg", url: "https://www.youtube.com/watch?v=DTNqMLNVBC8", duration: 600 };
   const remote = { data: { videos: { "2026-10-26": video }, failedDates: [] }, loading: false, error: false, retry() {} };
   const mocked = { ...imports,
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: teams.getCeltics() }) },
@@ -90,13 +86,15 @@ test("highlight thumbnails and direct video links respect both spoiler settings"
   const render = () => renderToStaticMarkup(createElement(Page));
   for ([hideScores, hideHeadlines] of [[true, true], [false, true], [true, false]]) {
     assert.match(render(), /Reveal video preview/);
-    assert.doesNotMatch(render(), /src="https:\/\/a.espncdn.com\/video|href="https:\/\/www.espn.com\/video/);
+    assert.doesNotMatch(render(), /src="https:\/\/i.ytimg|href="https:\/\/www.youtube.com\/watch|<iframe/);
   }
   hideScores = false; hideHeadlines = false;
   let html = render();
-  assert.match(html, /src="https:\/\/a.espncdn.com\/video\/77.jpg/);
-  assert.match(html, /href="https:\/\/www.espn.com\/video\/clip\/_\/id\/77/);
-  assert.match(html, /1:11/);
+  assert.match(html, /src="https:\/\/i.ytimg.com\/vi\/DTNqMLNVBC8\/hqdefault.jpg/);
+  assert.match(html, /href="https:\/\/www.youtube.com\/watch\?v=DTNqMLNVBC8/);
+  assert.match(html, /Play highlights vs Bulls/);
+  assert.doesNotMatch(html, /<iframe/);
+  assert.match(html, /10:00/);
   assert.match(html, /134-99/);
   remote.data.videos = {};
   assert.match(render(), /Video not available yet/);

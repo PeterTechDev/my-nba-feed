@@ -1,0 +1,46 @@
+name: Daily YouTube Highlights
+
+on:
+  schedule:
+    # 08:15 America/Bahia (UTC-3), after the previous night's games.
+    - cron: '15 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: youtube-highlights
+  cancel-in-progress: false
+
+jobs:
+  keep-schedule-active:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      actions: write
+    steps:
+      - name: Renew workflow activation before GitHub's inactivity limit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/youtube-highlights.yml/enable"
+  sync:
+    if: github.ref == 'refs/heads/main'
+    environment: YOUTUBE_API_KEY
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.21.1'
+      - name: Check the YouTube sync
+        run: node --experimental-strip-types --test tests/youtube-highlights.test.mjs
+      - name: Sync and verify saved NBA highlights
+        run: npm run highlights:sync
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          DIGEST_PUBLISH_TOKEN: ${{ secrets.DIGEST_PUBLISH_TOKEN }}

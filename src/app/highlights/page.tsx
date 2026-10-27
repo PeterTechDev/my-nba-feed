@@ -36,23 +36,28 @@ function HighlightCard({ game, video, loading, failed }: { game: HighlightGame; 
   const { selectedTeam } = useTeam();
   const [revealed, setRevealed] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const protectedPreview = (hideScores || hideHeadlines) && !revealed;
   const matchup = `${game.isHome ? "vs" : "at"} ${game.opponent}`;
 
   return <article className="overflow-hidden rounded-xl border border-white/10 bg-[#161616]">
-    <div className="relative aspect-video bg-[#202020]">
+    <div className="relative aspect-video min-h-[200px] bg-[#202020]">
       {loading ? <div role="status" aria-label={`Loading highlights ${matchup}`} className="h-full animate-pulse bg-white/5" /> : video ? (
         protectedPreview ? <button type="button" onClick={() => setRevealed(true)} aria-label={`Reveal video preview ${matchup}`}
           className="flex h-full w-full flex-col items-center justify-center gap-3 p-5 text-white/80 hover:bg-white/5">
           <EyeOff aria-hidden="true" className="h-7 w-7" /><span className="font-medium">Reveal video preview</span><span className="text-xs text-white/70">The thumbnail may reveal the result</span>
-        </button> : <a href={video.url} target="_blank" rel="noopener noreferrer" aria-label={`Watch highlights ${matchup} on ESPN (opens in a new tab)`}
-          aria-describedby="video-warning" className="group relative flex h-full w-full items-center justify-center hover:bg-white/5">
+        </button> : playing ? <iframe
+          src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&playsinline=1&rel=0`}
+          title={`Full game highlights ${matchup}`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin" className="absolute inset-0 h-full w-full border-0" />
+        : <button type="button" onClick={() => setPlaying(true)} aria-label={`Play highlights ${matchup}`}
+          aria-describedby="video-warning" className="group relative flex h-full min-h-[200px] w-full items-center justify-center hover:bg-white/5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {!imageFailed && <img src={video.thumbnail} alt="" width={640} height={360} loading="lazy" onError={() => setImageFailed(true)} className="absolute inset-0 h-full w-full object-cover" />}
           <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-black/80 text-white transition-transform duration-200 group-hover:scale-110"><Play aria-hidden="true" className="h-6 w-6 fill-current" /></span>
           {video.duration && <span className="absolute bottom-3 right-3 rounded bg-black/80 px-2 py-1 text-xs font-medium tabular-nums text-white">{Math.floor(video.duration / 60)}:{String(Math.floor(video.duration % 60)).padStart(2, "0")}</span>}
           {imageFailed && <span className="absolute bottom-3 left-3 text-xs text-white/70">Preview unavailable · Play video</span>}
-        </a>
+        </button>
       ) : <div className="flex h-full flex-col items-center justify-center gap-3 p-5 text-center text-white/70">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={selectedTeam.logo} alt="" width={64} height={64} className="h-16 w-16 object-contain" />
@@ -66,8 +71,11 @@ function HighlightCard({ game, video, loading, failed }: { game: HighlightGame; 
       </div>
       <p className="mt-1 text-sm text-white/70">{formatGameDate(game.date, { weekday: "short", month: "short", day: "numeric" })}</p>
       {video ? <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm text-white/70">Game highlights · ESPN</span>
-        {(hideScores || hideHeadlines) && revealed && <button type="button" onClick={() => setRevealed(false)} className="min-h-11 rounded-lg border border-white/20 px-3 text-sm text-white/80 hover:bg-white/10">Hide video preview</button>}
+        {protectedPreview ? <span className="text-sm text-white/70">NBA · YouTube</span> : <a href={video.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 text-sm text-white/70 hover:text-white">
+          NBA · YouTube<ExternalLink aria-hidden="true" className="h-4 w-4" /><span className="sr-only">(opens in a new tab)</span>
+        </a>}
+        {playing && <button type="button" onClick={() => setPlaying(false)} className="min-h-11 rounded-lg border border-white/20 px-3 text-sm text-white/80 hover:bg-white/10">Close player</button>}
+        {(hideScores || hideHeadlines) && revealed && <button type="button" onClick={() => { setPlaying(false); setRevealed(false); }} className="min-h-11 rounded-lg border border-white/20 px-3 text-sm text-white/80 hover:bg-white/10">Hide video preview</button>}
       </div> : !loading && <a href={game.youtubeUrl} target="_blank" rel="noopener noreferrer" aria-describedby="video-warning"
         className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm text-white/80 hover:text-white"><Youtube aria-hidden="true" className="h-4 w-4" />Search on YouTube<ExternalLink aria-hidden="true" className="h-4 w-4" /><span className="sr-only">(opens in a new tab)</span></a>}
     </div>
@@ -110,12 +118,12 @@ export default function HighlightsPage() {
         <img src={selectedTeam.logo} alt="" className="w-10 h-10 shrink-0" />
         <div>
           <h1 className="text-2xl font-bold">{selectedTeam.name} Highlights</h1>
-          <p className="text-sm text-white/70">Game highlights from the last 30 days</p>
+          <p className="text-sm text-white/70">Full game highlights from the NBA YouTube channel</p>
         </div>
         </div>
         <TeamSelector />
       </div>
-      <p id="video-warning" className="text-sm text-white/70 mb-6">Videos open on ESPN in a new tab. External pages may reveal results.</p>
+      <p id="video-warning" className="text-sm text-white/70 mb-6">Play here or open on YouTube. Video previews and the player may reveal results.</p>
       {(videos.error || Boolean(videos.data?.failedDates.length)) && <div className="mb-6"><DataError subject="highlight videos" retry={videos.retry} /></div>}
 
       {error ? (
