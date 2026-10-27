@@ -5,6 +5,7 @@ import { test } from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
 
 const require = createRequire(import.meta.url);
 function load(file, globals = {}, imports = {}) {
@@ -21,10 +22,77 @@ const dates = load("lib/nbaDate.ts").exports;
 const status = load("lib/gameStatus.ts").exports;
 const teams = load("lib/teams.ts").exports;
 const digest = load("lib/digest.ts").exports;
+const api = load("lib/api.ts").exports;
 const imports = {
   "next/server": { NextResponse: { json: (body, options) => ({ status: options?.status ?? 200, body }) } },
-  "@/lib/nbaDate": dates, "@/lib/gameStatus": status, "@/lib/teams": teams, "@/lib/digest": digest,
+  "@/lib/nbaDate": dates, "@/lib/gameStatus": status, "@/lib/teams": teams, "@/lib/digest": digest, "@/lib/api": api,
 };
+
+test("news labels remove only publisher suffixes and report honest publication ages", () => {
+  const item = { title: "Celtics update - ESPN", source: "ESPN", safeTitle: "Protected recap", isSpoiler: true };
+  for (const separator of [" - ", " – ", " — "]) {
+    assert.equal(api.getNewsTitle({ ...item, title: "Celtics update" + separator + "espn" }, false), "Celtics update");
+  }
+  assert.equal(api.getNewsTitle(item, true), "Protected recap");
+  assert.equal(api.getNewsTitle({ ...item, title: "ESPN: Celtics update" }, false), "ESPN: Celtics update");
+  assert.equal(api.getNewsTitle({ ...item, title: "Celtics update - ESPN2" }, false), "Celtics update - ESPN2");
+  assert.equal(api.getNewsTitle({ ...item, source: "" }, false), item.title);
+  const now = Date.parse("2026-10-27T14:00:00Z");
+  assert.equal(api.formatNewsAge("2026-10-27T13:59:45Z", now), "Just published");
+  assert.equal(api.formatNewsAge("2026-10-27T13:58:00Z", now), "2m ago");
+  assert.equal(api.formatNewsAge("2026-10-27T05:00:00Z", now), "9h ago");
+  assert.equal(api.formatNewsAge("2026-10-25T14:00:00Z", now), "2d ago");
+  for (const value of ["", "invalid", "2026-10-28T14:00:00Z"]) {
+    assert.equal(api.formatNewsAge(value, now), "Publication time unavailable");
+  }
+});
+
+test("homepage prioritizes followed stories and shows the focus-team lead only once", () => {
+  const focus = teams.getCeltics();
+  const other = teams.teams.find((team) => team.name === "Lakers");
+  let favorites = [focus.id];
+  const story = (title) => ({ title: title + " - ESPN", safeTitle: "Protected recap", source: "ESPN",
+    pubDate: "2026-10-27T05:00:00Z", link: "https://example.com/" + encodeURIComponent(title), isSpoiler: false });
+  const news = ["Celtics lead", "Celtics second", "Celtics third", "Celtics fourth"].map(story);
+  const state = { currentGame: null, lastGame: null, record: { wins: 2, losses: 1 }, loading: false, error: null,
+    nextGame: { date: "2026-10-27", status: "Scheduled", isHome: true,
+      homeTeam: focus, awayTeam: { name: "Nets", abbreviation: "BKN" }, homeScore: 0, awayScore: 0 } };
+  const mocked = { ...imports,
+    "next/link": { default: "a" },
+    "@/lib/nbaDate": { ...dates, gameDaysAgo: () => 0 },
+    "@/hooks/useFavoriteTeams": { useFavoriteTeams: () => ({ favoriteTeamIds: favorites }),
+      useFavoriteTeamObjects: () => favorites.map((id) => teams.teams.find((team) => team.id === id)) },
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: focus }) },
+    "@/hooks/useGameData": { useGameData: () => state },
+    "@/hooks/useLastVisit": { useLastVisit: () => ({ ready: true, lastVisitAt: null }) },
+    "@/hooks/useRemoteData": { useRemoteData: (url) => ({ loading: false, error: false, retry: () => {},
+      data: url.includes("/api/games") ? state : url.includes("team=Celtics") ? news :
+        [story(url.includes("team=NBA") ? "League update" : "Lakers latest")] }) },
+    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }) },
+    "./DataError": load("components/DataError.tsx").exports,
+  };
+  for (const name of ["GameDayHero", "GameSection", "MorningBriefingCard", "PersonalizedFeed", "NewsFeed", "TopPlaysCard"]) {
+    mocked["@/components/" + name] = load("components/" + name + ".tsx", {}, mocked).exports;
+  }
+  mocked["@/components/TeamHeader"] = { default: () => null };
+  mocked["@/components/GameDataProvider"] = { default: ({ children }) => children };
+  const Home = load("app/page.tsx", {}, mocked).exports.default;
+  let html = renderToStaticMarkup(createElement(Home));
+  assert.equal(html.split("Celtics lead").length - 1, 1);
+  assert.ok(html.indexOf("Celtics lead") < html.indexOf("vs Nets"));
+  assert.doesNotMatch(html, /Morning Briefing/);
+  favorites = [other.id];
+  html = renderToStaticMarkup(createElement(Home));
+  assert.ok(html.indexOf("Lakers latest") < html.indexOf("vs Nets"));
+  assert.equal(html.split("Celtics lead").length - 1, 1);
+  assert.match(html, /Morning Briefing/);
+  favorites = [];
+  html = renderToStaticMarkup(createElement(Home));
+  assert.equal(html.split("Celtics lead").length - 1, 1);
+  assert.match(html, /Celtics second/);
+  assert.match(html, /Celtics third/);
+  assert.doesNotMatch(html, /Celtics fourth/);
+});
 
 test("homepage shows a matchup once, including live games that cross midnight", () => {
   const api = load("lib/api.ts").exports;
@@ -77,6 +145,7 @@ test("briefing preserves protected headlines and offers loading, empty and retry
     source: "NBA", link: "https://www.nba.com/news/recap" }], loading: false, error: false, retry: () => {} };
   let hideHeadlines = true;
   const Briefing = load("components/MorningBriefingCard.tsx", {}, {
+    ...imports,
     "@/hooks/useRemoteData": { useRemoteData: () => response },
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: teams.getCeltics() }) },
     "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideHeadlines, hideScores: false }) },

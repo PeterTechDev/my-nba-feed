@@ -50,14 +50,14 @@ export default function NavBar() {
           <button type="button" onClick={toggleSpoiler}
             aria-label={`${protection}. ${spoilerFree ? "Show spoilers" : "Hide scores and headlines"}`}
             aria-pressed={spoilerFree ? true : hideScores || hideHeadlines ? "mixed" : false}
-            className={`flex min-h-11 min-w-11 justify-center shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium sm:px-3 ${hideScores || hideHeadlines ? "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
-            {hideScores || hideHeadlines ? <EyeOff aria-hidden="true" className="h-4 w-4" /> : <Eye aria-hidden="true" className="h-4 w-4" />}
-            <span className="sm:hidden"><span className="hidden min-[360px]:inline">{spoilerFree ? "Safe" : hideScores || hideHeadlines ? "Custom" : "Visible"}</span></span>
+            className={`flex min-h-11 min-w-11 justify-center shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs min-[360px]:text-sm font-medium sm:px-3 ${hideScores || hideHeadlines ? "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
+            {hideScores || hideHeadlines ? <EyeOff aria-hidden="true" className="hidden h-4 w-4 min-[360px]:block" /> : <Eye aria-hidden="true" className="hidden h-4 w-4 min-[360px]:block" />}
+            <span className="sm:hidden">{spoilerFree ? "Safe" : hideScores || hideHeadlines ? "Custom" : "Visible"}</span>
             <span className="hidden sm:inline">{protection}</span>
           </button>
           <button type="button" onClick={() => setMyTeamsOpen(true)} aria-label={`My Teams (${favoriteTeamIds.length} selected)`}
-            className={`relative flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-2 text-sm sm:px-3 ${favoriteTeamIds.length ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
-            <Heart aria-hidden="true" className="h-4 w-4" />
+            className={`relative flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-2 text-xs min-[360px]:text-sm sm:px-3 ${favoriteTeamIds.length ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
+            <Heart aria-hidden="true" className="hidden h-4 w-4 min-[360px]:block" />
             <span>My Teams</span>
             {favoriteTeamIds.length > 0 && <span aria-hidden="true" className="absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-900 px-1 text-xs text-emerald-200">{favoriteTeamIds.length}</span>}
           </button>

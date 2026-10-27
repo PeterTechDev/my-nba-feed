@@ -42,7 +42,7 @@ export default function GameDayHero() {
 
   return (
     <section
-      className="relative overflow-hidden rounded-2xl border border-white/10 px-5 py-5 sm:px-7 sm:py-6"
+      className="relative overflow-hidden rounded-2xl border border-white/10 px-4 py-4 sm:px-7 sm:py-6"
       style={{
         background: `radial-gradient(circle at top left, ${selectedTeam.primaryColor}20, transparent 40%), linear-gradient(135deg, #171717, #101010)`,
       }}
@@ -82,7 +82,8 @@ export default function GameDayHero() {
           <div className="flex flex-wrap gap-3">
             <Link
               href="/schedule"
-              className="inline-flex min-h-11 items-center rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+              className="inline-flex min-h-11 items-center rounded-lg px-4 py-2 text-sm font-medium transition hover:brightness-110"
+              style={{ background: selectedTeam.secondaryColor, color: getContrastColor(selectedTeam.secondaryColor) }}
             >
               Open schedule
             </Link>
@@ -90,8 +91,7 @@ export default function GameDayHero() {
               href={`https://www.google.com/search?q=${encodeURIComponent(searchContext)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center rounded-lg px-4 py-2 text-sm font-medium transition"
-              style={{ background: selectedTeam.secondaryColor, color: getContrastColor(selectedTeam.secondaryColor) }}
+              className="inline-flex min-h-11 items-center text-sm text-white/70 underline underline-offset-4 transition hover:text-white"
             >
               Search matchup on Google ↗
             </a>

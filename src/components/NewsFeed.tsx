@@ -3,19 +3,9 @@ import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "./DataError";
 import { Fragment, useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
-import { NewsItem } from "@/lib/api";
+import { NewsItem, getNewsTitle, formatNewsAge } from "@/lib/api";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 import { useLastVisit } from "@/hooks/useLastVisit";
-
-function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 function categoryLabel(category: NewsItem["category"]): string | null {
   switch (category) {
@@ -52,8 +42,9 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
   const revealed = revealedTeam === selectedTeam.id;
   const { lastVisitAt, ready: visitReady } = useLastVisit();
 
-  const displayNews = news.slice(0, limit);
-  const hasMore = news.length > limit;
+  // The briefing already shows the first story from this same feed.
+  const displayNews = news.slice(1, limit + 1);
+  const hasMore = news.length > limit + 1;
   const hiddenCount = displayNews.filter((item) => hideHeadlines && item.isSpoiler && !revealed).length;
 
   // Determine the index where the separator should appear (first "old" item)
@@ -72,7 +63,7 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
       <div className="p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest">News</h2>
+            <h2 className="text-xs font-bold text-white/60 uppercase tracking-widest">More news</h2>
             {hideHeadlines && hiddenCount > 0 && (
               <p className="text-[11px] text-amber-400/80 mt-1">
                 {hiddenCount} headline{hiddenCount > 1 ? "s" : ""} hidden to avoid spoilers
@@ -100,9 +91,9 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
               </div>
             ))}
           </div>
-        ) : news.length === 0 ? (
+        ) : displayNews.length === 0 ? (
           <div className="text-center py-4">
-            <p className="text-white/70 text-sm">No news found</p>
+            <p className="text-white/70 text-sm">No more recent stories</p>
             <p className="text-white/70 text-xs mt-1">Check back later</p>
           </div>
         ) : (
@@ -130,7 +121,7 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
                           : "group-hover:text-white"
                       }`}
                     >
-                      {hideHeadlines && item.isSpoiler && !revealed ? item.safeTitle : item.title}
+                      {getNewsTitle(item, hideHeadlines && !revealed)}
                     </a>
                     <p className="text-xs text-white/70 mt-1">
                       {categoryLabel(item.category) && (
@@ -140,8 +131,8 @@ export default function NewsFeed({ limit = 3 }: { limit?: number }) {
                         </>
                       )}
                       {item.source && <span className="text-white/70">{item.source}</span>}
-                      {item.source && item.pubDate && <span> · </span>}
-                      {item.pubDate && relativeTime(item.pubDate)}
+                      {item.source && <span> · </span>}
+                      {formatNewsAge(item.pubDate)}
                     </p>
                     {hideHeadlines && item.isSpoiler && !revealed && (
                       <p className="text-[11px] text-white/70 mt-1">Tap reveal to view the original headline</p>
