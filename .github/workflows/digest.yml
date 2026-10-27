@@ -19,6 +19,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  keep-schedule-active:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      actions: write
+    steps:
+      - name: Renew workflow activation before GitHub's inactivity limit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/digest.yml/enable"
+          workflow_state=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/digest.yml" --jq '.state')
+          test "$workflow_state" = active
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/digest.yml" --jq '{state, updated_at}'
   publish:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04

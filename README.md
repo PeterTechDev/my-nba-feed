@@ -123,8 +123,10 @@ runs on GitHub Actions at 08:00 America/Bahia, using a free Qwen model on the cl
 runner's CPU and the authenticated publisher. It needs no paid inference API,
 local computer or Codex session. Configure `DIGEST_PUBLISH_TOKEN` as a repository Actions secret. Existing daily editions
 are preserved unless a manual recovery run explicitly replaces today's edition.
-See [the publisher runbook](docs/digest-publisher.md) for verification, the free public
-runner requirement and GitHub's 60-day inactivity limitation for public repositories.
+An independent maintenance job renews the workflow's activation automatically,
+preventing GitHub's 60-day inactivity suspension without human commits or a local
+computer. See [the publisher runbook](docs/digest-publisher.md) for verification,
+permissions and the free public-runner requirement.
 Empty content is shown only after a successful read; storage failures have a retry action.
 
 ### Data fallbacks

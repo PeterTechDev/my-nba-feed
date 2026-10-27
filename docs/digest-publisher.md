@@ -46,8 +46,10 @@ statistics and source references come from code.
    production endpoint, refuses redirects and confirms saved content by a fresh
    read. An uncertain write retries the same edition once without regenerating.
 
-The workflow has one concurrency group, read-only repository permissions, pinned
-actions and a 15-minute timeout. It never changes app code, My Teams, homepage or
+The publishing job has read-only repository permissions, pinned actions and a
+15-minute timeout. A separate maintenance job has only `actions: write` for renewing
+workflow activation; it does not check out or execute repository code. Both share
+one concurrency group. The workflow never changes app code, My Teams, homepage or
 Telegram integrations. Generation and publishing require no approval per edition.
 
 ## Manual verification and recovery
@@ -71,10 +73,21 @@ under ignored `data/`; the hosted runner's temporary files are discarded after t
 
 ## Scheduler maintenance
 
-GitHub automatically disables scheduled workflows in a public repository after
-60 days without repository activity. Check the Actions workflow status and re-enable
-it if GitHub disables it; there is no hidden keepalive commit. See
-[GitHub schedule behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
+The independent `keep-schedule-active` job preemptively re-enables `digest.yml`
+through GitHub's supported workflow activation API on every daily or manual run.
+This renews activation before the 60-day inactivity deadline, even when there are
+no human commits. It follows the API-based
+[workflow keepalive approach](https://github.com/liskin/gh-workflow-keepalive).
+It uses only the job's short-lived `GITHUB_TOKEN` with `actions: write`; publishing
+retains read-only permissions. No personal token, paid service, dummy commit,
+repository write or additional deployment is needed.
+
+The maintenance job runs independently of publication and verifies `state=active`
+after the API call. Source/model failures therefore do not prevent renewal. Renewal
+errors fail the job visibly rather than being ignored. Manual disabling of Actions
+or removal of repository access still requires owner intervention; this maintenance
+does not override an owner's deliberate stop.
+
 The previous local Codex automation **Publicar Phantom Digest** is disabled
 (PAUSED) after cloud verification on October 27, 2026. There is one active daily
 generator, hosted by GitHub.
