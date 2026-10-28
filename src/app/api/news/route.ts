@@ -49,13 +49,13 @@ function spoilerFlags(req: NextRequest) {
   const tokens = (req.headers?.get?.("x-nba-spoilers") ?? "").split(/[,;]/).map((part) => part.trim().toLowerCase()).filter(Boolean);
   const known = new Set(["none", "scores", "headlines"]);
   const unknown = tokens.some((token) => !known.has(token));
-  const explicitNone = tokens.length > 0 && tokens.every((token) => token === "none");
+  const explicitNone = tokens.length === 1 && tokens[0] === "none";
   let hideScores = true;
   let hideHeadlines = true;
   if (!unknown && explicitNone) {
     hideScores = false;
     hideHeadlines = false;
-  } else if (!unknown && tokens.some((token) => token === "scores" || token === "headlines")) {
+  } else if (!unknown && !tokens.includes("none") && tokens.some((token) => token === "scores" || token === "headlines")) {
     hideScores = tokens.includes("scores");
     hideHeadlines = tokens.includes("headlines");
   }
@@ -68,8 +68,8 @@ function responseInit(status = 200) {
   return { status, headers: { Vary: "x-nba-spoilers", "Cache-Control": "private, no-store" } };
 }
 
-function deliver(items: NewsItem[], team: string, hideHeadlines: boolean, reveal: string | null, grouped: boolean) {
-  return hideHeadlines ? presentNews(items, team, reveal, grouped) : items;
+function deliver(items: NewsItem[], team: string, hideHeadlines: boolean, reveal: string | null) {
+  return hideHeadlines ? presentNews(items, team, reveal) : items;
 }
 
 export async function GET(req: NextRequest) {
@@ -84,11 +84,11 @@ export async function GET(req: NextRequest) {
   if (!batch) {
     const result = results[0];
     return result.status === "fulfilled"
-      ? NextResponse.json(deliver(result.value, names[0], hideHeadlines, reveal, false), responseInit())
+      ? NextResponse.json(deliver(result.value, names[0], hideHeadlines, reveal), responseInit())
       : NextResponse.json({ error: "News unavailable" }, responseInit(502));
   }
   const feeds = Object.fromEntries(names.map((name, i) => [name, {
-    items: results[i].status === "fulfilled" ? deliver(results[i].value, name, hideHeadlines, reveal, true) : [],
+    items: results[i].status === "fulfilled" ? deliver(results[i].value, name, hideHeadlines, reveal) : [],
     error: results[i].status === "rejected",
     ...(hideHeadlines && results[i].status === "fulfilled" ? { grouped: true } : {}),
   }]));

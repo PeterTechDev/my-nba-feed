@@ -280,7 +280,19 @@ export async function revealNewsItem(item: NewsItem): Promise<NewsItem | null> {
   if (!response.ok) return null;
   const data = await response.json() as NewsItem[];
   if (!Array.isArray(data)) return null;
-  return data.find((entry) => !entry.redacted && (entry.identity === item.identity || entry.link === item.link)) ?? null;
+  const matches = (entry: NewsItem): NewsItem | null => {
+    if (!entry.redacted && (entry.identity === item.identity || entry.link === item.link)) return entry;
+    for (const related of entry.related ?? []) {
+      const found = matches(related);
+      if (found) return found;
+    }
+    return null;
+  };
+  for (const entry of data) {
+    const found = matches(entry);
+    if (found) return found;
+  }
+  return null;
 }
 
 export async function revealDigest(date: string): Promise<{ redacted?: boolean } | null> {

@@ -172,6 +172,6 @@ function sealNewsItem(item: NewsItem, team: string, reveal: string | null): News
   return coverHeadline(sealed);
 }
 
-export function presentNews(items: NewsItem[], team: string, reveal: string | null, grouped: boolean): NewsItem[] {
-  return (grouped ? groupNews(items) : items).map((item) => sealNewsItem(item, team, reveal));
+export function presentNews(items: NewsItem[], team: string, reveal: string | null): NewsItem[] {
+  return groupNews(items).map((item) => sealNewsItem(item, team, reveal));
 }
