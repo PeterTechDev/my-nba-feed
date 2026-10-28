@@ -17,9 +17,10 @@ import ts from "typescript";
 const require = createRequire(import.meta.url);
 function load(file, globals = {}, imports = {}) {
   const source = readFileSync(new URL("../src/" + file, import.meta.url), "utf8");
-  const code = ts.transpileModule(source, { compilerOptions: {
+  let code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX,
   } }).outputText;
+  if (file === "app/api/news/route.ts") code += "\nexports.SPOILERS = SPOILERS;\n";
   const exports = {};
   const scope = { exports, require: (id) => imports[id] ?? (id.endsWith(".module.css") ? { default: new Proxy({}, { get: (_target, key) => key }) } : require(id)), Date, URL, AbortSignal, Response, Buffer, setTimeout, ...globals };
   vm.runInNewContext(code, scope);
@@ -215,6 +216,26 @@ const roundTwo = [
   { headline: "Boston rallies past Brooklyn", expected: true, reason: "rallies past" },
 ];
 
+// Casos do regex em a31986e: victory/win over, N-N start, box scores, push … past, e o lookahead do decimal.
+const roundThree = [
+  { headline: "Karl-Anthony Towns, Knicks avert 0-4 start with victory over Pistons", expected: true, reason: "0-4 start e victory over" },
+  { headline: "Oct. 28 - 95.7 WDAE", expected: false, reason: "hífen antes de decimal não é placar" },
+  { headline: "victory over", expected: true, reason: "victory over" },
+  { headline: "win over", expected: true, reason: "win over" },
+  { headline: "0-4 start", expected: true, reason: "N-N start com hífen" },
+  { headline: "0\u20134 start", expected: true, reason: "N-N start com en dash" },
+  { headline: "box scores", expected: true, reason: "box scores no plural" },
+  { headline: "push past", expected: true, reason: "push past" },
+  { headline: "pushes the Celtics past", expected: true, reason: "pushes … past" },
+  { headline: "pushed the Celtics past", expected: true, reason: "pushed … past" },
+  { headline: "118-107", expected: true, reason: "placar com hífen" },
+  { headline: "118\u2013107", expected: true, reason: "placar com en dash" },
+  { headline: "118\u2014107", expected: true, reason: "placar com em dash" },
+  { headline: "118:107", expected: true, reason: "placar com dois-pontos" },
+  { headline: "Celtics 118, Knicks 107", expected: true, reason: "formato AP" },
+  { headline: "Knicks avert 0\u20144 start", expected: true, reason: "N-N start com em dash; o regex ainda só aceita hífen e en dash" },
+];
+
 // Negativos óbvios que não podem casar. Se casarem, o teste fica vermelho.
 const obviousNegatives = [
   { headline: "preview", expected: false, reason: "preview não pode casar" },
@@ -223,7 +244,7 @@ const obviousNegatives = [
   { headline: "Game 3 tonight", expected: false, reason: "Game 3 tonight não pode casar" },
 ];
 
-const cases = [...acceptedPrice, ...devTable, ...devScripts, ...criterionSpellings, ...roundTwo, ...obviousNegatives];
+const cases = [...acceptedPrice, ...devTable, ...devScripts, ...criterionSpellings, ...roundTwo, ...roundThree, ...obviousNegatives];
 const seen = new Set();
 for (const row of cases) {
   assert.equal(seen.has(row.headline), false, `duplicate headline: ${row.headline}`);
@@ -238,3 +259,11 @@ for (const row of cases) {
     assert.equal(item.safeTitle, row.expected ? "Spoiler-protected headline from ESPN" : row.headline, row.reason);
   });
 }
+
+test("SPOILERS.test on a repeated dotted string stays under 200 ms", () => {
+  const started = performance.now();
+  route.SPOILERS.test("a.".repeat(100000));
+  const elapsed = performance.now() - started;
+  console.log(`SPOILERS_TIMING_MS ${elapsed}`);
+  assert.ok(elapsed < 200, `SPOILERS.test took ${elapsed} ms`);
+});
