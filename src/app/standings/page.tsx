@@ -3,7 +3,7 @@ import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
 import SpoilerGuard from "@/components/SpoilerGuard";
 import { formatGameDate } from "@/lib/nbaDate";
-import { compareStandings } from "@/lib/standings";
+import { compareStandings } from "@/lib/gameStatus";
 import { useState } from "react";
 import { teams } from "@/lib/teams";
 

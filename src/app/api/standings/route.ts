@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
-import { isFinalStatus } from "@/lib/gameStatus";
-import { compareStandings } from "@/lib/standings";
+import { compareStandings, isFinalStatus } from "@/lib/gameStatus";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 

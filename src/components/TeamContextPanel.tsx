@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTeam } from "@/hooks/useTeam";
 import { useGameData } from "@/hooks/useGameData";
-import { compareStandings } from "@/lib/standings";
+import { compareStandings } from "@/lib/gameStatus";
 
 interface Standing {
   id: number;
