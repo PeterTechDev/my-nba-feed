@@ -26,11 +26,36 @@ function trapDialogFocus(event: React.KeyboardEvent<HTMLDialogElement>) {
   }
 }
 
-function RevealSpoilersDialog({ onDismiss, onConfirm, returnFocusRef }: {
+function revealCopy(hideScores: boolean, hideHeadlines: boolean) {
+  if (hideScores && !hideHeadlines) {
+    return {
+      title: "Show scores?",
+      description: "Scores and records will show across NBA Feed. This choice is saved in this browser.",
+      confirm: "Show scores",
+    };
+  }
+  if (hideHeadlines && !hideScores) {
+    return {
+      title: "Show headlines?",
+      description: "Headlines will show across NBA Feed. This choice is saved in this browser.",
+      confirm: "Show headlines",
+    };
+  }
+  return {
+    title: "Show scores and headlines?",
+    description: "Scores, records and headlines will show across NBA Feed. This choice is saved in this browser.",
+    confirm: "Show scores and headlines",
+  };
+}
+
+function RevealSpoilersDialog({ hideScores, hideHeadlines, onDismiss, onConfirm, returnFocusRef }: {
+  hideScores: boolean;
+  hideHeadlines: boolean;
   onDismiss: () => void;
   onConfirm: () => void;
   returnFocusRef: React.RefObject<HTMLButtonElement>;
 }) {
+  const copy = revealCopy(hideScores, hideHeadlines);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -63,14 +88,14 @@ function RevealSpoilersDialog({ onDismiss, onConfirm, returnFocusRef }: {
       className="m-auto max-h-[85dvh] w-[calc(100%_-_2rem)] max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#141414] p-0 text-white backdrop:bg-black/75"
     >
       <form className="p-5 sm:p-6" onSubmit={(event) => { event.preventDefault(); onDismiss(); }}>
-        <h2 id="reveal-spoilers-title" className="text-xl font-bold">Show scores and headlines?</h2>
-        <p id="reveal-spoilers-description" className="mt-2 text-sm text-white/70">Scores, records and headlines will show across NBA Feed. This choice is saved in this browser.</p>
+        <h2 id="reveal-spoilers-title" className="text-xl font-bold">{copy.title}</h2>
+        <p id="reveal-spoilers-description" className="mt-2 text-sm text-white/70">{copy.description}</p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button ref={cancelRef} type="submit" className="min-h-11 w-full rounded-lg bg-white/10 px-4 text-sm font-medium text-white hover:bg-white/20 sm:w-auto">
             Keep hidden
           </button>
           <button type="button" onClick={onConfirm} className="min-h-11 w-full rounded-lg border border-white/15 px-4 text-sm font-medium text-amber-300 hover:bg-amber-500/10 sm:w-auto">
-            Show scores and headlines
+            {copy.confirm}
           </button>
         </div>
       </form>
@@ -100,6 +125,7 @@ export default function NavBar() {
   const protectionButtonRef = useRef<HTMLButtonElement>(null);
   const mobileProtection = spoilerFree ? "Spoilers hidden" : hideScores ? "Scores hidden" : hideHeadlines ? "Headlines hidden" : "Spoilers shown";
   const protection = `${mobileProtection} by default`;
+  const protectionAction = hideScores || hideHeadlines ? "Show scores and headlines by default" : "Hide scores and headlines by default";
 
   useEffect(() => {
     if (revealNotice && (hideScores || hideHeadlines)) setRevealNotice(false);
@@ -155,7 +181,7 @@ export default function NavBar() {
           <button ref={protectionButtonRef} type="button" onClick={onProtectionClick}
             aria-haspopup={hideScores || hideHeadlines ? "dialog" : undefined}
             aria-controls={confirmReveal ? "reveal-spoilers" : undefined}
-            aria-label={`${protection}. ${spoilerFree ? "Show scores and headlines by default" : "Hide scores and headlines by default"}`}
+            aria-label={`${protection}. ${protectionAction}`}
             title={`${protection}. Individual items can be revealed.`}
             aria-pressed={spoilerFree ? true : hideScores || hideHeadlines ? "mixed" : false}
             className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium ${hideScores || hideHeadlines ? "text-amber-300 hover:bg-amber-500/10" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
@@ -235,6 +261,8 @@ export default function NavBar() {
     {myTeamsOpen && <FavoriteTeamsModal onClose={() => setMyTeamsOpen(false)} />}
     {confirmReveal && (
       <RevealSpoilersDialog
+        hideScores={hideScores}
+        hideHeadlines={hideHeadlines}
         returnFocusRef={protectionButtonRef}
         onDismiss={() => setConfirmReveal(false)}
         onConfirm={confirmShowSpoilers}
