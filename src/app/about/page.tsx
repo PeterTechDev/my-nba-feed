@@ -27,9 +27,8 @@ export default function AboutPage() {
         <section aria-labelledby="your-teams">
           <h2 id="your-teams" className="text-2xl font-semibold tracking-tight">A home for your teams.</h2>
           <p className="mt-4 leading-7 text-white/70">
-            Catching up should be simple. NBA Feed puts team news, game information,
-            highlights and fan conversations within reach, without an endless feed
-            of recommendations.
+            Catching up should be simple. NBA Feed puts team news, game information
+            and highlights within reach, without an endless feed of recommendations.
           </p>
           <p className="mt-4 leading-7 text-white/70">
             Follow your favorites in <span className="font-medium text-white">My Teams</span>.
@@ -70,8 +69,8 @@ export default function AboutPage() {
                 <dd className="mt-1 text-white/70">BALLDONTLIE supplies game and team data. ESPN provides a roster fallback.</dd>
               </div>
               <div className="py-4">
-                <dt className="font-medium">News & community</dt>
-                <dd className="mt-1 text-white/70">News comes through Google News RSS. Fan discussions come from Reddit, with RSS and indexed links as fallbacks.</dd>
+                <dt className="font-medium">News</dt>
+                <dd className="mt-1 text-white/70">News comes through Google News RSS.</dd>
               </div>
               <div className="py-4">
                 <dt className="font-medium">Highlights</dt>
