@@ -294,6 +294,13 @@ test("VERCEL_URL alone does not replace metadataBase", () => {
   assertOrigin({ VERCEL_URL: "my-nba-feed-abc123.vercel.app" }, "https://my-nba-feed.vercel.app");
 });
 
+test("VERCEL_URL and VERCEL_BRANCH_URL do not replace metadataBase", () => {
+  assertOrigin({
+    VERCEL_BRANCH_URL: "my-nba-feed-git-branch.vercel.app",
+    VERCEL_URL: "my-nba-feed-abc123.vercel.app",
+  }, "https://my-nba-feed.vercel.app");
+});
+
 const fallbackOrigin = "https://my-nba-feed.vercel.app";
 const ignoredSiteUrlWarning = "Ignoring NEXT_PUBLIC_SITE_URL because it is not a valid https URL.";
 
@@ -365,10 +372,13 @@ for (const value of [
   });
 }
 
-function assertProductionHost(value, origin) {
+function assertProductionHost(value, origin, { rejected = false } = {}) {
+  const warnings = [];
   let loaded;
   try {
-    loaded = loadGraph({ VERCEL_PROJECT_PRODUCTION_URL: value });
+    loaded = loadGraph({ VERCEL_PROJECT_PRODUCTION_URL: value }, {
+      console: { ...console, warn(...args) { warnings.push(args.map((part) => String(part)).join(" ")); } },
+    });
   } catch (error) {
     assert.fail(`VERCEL_PROJECT_PRODUCTION_URL ${JSON.stringify(value)} threw ${error.name}: ${error.message}`);
   }
@@ -389,6 +399,12 @@ function assertProductionHost(value, origin) {
   const robots = loaded.robots.default();
   assert.equal(`${robots.sitemap}`, `${origin}/sitemap.xml`);
   assertNoDoubleSlash(robots.sitemap);
+  if (rejected) {
+    assert.deepEqual(warnings, ["Ignoring VERCEL_PROJECT_PRODUCTION_URL because it is not a valid https URL."]);
+    assert.equal(warnings.some((warning) => warning.includes(value)), false);
+  } else {
+    assert.deepEqual(warnings, []);
+  }
 }
 
 test("VERCEL_PROJECT_PRODUCTION_URL host becomes https://host", () => {
@@ -400,9 +416,9 @@ test("VERCEL_PROJECT_PRODUCTION_URL with a path keeps only the origin", () => {
 });
 
 test("VERCEL_PROJECT_PRODUCTION_URL http://host falls back without throwing", () => {
-  assertProductionHost("http://prod.example", fallbackOrigin);
+  assertProductionHost("http://prod.example", fallbackOrigin, { rejected: true });
 });
 
 test("VERCEL_PROJECT_PRODUCTION_URL https:/// falls back without throwing", () => {
-  assertProductionHost("https:///", fallbackOrigin);
+  assertProductionHost("https:///", fallbackOrigin, { rejected: true });
 });
