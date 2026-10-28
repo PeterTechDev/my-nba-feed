@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTeam } from "@/hooks/useTeam";
 import { useGameData } from "@/hooks/useGameData";
+import { compareStandings } from "@/lib/gameStatus";
 
 interface Standing {
   id: number;
@@ -61,11 +62,7 @@ function getOutcome(game: ScheduleGame, teamId: number): "W" | "L" {
 function getConferenceRank(standings: Standing[], conference: "East" | "West", teamId: number) {
   const conferenceTeams = standings
     .filter((team) => team.conference === conference)
-    .sort((a, b) => {
-      const pctA = a.wins / (a.wins + a.losses || 1);
-      const pctB = b.wins / (b.wins + b.losses || 1);
-      return pctB - pctA;
-    });
+    .sort(compareStandings);
 
   return conferenceTeams.findIndex((team) => team.id === teamId) + 1;
 }
