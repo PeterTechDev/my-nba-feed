@@ -1,16 +1,38 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import TeamThemeProvider from "@/components/TeamThemeProvider";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import { SpoilerModeProvider } from "@/components/SpoilerModeProvider";
+import { getSiteUrl, siteDescription, siteName } from "@/lib/site";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "NBA Feed",
-  description: "Your personalized NBA dashboard",
+  metadataBase: getSiteUrl(),
+  title: {
+    default: siteName,
+    template: `%s | ${siteName}`,
+  },
+  description: siteDescription,
+  applicationName: siteName,
+  openGraph: {
+    type: "website",
+    siteName,
+    locale: "en_US",
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

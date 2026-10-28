@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "About | NBA Feed",
+  title: "About",
   description: "Basketball on your terms. Learn about NBA Feed, spoiler protection, our sources and the person behind the project.",
 };
 
