@@ -82,94 +82,17 @@ export function teamByAbbreviation(abbreviation: string): Team | undefined {
   return teams.find((team) => team.abbreviation === code);
 }
 
-const LEADING_ARTICLES = new Set(["the", "a", "an"]);
-// Placar (121-115) ou campanha (3-1). Não cola em outro dígito, barra ou data 10-26-2026.
-const SPOILER_FIGURE = /(?<![\d/])(?:\d{2,3}[-–—]\d{2,3}|\d{1,2}[-–—]\d{1,2})(?![\d/]|[-–—]\d)/;
+const AMBIGUOUS_CITIES = new Set(["Los Angeles", "New York"]);
 
-function textTokens(value: string): string[] {
-  return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
-}
-
-function containsTokens(words: string[], phrase: string[]): boolean {
-  return words.some((_, index) => phrase.every((part, offset) => words[index + offset] === part));
-}
-
-// Nome, apelido e cidade. Cidade sozinha só entra se nenhum outro time a divide
-// (Los Angeles é Lakers e Clippers; "LA" só vale junto do nome).
-function teamPhrases(team: Team): string[][] {
-  const phrases = [`${team.city} ${team.name}`, team.name];
-  if (team.name === "76ers") phrases.push("Sixers");
-  if (team.name === "Trail Blazers") phrases.push("Blazers", "Rip City");
-  if (team.city === "Los Angeles") phrases.push(`LA ${team.name}`);
-  const sharedCity = teams.some((other) => other.id !== team.id && other.city === team.city);
-  if (!sharedCity) phrases.push(team.city);
-  return phrases.map((phrase) => textTokens(phrase)).filter((parts) => parts.length > 0)
-    .sort((a, b) => b.length - a.length);
-}
-
-// Nome do clube, sem a cidade sozinha. "New York" não escolhe os Knicks se os Nets também estão na frase.
-function clubNamePhrases(team: Team): string[][] {
-  const phrases = [`${team.city} ${team.name}`, team.name];
-  if (team.name === "76ers") phrases.push("Sixers");
-  if (team.name === "Trail Blazers") phrases.push("Blazers", "Rip City");
-  if (team.city === "Los Angeles") phrases.push(`LA ${team.name}`);
-  return phrases.map((phrase) => textTokens(phrase)).filter((parts) => parts.length > 0);
-}
-
-function startsWithPhrase(words: string[], phrase: string[]): boolean {
-  let index = 0;
-  while (LEADING_ARTICLES.has(words[index] ?? "")) index += 1;
-  return phrase.every((part, offset) => words[index + offset] === part);
-}
-
-function phraseEndsAt(words: string[], end: number, phrase: string[]): boolean {
-  const start = end - phrase.length + 1;
-  if (start < 0) return false;
-  return phrase.every((part, offset) => words[start + offset] === part);
-}
-
-function phraseStartsAt(words: string[], start: number, phrase: string[]): boolean {
-  return phrase.every((part, offset) => words[start + offset] === part);
-}
-
-// "Heat wave and …" / "Magic Johnson and …": o nome não é o lado do par.
-function leadingNameIsNotTheAndPair(words: string[], phrase: string[]): boolean {
-  let index = 0;
-  while (LEADING_ARTICLES.has(words[index] ?? "")) index += 1;
-  if (!phrase.every((part, offset) => words[index + offset] === part)) return false;
-  const andAt = words.findIndex((word, position) => position > index + phrase.length - 1 && (word === "and" || word === "&"));
-  return andAt > index + phrase.length;
-}
-
-function clausesOf(title: string): string[] {
-  return title.split(/\s*(?:[;:?!.]|(?<!\d)[—–](?!\d)|,\s*(?=(?:and|but|or|nor|so|yet|for)\b))\s*/i)
-    .map((clause) => clause.trim()).filter(Boolean);
-}
-
-function teamInAdjacentAndPair(words: string[], team: Team): boolean {
-  const names = clubNamePhrases(team);
-  for (let index = 0; index < words.length; index += 1) {
-    if (words[index] !== "and") continue;
-    const onLeft = names.some((phrase) => phraseEndsAt(words, index - 1, phrase));
-    const onRight = names.some((phrase) => phraseStartsAt(words, index + 1, phrase));
-    // Nome colado ao "and". Se o outro lado também for time, só esse par conta
-    // (quem está fora dele não entra aqui). Se o outro lado não for time,
-    // o par não restringe e este nome ainda vale.
-    if (onLeft || onRight) return true;
-  }
-  return false;
-}
-
-// A manchete é sobre o time quando começa por ele, quando a oração em que ele
-// aparece tem placar ou campanha, ou quando o nome dele está colado a "and".
-// "X and Y" só fecha a frase nos dois times quando os dois lados são times.
-// Menção fora desse par, ou número noutra oração, não conta.
+// A manchete nomeia o time: nome, cidade + nome, ou a cidade sozinha se ela
+// não for ambígua. Possessivo ('s, s') cola no nome. Não decide spoiler.
 export function headlineIsAboutTeam(title: string, team: Team): boolean {
-  const words = textTokens(title);
-  const phrases = teamPhrases(team);
-  if (phrases.some((phrase) => startsWithPhrase(words, phrase) && !leadingNameIsNotTheAndPair(words, phrase))) return true;
-  if (clausesOf(title).some((clause) => SPOILER_FIGURE.test(clause) && phrases.some((phrase) => containsTokens(textTokens(clause), phrase)))) return true;
-  return teamInAdjacentAndPair(words, team);
+  const phrases = [`${team.city} ${team.name}`, team.name];
+  if (!AMBIGUOUS_CITIES.has(team.city)) phrases.push(team.city);
+  const body = phrases.sort((a, b) => b.length - a.length)
+    .map((phrase) => phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  return new RegExp(`\\b(?:${body})(?:'s|s'|')?(?!\\w)`, "i").test(title);
 }
 
 // Version 0 persisted these eight IDs under the wrong team identities.
