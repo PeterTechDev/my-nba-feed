@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useFavoriteTeamObjects, useFavoriteTeams } from "@/hooks/useFavoriteTeams";
-import { useGameData } from "@/hooks/useGameData";
-import { useRemoteData } from "@/hooks/useRemoteData";
+import { useRemoteData, useRemoteDataAll } from "@/hooks/useRemoteData";
 import { useTeam } from "@/hooks/useTeam";
-import type { NewsFeeds } from "@/lib/api";
+import type { GamesResponse, NewsFeeds } from "@/lib/api";
+import { gameDaysAgo } from "@/lib/nbaDate";
 import { selectHomepageNews } from "@/lib/news";
 
 function usePreferencesHydrated() {
@@ -26,17 +26,24 @@ export default function EndOfSession() {
   const hydrated = usePreferencesHydrated();
   const favoriteTeams = useFavoriteTeamObjects();
   const { selectedTeam } = useTeam();
-  const games = useGameData();
+  const coveredTeams = [...new Map([selectedTeam, ...favoriteTeams].map((team) => [team.id, team])).values()];
+  const coveredGames = useRemoteDataAll<GamesResponse>(coveredTeams.map((team) => `/api/games?teamId=${team.id}`));
   const hasPersonalized = favoriteTeams.length > 0;
   const followedFocus = favoriteTeams.some((team) => team.id === selectedTeam.id);
   const order = [...new Set([...favoriteTeams.map((team) => team.name), ...(!followedFocus ? [selectedTeam.name] : []), ...(hasPersonalized ? ["NBA"] : [])])];
   const news = useRemoteData<{ feeds: NewsFeeds }>(`/api/news?teams=${encodeURIComponent(order.join(","))}`);
   const feeds = selectHomepageNews(news.data?.feeds ?? {}, order, hasPersonalized && !followedFocus ? selectedTeam.name : undefined);
   const newsFailed = news.error || order.some((name) => Boolean(feeds[name]?.error));
-  if (!hydrated || games.loading || news.loading || games.error || newsFailed) return null;
+  const gamesLoading = coveredGames.some((game) => game.loading);
+  const gamesFailed = coveredGames.some((game) => game.error);
+  if (!hydrated || gamesLoading || news.loading || gamesFailed || newsFailed) return null;
 
-  const coveredTeams = [...new Map([selectedTeam, ...favoriteTeams].map((team) => [team.id, team])).values()];
-  const hasGames = Boolean(games.lastGame || games.currentGame || games.nextGame);
+  const hasGames = coveredTeams.some((team, index) => {
+    const data = coveredGames[index].data;
+    if (!data) return false;
+    if (team.id === selectedTeam.id) return Boolean(data.lastGame || data.currentGame || data.nextGame);
+    return Boolean(data.lastGame && gameDaysAgo(data.lastGame.date) === 1);
+  });
   const hasTeamNews = coveredTeams.some((team) => (feeds[team.name]?.items.length ?? 0) > 0);
   const severalTeams = coveredTeams.length > 1;
   const teamName = coveredTeams[0].name;
