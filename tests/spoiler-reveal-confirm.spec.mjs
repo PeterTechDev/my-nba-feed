@@ -1,14 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-// Same contract as the Playwright config on cursor/pet-30-automated-tests-f72a:
-// testDir is tests/, and use.baseURL is process.env.BASE_URL. Paths stay relative.
-// tests/preview-bypass.mjs is not imported. That helper is not on this branch, and
-// a localhost origin does not need a Vercel protection bypass, so this file loads
-// unchanged before and after the helper lands on main.
-// The filename is *.spec.mjs, so node --test "tests/**/*.test.mjs" (npm test on
-// that branch) does not execute it. Playwright's testMatch on that branch is an
-// allowlist of morning-briefing-hydration.spec.mjs and smoke-pages.spec.mjs;
-// `npm run test:e2e` collects this file once that allowlist includes this name.
+// Local spec. It lives in tests/, not tests/preview/, and runs with the other
+// local specs against the origin in BASE_URL. It does not run against a Vercel
+// preview and does not call registerPreviewBypass.
 
 if (!process.env.BASE_URL) {
   throw new Error("Set BASE_URL to the origin of the running app.");
@@ -26,6 +20,39 @@ const DIALOG_NAME = "Show scores and headlines?";
 const KEEP_HIDDEN = "Keep hidden";
 const CONFIRM = "Show scores and headlines";
 const FOCUSABLE = [KEEP_HIDDEN, CONFIRM];
+const REAL_HEADLINE = "Celtics sealed the Tuesday recap";
+const SAFE_HEADLINE = "Spoiler-protected headline from the wire";
+
+const PROTECTION = {
+  TT: {
+    settings: { hideScores: true, hideHeadlines: true },
+    label: "Spoilers hidden by default. Show scores and headlines by default",
+    pressed: "true",
+    dialog: "Show scores and headlines?",
+    confirm: "Show scores and headlines",
+  },
+  TF: {
+    settings: { hideScores: true, hideHeadlines: false },
+    label: "Scores hidden by default. Show scores and headlines by default",
+    pressed: "mixed",
+    dialog: "Show scores?",
+    confirm: "Show scores",
+  },
+  FT: {
+    settings: { hideScores: false, hideHeadlines: true },
+    label: "Headlines hidden by default. Show scores and headlines by default",
+    pressed: "mixed",
+    dialog: "Show headlines?",
+    confirm: "Show headlines",
+  },
+  FF: {
+    settings: { hideScores: false, hideHeadlines: false },
+    label: "Spoilers shown by default. Hide scores and headlines by default",
+    pressed: "false",
+    dialog: null,
+    confirm: null,
+  },
+};
 
 const FINAL_GAME = {
   lastGame: {
@@ -67,7 +94,19 @@ test.beforeEach(async ({ page }) => {
       return;
     }
     const names = (url.searchParams.get("teams") || url.searchParams.get("team") || "Celtics").split(",").filter(Boolean);
-    const feeds = Object.fromEntries(names.map((name) => [name, { items: [], error: false }]));
+    const story = {
+      title: REAL_HEADLINE,
+      safeTitle: SAFE_HEADLINE,
+      link: "https://example.com/celtics-tuesday-recap",
+      pubDate: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      source: "Wire",
+      isSpoiler: true,
+      category: "recap",
+    };
+    const feeds = Object.fromEntries(names.map((name) => [name, {
+      items: name === "Celtics" ? [story] : [],
+      error: false,
+    }]));
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -77,14 +116,15 @@ test.beforeEach(async ({ page }) => {
 });
 
 function topButton(page, mode) {
-  const name = mode === "hidden"
-    ? "Spoilers hidden by default. Show scores and headlines by default"
-    : "Spoilers shown by default. Hide scores and headlines by default";
-  return page.getByRole("button", { name, exact: true });
+  return protectionButton(page, mode === "hidden" ? "TT" : "FF");
 }
 
-function revealDialog(page) {
-  return page.getByRole("dialog", { name: DIALOG_NAME, exact: true });
+function revealDialog(page, name = DIALOG_NAME) {
+  return page.getByRole("dialog", { name, exact: true });
+}
+
+function protectionButton(page, key) {
+  return page.getByRole("button", { name: PROTECTION[key].label, exact: true });
 }
 
 function games(page) {
@@ -172,10 +212,47 @@ async function clickBackdrop(page, dialog) {
 }
 
 function mixedButton(page, hiddenPart) {
-  const name = hiddenPart === "scores"
-    ? "Scores hidden by default. Hide scores and headlines by default"
-    : "Headlines hidden by default. Hide scores and headlines by default";
-  return page.getByRole("button", { name, exact: true });
+  return protectionButton(page, hiddenPart === "scores" ? "TF" : "FT");
+}
+
+async function openMixedDialog(page, key) {
+  const state = PROTECTION[key];
+  const button = protectionButton(page, key);
+  await expect(button).toHaveAttribute("aria-pressed", "mixed");
+  expect(await storedSettings(page)).toBe(JSON.stringify(state.settings));
+  const overflowBefore = await bodyOverflow(page);
+  await button.click();
+  const dialog = revealDialog(page, state.dialog);
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: KEEP_HIDDEN, exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: state.confirm, exact: true })).toBeVisible();
+  await expect(revealDialog(page, DIALOG_NAME)).toHaveCount(0);
+  await expect.poll(() => bodyOverflow(page)).toBe("hidden");
+  expect(await storedSettings(page)).toBe(JSON.stringify(state.settings));
+  return { dialog, overflowBefore, state };
+}
+
+async function expectMixedKept(page, key, overflowBefore, { onHome = true } = {}) {
+  const state = PROTECTION[key];
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(await storedSettings(page)).toBe(JSON.stringify(state.settings));
+  const button = protectionButton(page, key);
+  await expect(button).toHaveAttribute("aria-pressed", "mixed");
+  await expect(button).toBeFocused();
+  await expect.poll(() => bodyOverflow(page)).toBe(overflowBefore);
+  if (!onHome) {
+    await expect(page.getByText(HOME_SCORE, { exact: true })).toHaveCount(0);
+    await expect(page.getByText(AWAY_SCORE, { exact: true })).toHaveCount(0);
+    return;
+  }
+  if (state.settings.hideScores) await expectScoreAbsent(page);
+  else {
+    await expect(homeScore(page)).toBeVisible();
+    await expect(awayScore(page)).toBeVisible();
+  }
+  if (state.settings.hideHeadlines) {
+    await expect(page.getByText(REAL_HEADLINE, { exact: true })).toHaveCount(0);
+  }
 }
 
 function aboutLink(page) {
@@ -352,31 +429,31 @@ test("Tab and Shift+Tab cycle only inside the reveal dialog", async ({ page }) =
   await expect(dialog).toBeVisible();
 });
 
-for (const [hiddenPart, initial] of [
-  ["scores", { hideScores: true, hideHeadlines: false }],
-  ["headlines", { hideScores: false, hideHeadlines: true }],
-]) {
-  test(`confirming from ${hiddenPart} hidden and the other shown writes both flags false`, async ({ page }) => {
-    await seedSettings(page, initial);
+for (const [hiddenPart, key] of [["scores", "TF"], ["headlines", "FT"]]) {
+  test(`confirming from ${hiddenPart} hidden writes both flags false`, async ({ page }) => {
+    const state = PROTECTION[key];
+    await seedSettings(page, state.settings);
     await openHome(page);
-    const button = mixedButton(page, hiddenPart);
-    await expect(button).toHaveAttribute("aria-pressed", "mixed");
-    expect(await storedSettings(page)).toBe(JSON.stringify(initial));
-    if (initial.hideScores) await expectScoreAbsent(page);
-    else {
-      await expect(homeScore(page)).toBeVisible();
-      await expect(awayScore(page)).toBeVisible();
-    }
-
-    await button.click();
-    const dialog = revealDialog(page);
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: CONFIRM, exact: true }).click();
+    const { dialog } = await openMixedDialog(page, key);
+    await dialog.getByRole("button", { name: state.confirm, exact: true }).click();
 
     await expect(dialog).toHaveCount(0);
     await expect(homeScore(page)).toBeVisible();
     await expect(awayScore(page)).toBeVisible();
+    await expect(protectionButton(page, "FF")).toHaveAttribute("aria-pressed", "false");
     expect(await storedSettings(page)).toBe(SHOWN_JSON);
+  });
+}
+
+for (const key of ["TT", "TF", "FT", "FF"]) {
+  test(`protection control for ${key} uses its label and aria-pressed`, async ({ page }) => {
+    const state = PROTECTION[key];
+    await seedSettings(page, state.settings);
+    await openHome(page);
+    const button = protectionButton(page, key);
+    await expect(button).toBeVisible();
+    await expect(button).toHaveAttribute("aria-pressed", state.pressed);
+    if (key === "FF") await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 }
 
@@ -428,4 +505,60 @@ test("history.pushState closes the reveal dialog without revealing", async ({ pa
 
   await expect(page).toHaveURL(/\/about$/);
   await expectClosedWithoutReveal(page, overflowBefore);
+});
+
+for (const key of ["TF", "FT"]) {
+  test(`Keep hidden from ${key} keeps the mixed setting`, async ({ page }) => {
+    await seedSettings(page, PROTECTION[key].settings);
+    await openHome(page);
+    const { dialog, overflowBefore } = await openMixedDialog(page, key);
+    await dialog.getByRole("button", { name: KEEP_HIDDEN, exact: true }).click();
+    await expectMixedKept(page, key, overflowBefore);
+  });
+
+  test(`Escape from ${key} keeps the mixed setting`, async ({ page }) => {
+    await seedSettings(page, PROTECTION[key].settings);
+    await openHome(page);
+    const { dialog, overflowBefore } = await openMixedDialog(page, key);
+    await expect(dialog.getByRole("button", { name: KEEP_HIDDEN, exact: true })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expectMixedKept(page, key, overflowBefore);
+  });
+
+  test(`backdrop click from ${key} keeps the mixed setting`, async ({ page }) => {
+    await seedSettings(page, PROTECTION[key].settings);
+    await openHome(page);
+    const { dialog, overflowBefore } = await openMixedDialog(page, key);
+    await clickBackdrop(page, dialog);
+    await expectMixedKept(page, key, overflowBefore);
+  });
+
+  test(`going back from ${key} keeps the mixed setting`, async ({ page }) => {
+    await seedSettings(page, PROTECTION[key].settings);
+    await openHome(page);
+    await aboutLink(page).click();
+    await expect(page.getByRole("heading", { name: /Basketball/ })).toBeVisible();
+    await page.getByRole("link", { name: "My NBA Feed home", exact: true }).click();
+    await expect(games(page).getByRole("heading", { name: "Last Game", exact: true })).toBeVisible();
+    const { overflowBefore } = await openMixedDialog(page, key);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/about$/);
+    await expect(page.getByRole("heading", { name: /Basketball/ })).toBeVisible();
+    await expectMixedKept(page, key, overflowBefore, { onHome: false });
+  });
+}
+
+test("confirming hidden headlines shows the redacted story", async ({ page }) => {
+  await seedSettings(page, PROTECTION.FT.settings);
+  await openHome(page);
+  await page.getByText("Celtics, latest news", { exact: true }).click();
+  await expect(page.getByText(REAL_HEADLINE, { exact: true })).toHaveCount(0);
+  await expect(page.getByText(SAFE_HEADLINE, { exact: true })).toBeVisible();
+
+  const { dialog } = await openMixedDialog(page, "FT");
+  await dialog.getByRole("button", { name: PROTECTION.FT.confirm, exact: true }).click();
+
+  await expect(page.getByText(REAL_HEADLINE, { exact: true })).toBeVisible();
+  await expect(page.getByText(SAFE_HEADLINE, { exact: true })).toHaveCount(0);
+  expect(await storedSettings(page)).toBe(SHOWN_JSON);
 });
