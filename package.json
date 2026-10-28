@@ -2,11 +2,16 @@
   "name": "my-nba-feed",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "test": "node --experimental-strip-types --test \"tests/**/*.test.mjs\"",
+    "typecheck": "tsc --noEmit",
     "digest:publish": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/publish-digest.mjs",
     "digest:generate": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/generate-digest.mjs",
     "highlights:sync": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/sync-youtube-highlights.mjs"
