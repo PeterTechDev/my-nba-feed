@@ -93,7 +93,9 @@ test("bypass header stays on the first origin for navigation, fetch, and iframe 
       assert.equal(hit(otherHits, "/from-iframe")?.bypass, null);
     });
   } finally {
+    app.closeAllConnections();
     await new Promise((resolve) => app.close(resolve));
+    other.closeAllConnections();
     await new Promise((resolve) => other.close(resolve));
   }
 });
@@ -126,6 +128,7 @@ test("a same-origin 302 is refetched with the bypass header", async () => {
       assert.equal(hit(hits, "/b")?.bypass, FIXTURE);
     });
   } finally {
+    app.closeAllConnections();
     await new Promise((resolve) => app.close(resolve));
   }
 });
@@ -165,7 +168,9 @@ test("a same-origin hop stops before a cross-origin redirect and omits the heade
       assert.equal(hit(otherHits, "/end")?.bypass, null);
     });
   } finally {
+    app.closeAllConnections();
     await new Promise((resolve) => app.close(resolve));
+    other.closeAllConnections();
     await new Promise((resolve) => other.close(resolve));
   }
 });
@@ -187,6 +192,7 @@ test("same-origin redirects stop after 5 hops", async () => {
       setBypassFailureHook();
     });
   } finally {
+    app.closeAllConnections();
     await new Promise((resolve) => app.close(resolve));
   }
 });
@@ -237,6 +243,7 @@ for (const status of [301, 302, 303, 307, 308]) {
         }
       });
     } finally {
+      app.closeAllConnections();
       await new Promise((resolve) => app.close(resolve));
     }
   });
@@ -287,7 +294,9 @@ test("a context cookie reaches the same-origin bypass hop and not the next origi
       assert.equal(hit(otherHits, "/cookie-land")?.cookie, null);
     });
   } finally {
+    app.closeAllConnections();
     await new Promise((resolve) => app.close(resolve));
+    other.closeAllConnections();
     await new Promise((resolve) => other.close(resolve));
   }
 });
@@ -324,6 +333,7 @@ test("Set-Cookie from two redirect hops is sent on the next hop and to the brows
       assert.deepEqual(stored, ["one=hop1", "two=hop2"]);
     });
   } finally {
+    app.closeAllConnections();
     await new Promise((resolve) => app.close(resolve));
   }
 });

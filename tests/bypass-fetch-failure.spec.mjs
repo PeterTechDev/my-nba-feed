@@ -41,6 +41,7 @@ test("a dropped connection reports a fetch failure without the bypass value", as
   try {
     await expectSafeFailure(page, `http://127.0.0.1:${server.address().port}`, "/drop");
   } finally {
+    server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   }
 });
@@ -51,6 +52,7 @@ test("a stalled response reports a fetch failure without the bypass value", asyn
   try {
     await expectSafeFailure(page, `http://127.0.0.1:${server.address().port}`, "/stall");
   } finally {
+    server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   }
 });
@@ -68,6 +70,7 @@ test("slow body bytes still hit the total request timeout", async ({ page }) => 
     const elapsed = await expectSafeFailure(page, `http://127.0.0.1:${server.address().port}`, "/drip");
     assert.ok(elapsed < 25000, `elapsed ${elapsed}`);
   } finally {
+    server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   }
 });
@@ -86,6 +89,7 @@ test("a reset while the body is still arriving is logged without the bypass valu
       "preview bypass connection reset while reading GET /reset",
     );
   } finally {
+    server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   }
 });

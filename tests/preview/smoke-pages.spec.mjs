@@ -103,6 +103,11 @@ test("spoiler protection hides the score and stays on after reload", async ({ pa
   await expect(hidden).toHaveAttribute("aria-pressed", "true");
   await expect(score()).toHaveCount(0);
   await hidden.click();
+  const confirmation = page.getByRole("dialog", { name: "Show scores and headlines?", exact: true });
+  await expect(shown.or(confirmation)).toBeVisible();
+  if (await confirmation.isVisible()) {
+    await confirmation.getByRole("button", { name: "Show scores and headlines", exact: true }).click();
+  }
   await expect(shown).toHaveAttribute("aria-pressed", "false");
   await expect(score().first()).toBeVisible();
   await page.reload();
