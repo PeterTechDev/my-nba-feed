@@ -8,6 +8,7 @@ import GameDataProvider from "@/components/GameDataProvider";
 import TopPlaysCard from "@/components/TopPlaysCard";
 import MorningBriefingCard from "@/components/MorningBriefingCard";
 import PersonalizedFeed, { LeagueNewsSection } from "@/components/PersonalizedFeed";
+import EndOfSession from "@/components/EndOfSession";
 import { useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
 import { useTeam } from "@/hooks/useTeam";
 import { useRemoteData } from "@/hooks/useRemoteData";
@@ -58,6 +59,7 @@ function FeedContent() {
         </div>
       </details>
       </section>
+      <EndOfSession />
       </div>
     </>
   );

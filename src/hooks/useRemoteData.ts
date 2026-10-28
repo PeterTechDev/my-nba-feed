@@ -110,3 +110,44 @@ export function useRemoteData<T>(url: string | null, refreshMs = 0) {
     retry,
   };
 }
+
+/** Subscribe to the same cache entries other callers already use. Does not start a second refresh timer. */
+export function useRemoteDataAll<T>(urls: readonly string[]) {
+  const key = urls.join("\n");
+  const [state, setState] = useState<{ key: string; rows: Snapshot[] }>({ key: "", rows: [] });
+  useEffect(() => {
+    const list = key ? key.split("\n") : [];
+    let active = true;
+    const sync = () => {
+      if (active) setState({ key, rows: list.map((url) => getEntry(url).snapshot) });
+    };
+    const releases = list.map((url) => {
+      const entry = getEntry(url);
+      entry.listeners.add(sync);
+      void fetchRemoteData(url).catch(() => {});
+      return () => {
+        entry.listeners.delete(sync);
+        queueMicrotask(() => {
+          if (!entry.listeners.size) {
+            entry.controller?.abort();
+            entries.delete(url);
+          }
+        });
+      };
+    });
+    sync();
+    return () => {
+      active = false;
+      releases.forEach((release) => release());
+    };
+  }, [key]);
+  const current = state.key === key;
+  return urls.map((_, index) => {
+    const row = current ? state.rows[index] : undefined;
+    return {
+      data: (row?.data ?? null) as T | null,
+      loading: !current || row?.loading !== false,
+      error: Boolean(row?.error),
+    };
+  });
+}

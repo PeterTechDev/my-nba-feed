@@ -48,20 +48,27 @@ test("tipoff uses an actual timestamp and never invents midnight", () => {
   assert.equal(dates.formatTipoff(null, base.status), base.status);
 });
 
-test("league date-only values keep their calendar day across timezones and DST", () => {
+test("league date-only values keep their calendar day, and age follows Eastern Time", () => {
   const previous = process.env.TZ;
   try {
-    for (const zone of ["America/Bahia", "America/Los_Angeles", "America/New_York", "Asia/Tokyo"]) {
+    for (const zone of ["UTC", "America/Los_Angeles", "Asia/Tokyo", "Pacific/Kiritimati", "America/Bahia", "America/New_York"]) {
       process.env.TZ = zone;
-      assert.equal(dates.formatGameDate("2026-10-26", { month: "short", day: "numeric" }), "Oct 26", zone);
-      assert.equal(dates.gameDaysAgo("2026-10-26", new Date("2026-10-27T10:00:00")), 1, zone);
-      assert.equal(dates.gameDaysAgo("2026-10-27", new Date("2026-10-27T10:00:00")), 0, zone);
-      assert.equal(dates.gameDaysAgo("2026-03-08", new Date("2026-03-09T10:00:00")), 1, zone);
+      const formatted = dates.formatGameDate("2026-10-26", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+      assert.match(formatted, /Oct 26/, zone);
+      assert.match(formatted, /12:00/, `${zone} anchors a date-only value at local noon`);
     }
   } finally {
     if (previous === undefined) delete process.env.TZ;
     else process.env.TZ = previous;
   }
+  const tokyoAlreadyOnThe27th = new Date("2026-10-27T01:00:00Z");
+  assert.equal(dates.gameDaysAgo("2026-10-26", tokyoAlreadyOnThe27th), 0, "01:00Z is 27 Oct in Tokyo and still 26 Oct in New York");
+  assert.equal(dates.gameDaysAgo("2026-10-27", tokyoAlreadyOnThe27th), -1, "that league date is still tomorrow in Eastern Time");
+  const easternMorning = new Date("2026-10-27T08:00:00Z");
+  assert.equal(dates.gameDaysAgo("2026-10-26", easternMorning), 1);
+  assert.equal(dates.gameDaysAgo("2026-10-27", easternMorning), 0);
+  assert.equal(dates.gameDaysAgo("2026-03-08", new Date("2026-03-09T03:00:00Z")), 0, "03:00Z is still 8 Mar in Eastern Time");
+  assert.equal(dates.gameDaysAgo("2026-03-08", new Date("2026-03-09T08:00:00Z")), 1);
 });
 
 test("team surfaces and actions have at least 4.5:1 contrast for all 30 teams", () => {

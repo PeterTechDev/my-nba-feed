@@ -374,14 +374,17 @@ test("homepage keeps news optional after games and shows the focus-team lead onl
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: focus }) },
     "@/hooks/useGameData": { useGameData: () => state },
     "@/hooks/useLastVisit": { useLastVisit: () => ({ ready: true, lastVisitAt }) },
-    "@/hooks/useRemoteData": { useRemoteData: (url) => ({ loading: false, error: false, retry: () => {},
-      data: url.includes("/api/games") ? state : { feeds: Object.fromEntries(new URL(url, "http://localhost").searchParams.get("teams").split(",").map((name) => [name, { items: name === "Celtics" ? news : [story(name === "NBA" ? "League update" : "Lakers latest")], error: false }])) } }) },
+    "@/hooks/useRemoteData": {
+      useRemoteData: (url) => ({ loading: false, error: false, retry: () => {},
+        data: url.includes("/api/games") ? state : { feeds: Object.fromEntries(new URL(url, "http://localhost").searchParams.get("teams").split(",").map((name) => [name, { items: name === "Celtics" ? news : [story(name === "NBA" ? "League update" : "Lakers latest")], error: false }])) } }),
+      useRemoteDataAll: (urls) => urls.map((url) => ({ loading: false, error: false, data: String(url).includes("/api/games") ? state : null })),
+    },
     "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }) },
     "./DataError": load("components/DataError.tsx").exports,
   };
   mocked["./NewsList"] = load("components/NewsList.tsx", {}, mocked).exports;
   mocked["./ScoreReveal"] = load("components/ScoreReveal.tsx", {}, mocked).exports;
-  for (const name of ["GameDayHero", "GameSection", "MorningBriefingCard", "PersonalizedFeed", "NewsFeed", "TopPlaysCard"]) {
+  for (const name of ["GameDayHero", "GameSection", "MorningBriefingCard", "PersonalizedFeed", "NewsFeed", "TopPlaysCard", "EndOfSession"]) {
     mocked["@/components/" + name] = load("components/" + name + ".tsx", {}, mocked).exports;
   }
   mocked["@/components/TeamHeader"] = { default: () => null };
