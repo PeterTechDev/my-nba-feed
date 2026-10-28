@@ -122,19 +122,53 @@ function startsWithPhrase(words: string[], phrase: string[]): boolean {
   return phrase.every((part, offset) => words[index + offset] === part);
 }
 
-// A manchete é sobre o time quando começa por ele (nome, apelido ou cidade única),
-// quando um placar ou uma campanha aparece em qualquer ponto e o time também,
-// ou quando dois nomes de clube estão ligados por "and" (os dois contam).
-// Menção depois de ponto e vírgula, sem número, não conta.
+function phraseEndsAt(words: string[], end: number, phrase: string[]): boolean {
+  const start = end - phrase.length + 1;
+  if (start < 0) return false;
+  return phrase.every((part, offset) => words[start + offset] === part);
+}
+
+function phraseStartsAt(words: string[], start: number, phrase: string[]): boolean {
+  return phrase.every((part, offset) => words[start + offset] === part);
+}
+
+// "Heat wave and …" / "Magic Johnson and …": o nome não é o lado do par.
+function leadingNameIsNotTheAndPair(words: string[], phrase: string[]): boolean {
+  let index = 0;
+  while (LEADING_ARTICLES.has(words[index] ?? "")) index += 1;
+  if (!phrase.every((part, offset) => words[index + offset] === part)) return false;
+  const andAt = words.findIndex((word, position) => position > index + phrase.length - 1 && (word === "and" || word === "&"));
+  return andAt > index + phrase.length;
+}
+
+function clausesOf(title: string): string[] {
+  return title.split(/\s*(?:[;:?!.]|(?<!\d)[—–](?!\d)|,\s*(?=(?:and|but|or|nor|so|yet|for)\b))\s*/i)
+    .map((clause) => clause.trim()).filter(Boolean);
+}
+
+function teamInAdjacentAndPair(words: string[], team: Team): boolean {
+  const names = clubNamePhrases(team);
+  for (let index = 0; index < words.length; index += 1) {
+    if (words[index] !== "and" && words[index] !== "&") continue;
+    const onLeft = names.some((phrase) => phraseEndsAt(words, index - 1, phrase));
+    const onRight = names.some((phrase) => phraseStartsAt(words, index + 1, phrase));
+    if (!onLeft && !onRight) continue;
+    const otherSideIsClub = teams.some((other) => other.id !== team.id && clubNamePhrases(other).some((phrase) =>
+      (onLeft && phraseStartsAt(words, index + 1, phrase)) || (onRight && phraseEndsAt(words, index - 1, phrase))));
+    if (otherSideIsClub) return true;
+  }
+  return false;
+}
+
+// A manchete é sobre o time quando começa por ele, quando a oração em que ele
+// aparece tem placar ou campanha, ou quando o nome dele é um dos dois lados
+// adjacentes de "X and/& Y". Menção fora desse par, ou número noutra oração, não conta.
 export function headlineIsAboutTeam(title: string, team: Team): boolean {
   const words = textTokens(title);
   const phrases = teamPhrases(team);
-  if (phrases.some((phrase) => startsWithPhrase(words, phrase))) return true;
-  if (SPOILER_FIGURE.test(title) && phrases.some((phrase) => containsTokens(words, phrase))) return true;
-  if (!/\band\b|&/i.test(title)) return false;
-  const names = clubNamePhrases(team);
-  if (!names.some((phrase) => containsTokens(words, phrase))) return false;
-  return teams.some((other) => other.id !== team.id && clubNamePhrases(other).some((phrase) => containsTokens(words, phrase)));
+  if (phrases.some((phrase) => startsWithPhrase(words, phrase) && !leadingNameIsNotTheAndPair(words, phrase))) return true;
+  if (clausesOf(title).some((clause) => SPOILER_FIGURE.test(clause) && phrases.some((phrase) => containsTokens(textTokens(clause), phrase)))) return true;
+  return teamInAdjacentAndPair(words, team);
 }
 
 // Version 0 persisted these eight IDs under the wrong team identities.
