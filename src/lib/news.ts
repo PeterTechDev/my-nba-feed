@@ -112,7 +112,9 @@ export function selectHomepageNews(feeds: NewsFeeds, order: string[], briefingTe
   return Object.fromEntries(order.map((name) => {
     const bucket = feeds[name];
     const available = newestNews(bucket?.items ?? []).filter((item) => !newsIdentity(item).some((key) => seen.has(key)));
-    const items = (bucket?.grouped ? available : groupNews(available)).slice(0, name === "NBA" ? 6 : name === briefingTeam ? 1 : 3);
+    const grouped = bucket?.grouped ? available : groupNews(available);
+    // Around the League filters the focus team after this, then keeps six.
+    const items = name === "NBA" ? grouped : grouped.slice(0, name === briefingTeam ? 1 : 3);
     for (const item of items.flatMap((item) => [item, ...(item.related ?? [])])) newsIdentity(item).forEach((key) => seen.add(key));
     return [name, { items, error: feeds[name]?.error ?? false }];
   }));

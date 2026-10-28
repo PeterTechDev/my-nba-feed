@@ -2,6 +2,12 @@
 import { createContext, useContext } from "react";
 import { useSpoilerMode } from "@/hooks/useSpoilerMode";
 
+// A digest is a result narrative, so either spoiler switch covers it.
+// Score chips elsewhere stay behind hideScores only.
+export function digestContentIsProtected(settings: { hideScores: boolean; hideHeadlines: boolean }): boolean {
+  return settings.hideScores || settings.hideHeadlines;
+}
+
 interface SpoilerContextValue {
   spoilerFree: boolean;
   hideScores: boolean;

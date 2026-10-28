@@ -17,6 +17,31 @@ export interface FeedbackAgg {
   total: number;
 }
 
+export interface CoveredGame {
+  awayAbbr: string;
+  homeAbbr: string;
+  awayScore: number;
+  homeScore: number;
+}
+
+export function parseCoveredGames(lines: readonly string[]): CoveredGame[] {
+  const games: CoveredGame[] = [];
+  for (const line of lines) {
+    const match = /^([A-Z]{2,5}) (\d{1,3})[–—-](\d{1,3}) ([A-Z]{2,5})$/.exec(line.trim());
+    if (!match) continue;
+    const awayScore = Number(match[2]);
+    const homeScore = Number(match[3]);
+    if (awayScore < 1 || homeScore < 1 || awayScore > 300 || homeScore > 300 || awayScore === homeScore) continue;
+    games.push({ awayAbbr: match[1], homeAbbr: match[4], awayScore, homeScore });
+  }
+  return games;
+}
+
+export function readDigestLeagueDate(content: string): string | null {
+  const candidate = /League date:\s*(\d{4}-\d{2}-\d{2})/i.exec(content)?.[1];
+  return isDigestDate(candidate) ? candidate : null;
+}
+
 export function isDigestDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
     Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
