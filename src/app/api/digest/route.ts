@@ -6,27 +6,51 @@ import { formatNBADate } from "@/lib/nbaDate";
 
 export type { DigestEntry } from "@/lib/digest";
 
-function spoilerHidden(req: NextRequest, kind: "scores" | "headlines") {
-  const query = req.nextUrl.searchParams.get(kind === "scores" ? "hideScores" : "hideHeadlines");
-  if (query === "1" || query === "true") return true;
-  if (query === "0" || query === "false") return false;
-  const header = req.headers?.get?.("x-nba-spoilers") ?? "";
-  if (!header || header === "off") return false;
-  return header.split(",").some((part) => part.trim() === kind);
+function spoilerFlags(req: NextRequest) {
+  let queryScores = false;
+  let queryHeadlines = false;
+  for (const [key, value] of req.nextUrl.searchParams.entries()) {
+    const name = key.toLowerCase();
+    if (name !== "hidescores" && name !== "hideheadlines") continue;
+    const normalized = value.trim().toLowerCase();
+    if (normalized !== "1" && normalized !== "true") continue;
+    if (name === "hidescores") queryScores = true;
+    else queryHeadlines = true;
+  }
+  const tokens = (req.headers?.get?.("x-nba-spoilers") ?? "").split(/[,;]/).map((part) => part.trim().toLowerCase()).filter(Boolean);
+  const known = new Set(["none", "scores", "headlines"]);
+  const unknown = tokens.some((token) => !known.has(token));
+  const explicitNone = tokens.length > 0 && tokens.every((token) => token === "none");
+  let hideScores = true;
+  let hideHeadlines = true;
+  if (!unknown && explicitNone) {
+    hideScores = false;
+    hideHeadlines = false;
+  } else if (!unknown && tokens.some((token) => token === "scores" || token === "headlines")) {
+    hideScores = tokens.includes("scores");
+    hideHeadlines = tokens.includes("headlines");
+  }
+  if (queryScores) hideScores = true;
+  if (queryHeadlines) hideHeadlines = true;
+  return { hideScores, hideHeadlines };
+}
+
+function responseInit(status = 200) {
+  return { status, headers: { Vary: "x-nba-spoilers", "Cache-Control": "private, no-store" } };
 }
 
 export async function GET(req: NextRequest) {
   const date = req.nextUrl.searchParams.get("date");
   const range = req.nextUrl.searchParams.get("range");
-  if (date && !isDigestDate(date)) return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+  if (date && !isDigestDate(date)) return NextResponse.json({ error: "Invalid date" }, responseInit(400));
   if (range && (!/^\d+$/.test(range) || Number(range) < 1 || Number(range) > 90)) {
-    return NextResponse.json({ error: "Range must be between 1 and 90" }, { status: 400 });
+    return NextResponse.json({ error: "Range must be between 1 and 90" }, responseInit(400));
   }
-  const protect = spoilerHidden(req, "scores") || spoilerHidden(req, "headlines");
+  const flags = spoilerFlags(req);
+  const protect = flags.hideScores || flags.hideHeadlines;
   const reveal = req.nextUrl.searchParams.get("reveal");
   const show = (entry: DigestEntry) => protect ? redactDigest(entry, reveal) : entry;
-  const json = (body: unknown) => NextResponse.json(body, protect
-    ? { headers: new Headers({ Vary: "x-nba-spoilers", "Cache-Control": "private, no-store" }) } : undefined);
+  const json = (body: unknown, status = 200) => NextResponse.json(body, responseInit(status));
   try {
     const digests = await readDigestDocument<DigestEntry[]>("digests.json", []);
     const sorted = [...digests].sort((a, b) => b.date.localeCompare(a.date));
@@ -42,7 +66,7 @@ export async function GET(req: NextRequest) {
     const digest = sorted.find((entry) => entry.date === today) ?? sorted[0] ?? null;
     return json({ digest: digest ? show(digest) : null, isToday: digest?.date === today });
   } catch {
-    return NextResponse.json({ error: "Digest storage is unavailable. Please retry." }, { status: 503 });
+    return json({ error: "Digest storage is unavailable. Please retry." }, 503);
   }
 }
 

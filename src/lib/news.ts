@@ -135,12 +135,41 @@ function spoilerIdentity(item: NewsItem) {
   return (hash >>> 0).toString(16);
 }
 
+function neutralLink(link: string, identity: string) {
+  try {
+    const url = new URL(link);
+    if (!url.pathname.split("/").some((part) => /[a-z]{3,}-[a-z0-9]/i.test(decodeURIComponent(part)))) return link;
+    return `${url.origin}/story/${identity}`;
+  } catch {
+    return link;
+  }
+}
+
+function coverHeadline(item: NewsItem): NewsItem {
+  const identity = item.identity ?? spoilerIdentity(item);
+  const safe = item.isSpoiler && item.safeTitle !== item.title
+    ? item.safeTitle
+    : `Spoiler-protected headline${item.source ? ` from ${item.source}` : ""}`;
+  return {
+    ...item, title: safe, safeTitle: safe, isSpoiler: true, redacted: true, identity,
+    category: item.category === "recap" ? "general" : item.category,
+    link: neutralLink(item.link, identity),
+  };
+}
+
+function matchesReveal(item: NewsItem, reveal: string | null) {
+  if (!reveal) return false;
+  return reveal === item.link || reveal === item.identity || reveal === spoilerIdentity(item);
+}
+
 function sealNewsItem(item: NewsItem, team: string, reveal: string | null): NewsItem {
   const identity = spoilerIdentity(item);
-  const related = item.related?.map((entry) => sealNewsItem(entry, team, reveal));
+  const nested = item.related?.map((entry) => sealNewsItem(entry, team, reveal));
+  const cluster = Boolean(item.isSpoiler || nested?.some((entry) => entry.isSpoiler || entry.redacted));
+  const related = cluster ? nested?.map((entry) => matchesReveal(entry, reveal) ? entry : coverHeadline(entry)) : nested;
   const sealed = { ...item, related, identity, feed: team };
-  if (!item.isSpoiler || reveal === item.link) return sealed;
-  return { ...sealed, title: item.safeTitle, redacted: true };
+  if (matchesReveal(item, reveal) || !item.isSpoiler) return sealed;
+  return coverHeadline(sealed);
 }
 
 export function presentNews(items: NewsItem[], team: string, reveal: string | null, grouped: boolean): NewsItem[] {

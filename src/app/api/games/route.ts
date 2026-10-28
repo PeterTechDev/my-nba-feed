@@ -16,26 +16,50 @@ interface BDLGame {
   visitor_team_score: number;
 }
 
-function spoilerHidden(req: NextRequest, kind: "scores" | "headlines") {
-  const query = req.nextUrl.searchParams.get(kind === "scores" ? "hideScores" : "hideHeadlines");
-  if (query === "1" || query === "true") return true;
-  if (query === "0" || query === "false") return false;
-  const header = req.headers?.get?.("x-nba-spoilers") ?? "";
-  if (!header || header === "off") return false;
-  return header.split(",").some((part) => part.trim() === kind);
+function spoilerFlags(req: NextRequest) {
+  let queryScores = false;
+  let queryHeadlines = false;
+  for (const [key, value] of req.nextUrl.searchParams.entries()) {
+    const name = key.toLowerCase();
+    if (name !== "hidescores" && name !== "hideheadlines") continue;
+    const normalized = value.trim().toLowerCase();
+    if (normalized !== "1" && normalized !== "true") continue;
+    if (name === "hidescores") queryScores = true;
+    else queryHeadlines = true;
+  }
+  const tokens = (req.headers?.get?.("x-nba-spoilers") ?? "").split(/[,;]/).map((part) => part.trim().toLowerCase()).filter(Boolean);
+  const known = new Set(["none", "scores", "headlines"]);
+  const unknown = tokens.some((token) => !known.has(token));
+  const explicitNone = tokens.length > 0 && tokens.every((token) => token === "none");
+  let hideScores = true;
+  let hideHeadlines = true;
+  if (!unknown && explicitNone) {
+    hideScores = false;
+    hideHeadlines = false;
+  } else if (!unknown && tokens.some((token) => token === "scores" || token === "headlines")) {
+    hideScores = tokens.includes("scores");
+    hideHeadlines = tokens.includes("headlines");
+  }
+  if (queryScores) hideScores = true;
+  if (queryHeadlines) hideHeadlines = true;
+  return { hideScores, hideHeadlines };
+}
+
+function responseInit(status = 200) {
+  return { status, headers: { Vary: "x-nba-spoilers", "Cache-Control": "private, no-store" } };
 }
 
 export async function GET(req: NextRequest) {
   const teamId = req.nextUrl.searchParams.get("teamId");
   if (!teamId) {
-    return NextResponse.json({ error: "teamId required" }, { status: 400 });
+    return NextResponse.json({ error: "teamId required" }, responseInit(400));
   }
 
   const key = process.env.BALLDONTLIE_KEY || "";
   if (!key) {
     return NextResponse.json(
       { error: "API key not configured", lastGame: null, currentGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
-      { status: 503 }
+      responseInit(503)
     );
   }
 
@@ -52,7 +76,7 @@ export async function GET(req: NextRequest) {
       const status = res.status;
       return NextResponse.json(
         { error: `BallDontLie API returned ${status}`, lastGame: null, currentGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
-        { status: 502 }
+        responseInit(502)
       );
     }
 
@@ -111,7 +135,7 @@ export async function GET(req: NextRequest) {
     }
 
     const reveal = req.nextUrl.searchParams.get("reveal");
-    const hideScores = spoilerHidden(req, "scores");
+    const hideScores = spoilerFlags(req).hideScores;
     const conceal = (game: ReturnType<typeof toInfo> | null) => {
       if (!game || !hideScores || reveal === String(game.id)) return game;
       if (!isFinalStatus(game.status) && !isLiveStatus(game.status)) return game;
@@ -121,11 +145,11 @@ export async function GET(req: NextRequest) {
       lastGame: conceal(lastGame), currentGame: conceal(currentGame), nextGame: conceal(nextGame),
       record: hideScores && reveal !== "record" ? { wins: 0, losses: 0, redacted: true } : { wins, losses },
       error: null,
-    }, hideScores ? { headers: new Headers({ Vary: "x-nba-spoilers", "Cache-Control": "private, no-store" }) } : undefined);
+    }, responseInit());
   } catch {
     return NextResponse.json(
       { error: "Failed to fetch game data", lastGame: null, currentGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
-      { status: 500 }
+      responseInit(500)
     );
   }
 }

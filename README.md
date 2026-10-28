@@ -118,6 +118,19 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Set `BALLDONTLIE_KEY` in your environment before starting the app.
 
+### Spoiler API
+
+`GET /api/news`, `GET /api/digest` and `GET /api/games` are closed unless the caller asks for the open payload. Every response, open or redacted, sends `Vary: x-nba-spoilers` and `Cache-Control: private, no-store`.
+
+| Signal | Result |
+|---|---|
+| No `x-nba-spoilers` header, or an unknown token | Scores and spoiler headlines redacted |
+| `x-nba-spoilers: none` | Full payload |
+| `scores` and/or `headlines` (comma or semicolon, any case, trimmed) | Those parts stay redacted; the other part is included |
+| `hideScores=1` or `hideHeadlines=true` (name and value are case-insensitive; `1` or `true`) | Forces that part to stay redacted |
+
+`reveal=<id>` opens one item inside an otherwise redacted list: a news link or identity, a digest date, a game id, or `record`. The app sends the header on every one of these calls, including `none` when spoiler protection is off.
+
 ### Digest storage and publishing
 
 Connect a **private Vercel Blob store** to the project. Production uses the
