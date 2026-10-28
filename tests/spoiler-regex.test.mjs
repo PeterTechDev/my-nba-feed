@@ -229,7 +229,7 @@ const roundThree = [
   { headline: "win over", expected: true, reason: "win over" },
   { headline: "0-4 start", expected: true, reason: "N-N start com hífen" },
   { headline: "0\u20134 start", expected: true, reason: "N-N start com en dash" },
-  { headline: "0\u20144 start", expected: true, reason: "N-N start com em dash; o regex ainda só aceita hífen e en dash" },
+  { headline: "0\u20144 start", expected: true, reason: "N-N start com em dash" },
   { headline: "10-2 start", expected: true, reason: "N-N start com dois dígitos à esquerda" },
   { headline: "box scores", expected: true, reason: "box scores no plural" },
   { headline: "push past", expected: true, reason: "push past" },
@@ -246,7 +246,12 @@ const roundThree = [
   { headline: "118\u2014107", expected: true, reason: "placar com em dash" },
   { headline: "118:107", expected: true, reason: "placar com dois-pontos" },
   { headline: "Celtics 118, Knicks 107", expected: true, reason: "formato AP" },
-  { headline: "Knicks avert 0\u20144 start", expected: true, reason: "N-N start com em dash; o regex ainda só aceita hífen e en dash" },
+  { headline: "Knicks avert 0\u20144 start", expected: true, reason: "N-N start com em dash" },
+  { headline: "0-10 start", expected: true, reason: "N-N start com dois dígitos à direita" },
+  { headline: "76ers 112, Celtics 108", expected: true, reason: "formato AP com time que começa em dígito" },
+  { headline: "99-97", expected: true, reason: "placar sozinho, sem verbo ao redor" },
+  { headline: "Celtics 118,Knicks 107", expected: true, reason: "formato AP sem espaço depois da vírgula" },
+  { headline: "Clippers' 120, Lakers' 115", expected: true, reason: "formato AP com apóstrofo no nome" },
 ];
 
 // Negativos óbvios que não podem casar. Se casarem, o teste fica vermelho.
