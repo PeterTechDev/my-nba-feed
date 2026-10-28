@@ -40,6 +40,7 @@ test("highlights read saved YouTube videos without calling YouTube, and authenti
   let state = { syncedAt: now.toISOString(), videos: [clip] }, unavailable = false, reads = 0;
   const route = load("app/api/highlights/route.ts", { Date: FixedDate, process: { env: { DIGEST_PUBLISH_TOKEN: "publisher" } },
     fetch: () => { throw new Error("A page read must never call YouTube"); } }, { ...imports,
+    "@/lib/nbaDate": load("lib/nbaDate.ts", { Date: FixedDate }).exports,
     "@/lib/youtubeHighlights": load("lib/youtubeHighlights.ts", { Date: FixedDate }).exports,
     "@/lib/digestStorage": {
       readDigestDocument: async () => { reads++; if (unavailable) throw new Error("offline"); return state; },
