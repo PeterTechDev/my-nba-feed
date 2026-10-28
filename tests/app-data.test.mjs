@@ -70,7 +70,7 @@ test("highlights read saved YouTube videos without calling YouTube, and authenti
   assert.match(result.body.error, /storage unavailable/);
 });
 
-test("highlight thumbnails and direct video links respect both spoiler settings", () => {
+test("highlight thumbnails stay visible while scores respect spoiler settings", () => {
   let hideScores = true, hideHeadlines = true;
   const games = [{ id: 1, date: "2026-10-26", status: "Final", homeTeam: teams.getCeltics(), awayTeam: { name: "Bulls", abbreviation: "CHI" }, homeScore: 134, awayScore: 99 }];
   const video = { id: "DTNqMLNVBC8", thumbnail: "https://i.ytimg.com/vi/DTNqMLNVBC8/hqdefault.jpg", url: "https://www.youtube.com/watch?v=DTNqMLNVBC8", duration: 600 };
@@ -85,8 +85,12 @@ test("highlight thumbnails and direct video links respect both spoiler settings"
   const Page = load("app/highlights/page.tsx", {}, mocked).exports.default;
   const render = () => renderToStaticMarkup(createElement(Page));
   for ([hideScores, hideHeadlines] of [[true, true], [false, true], [true, false]]) {
-    assert.match(render(), /Reveal video preview/);
-    assert.doesNotMatch(render(), /src="https:\/\/i.ytimg|href="https:\/\/www.youtube.com\/watch|<iframe/);
+    const html = render();
+    assert.match(html, /src="https:\/\/i.ytimg.com\/vi\/DTNqMLNVBC8\/hqdefault.jpg/);
+    assert.match(html, /Play highlights vs Bulls/);
+    assert.doesNotMatch(html, /Reveal video preview|Hide video preview|<iframe/);
+    if (hideScores) assert.doesNotMatch(html, /134-99/);
+    else assert.match(html, /134-99/);
   }
   hideScores = false; hideHeadlines = false;
   let html = render();
