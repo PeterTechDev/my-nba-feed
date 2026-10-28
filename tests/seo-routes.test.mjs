@@ -422,3 +422,60 @@ test("VERCEL_PROJECT_PRODUCTION_URL http://host falls back without throwing", ()
 test("VERCEL_PROJECT_PRODUCTION_URL https:/// falls back without throwing", () => {
   assertProductionHost("https:///", fallbackOrigin, { rejected: true });
 });
+
+function assertSiteChoice(env, origin, warningsExpected) {
+  const warnings = [];
+  let loaded;
+  try {
+    loaded = loadGraph(env, {
+      console: { ...console, warn(...args) { warnings.push(args.map((part) => String(part)).join(" ")); } },
+    });
+  } catch (error) {
+    assert.fail(`site URL resolution threw ${error.name}: ${error.message}`);
+  }
+  const base = metadataBaseFrom(loaded.layout);
+  assert.equal(base.protocol, "https:");
+  assert.equal(base.origin, origin);
+  assert.equal(base.pathname, "/");
+  assert.equal(base.href, `${origin}/`);
+  assertNoDoubleSlash(base.href);
+  const urls = Array.from(loaded.sitemap.default(), (entry) => `${entry.url}`);
+  const paths = sitemapPaths(loaded.sitemap.default());
+  assert.equal(urls[0], origin);
+  assert.equal(urls[0].endsWith("/"), false);
+  assert.deepEqual(urls, paths.map((routePath) => routePath === "/" ? origin : `${origin}${routePath}`));
+  for (const url of urls) assertNoDoubleSlash(url);
+  assert.equal(`${loaded.robots.default().sitemap}`, `${origin}/sitemap.xml`);
+  assert.deepEqual(warnings, warningsExpected);
+}
+
+test("a valid NEXT_PUBLIC_SITE_URL wins over a different production host with no warning", () => {
+  assertSiteChoice({
+    NEXT_PUBLIC_SITE_URL: "https://public.example/base",
+    VERCEL_PROJECT_PRODUCTION_URL: "prod.example",
+  }, "https://public.example", []);
+});
+
+test("an invalid NEXT_PUBLIC_SITE_URL falls through to the production host with one warning", () => {
+  assertSiteChoice({
+    NEXT_PUBLIC_SITE_URL: "http://public.example",
+    VERCEL_PROJECT_PRODUCTION_URL: "prod.example",
+  }, "https://prod.example", [ignoredSiteUrlWarning]);
+});
+
+test("a bare NEXT_PUBLIC_SITE_URL host is rejected and the production host is used", () => {
+  assertSiteChoice({
+    NEXT_PUBLIC_SITE_URL: "x.example",
+    VERCEL_PROJECT_PRODUCTION_URL: "prod.example",
+  }, "https://prod.example", [ignoredSiteUrlWarning]);
+});
+
+test("invalid public and production site URLs fall back with one warning each", () => {
+  assertSiteChoice({
+    NEXT_PUBLIC_SITE_URL: "http://public.example",
+    VERCEL_PROJECT_PRODUCTION_URL: "https:///",
+  }, fallbackOrigin, [
+    ignoredSiteUrlWarning,
+    "Ignoring VERCEL_PROJECT_PRODUCTION_URL because it is not a valid https URL.",
+  ]);
+});
