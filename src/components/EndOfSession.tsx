@@ -1,13 +1,29 @@
 "use client";
 
-import { useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
+import { useEffect, useState } from "react";
+import { useFavoriteTeamObjects, useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { useGameData } from "@/hooks/useGameData";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import { useTeam } from "@/hooks/useTeam";
 import type { NewsFeeds } from "@/lib/api";
 import { selectHomepageNews } from "@/lib/news";
 
+function usePreferencesHydrated() {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    const stores = [useTeam, useFavoriteTeams];
+    const update = () => {
+      if (stores.every((store) => store.persist.hasHydrated())) setHydrated(true);
+    };
+    const unsubs = stores.map((store) => store.persist.onFinishHydration(update));
+    update();
+    return () => { unsubs.forEach((unsub) => unsub()); };
+  }, []);
+  return hydrated;
+}
+
 export default function EndOfSession() {
+  const hydrated = usePreferencesHydrated();
   const favoriteTeams = useFavoriteTeamObjects();
   const { selectedTeam } = useTeam();
   const games = useGameData();
@@ -17,7 +33,7 @@ export default function EndOfSession() {
   const news = useRemoteData<{ feeds: NewsFeeds }>(`/api/news?teams=${encodeURIComponent(order.join(","))}`);
   const feeds = selectHomepageNews(news.data?.feeds ?? {}, order, hasPersonalized && !followedFocus ? selectedTeam.name : undefined);
   const newsFailed = news.error || order.some((name) => Boolean(feeds[name]?.error));
-  if (games.loading || news.loading || games.error || newsFailed) return null;
+  if (!hydrated || games.loading || news.loading || games.error || newsFailed) return null;
 
   const hasGames = Boolean(games.lastGame || games.currentGame || games.nextGame);
   const hasNews = order.some((name) => (feeds[name]?.items.length ?? 0) > 0);
