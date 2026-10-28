@@ -185,29 +185,6 @@ function disallowValues(rules) {
   });
 }
 
-const siteEnvKeys = ["NEXT_PUBLIC_SITE_URL", "VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_ENV", "VERCEL_BRANCH_URL", "VERCEL_URL"];
-let envQueue = Promise.resolve();
-
-function testSiteEnv(name, env, fn) {
-  test(name, () => {
-    const run = envQueue.then(() => {
-      const saved = Object.fromEntries(siteEnvKeys.map((key) => [key, process.env[key]]));
-      try {
-        for (const key of siteEnvKeys) delete process.env[key];
-        Object.assign(process.env, env);
-        fn();
-      } finally {
-        for (const key of siteEnvKeys) {
-          if (saved[key] === undefined) delete process.env[key];
-          else process.env[key] = saved[key];
-        }
-      }
-    });
-    envQueue = run.then(() => {}, () => {});
-    return run;
-  });
-}
-
 for (const routePath of publicPaths) {
   test(`canonical and openGraph.url for ${routePath}`, async () => {
     const base = metadataBaseFrom(graph.layout);
@@ -305,11 +282,7 @@ function assertOrigin(env, origin) {
   assert.equal(robots.sitemap, `${origin}/sitemap.xml`);
 }
 
-testSiteEnv("preview canonical stays on metadataBase when branch and deployment URLs are set", {
-  VERCEL_ENV: "preview",
-  VERCEL_BRANCH_URL: "my-nba-feed-git-feat-pet-21-seo-og.vercel.app",
-  VERCEL_URL: "my-nba-feed-abc123.vercel.app",
-}, () => {
+test("preview canonical stays on metadataBase when branch and deployment URLs are set", () => {
   assertOrigin({
     VERCEL_ENV: "preview",
     VERCEL_BRANCH_URL: "my-nba-feed-git-feat-pet-21-seo-og.vercel.app",
@@ -317,9 +290,7 @@ testSiteEnv("preview canonical stays on metadataBase when branch and deployment 
   }, "https://my-nba-feed.vercel.app");
 });
 
-testSiteEnv("VERCEL_URL alone does not replace metadataBase", {
-  VERCEL_URL: "my-nba-feed-abc123.vercel.app",
-}, () => {
+test("VERCEL_URL alone does not replace metadataBase", () => {
   assertOrigin({ VERCEL_URL: "my-nba-feed-abc123.vercel.app" }, "https://my-nba-feed.vercel.app");
 });
 
@@ -377,13 +348,61 @@ const configuredOriginCases = [
 ];
 
 for (const [value, origin] of configuredOriginCases) {
-  testSiteEnv(`NEXT_PUBLIC_SITE_URL ${JSON.stringify(value)} is only ${origin}`, { NEXT_PUBLIC_SITE_URL: value }, () => {
+  test(`NEXT_PUBLIC_SITE_URL ${JSON.stringify(value)} is only ${origin}`, () => {
     assertConfiguredSite(value, origin);
   });
 }
 
-testSiteEnv("NEXT_PUBLIC_SITE_URL with credentials falls back to the production origin", {
-  NEXT_PUBLIC_SITE_URL: "https://user:pw@x.example/base/",
-}, () => {
-  assertConfiguredSite("https://user:pw@x.example/base/", fallbackOrigin, { rejected: true });
+for (const value of [
+  "http://x.example",
+  "http://x.example/base",
+  "https://user@x.example",
+  "https://:pw@x.example",
+  "https://user:pw@x.example/base/",
+]) {
+  test(`NEXT_PUBLIC_SITE_URL ${JSON.stringify(value)} falls back to the production origin`, () => {
+    assertConfiguredSite(value, fallbackOrigin, { rejected: true });
+  });
+}
+
+function assertProductionHost(value, origin) {
+  let loaded;
+  try {
+    loaded = loadGraph({ VERCEL_PROJECT_PRODUCTION_URL: value });
+  } catch (error) {
+    assert.fail(`VERCEL_PROJECT_PRODUCTION_URL ${JSON.stringify(value)} threw ${error.name}: ${error.message}`);
+  }
+  const base = metadataBaseFrom(loaded.layout);
+  assert.equal(base.protocol, "https:");
+  assert.equal(base.origin, origin);
+  assert.equal(base.pathname, "/", `production metadataBase kept a path: ${base.pathname}`);
+  assert.equal(base.search, "");
+  assert.equal(base.hash, "");
+  assert.equal(base.href, `${origin}/`);
+  assertNoDoubleSlash(base.href);
+  const urls = Array.from(loaded.sitemap.default(), (entry) => `${entry.url}`);
+  const paths = sitemapPaths(loaded.sitemap.default());
+  assert.equal(urls[0], origin);
+  assert.equal(urls[0].endsWith("/"), false);
+  assert.deepEqual(urls, paths.map((routePath) => routePath === "/" ? origin : `${origin}${routePath}`));
+  for (const url of urls) assertNoDoubleSlash(url);
+  const robots = loaded.robots.default();
+  assert.equal(`${robots.sitemap}`, `${origin}/sitemap.xml`);
+  assertNoDoubleSlash(robots.sitemap);
+}
+
+test("VERCEL_PROJECT_PRODUCTION_URL host becomes https://host", () => {
+  assertProductionHost("prod.example", "https://prod.example");
+});
+
+test("VERCEL_PROJECT_PRODUCTION_URL with a path keeps only the origin", () => {
+  assertProductionHost("prod.example/base", "https://prod.example");
+});
+
+test("VERCEL_PROJECT_PRODUCTION_URL http://host falls back without throwing", () => {
+  assertProductionHost("http://prod.example", fallbackOrigin);
+});
+
+test("VERCEL_PROJECT_PRODUCTION_URL https:/// falls back without throwing", () => {
+  assertProductionHost("https:///", fallbackOrigin);
 });
