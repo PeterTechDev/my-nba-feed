@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, ResolvingMetadata } from "next";
 
 /**
  * Origin for absolute metadata URLs (canonical, Open Graph url, sitemap, robots).
@@ -25,8 +25,16 @@ function configuredSiteUrl(): URL | undefined {
   } catch {
     // Invalid URL strings throw; fall through after the warning below.
   }
-  console.warn("Ignoring NEXT_PUBLIC_SITE_URL because it is not a valid https URL.");
+  warnInvalidSiteUrl();
   return undefined;
+}
+
+let didWarnInvalidSiteUrl = false;
+
+function warnInvalidSiteUrl() {
+  if (didWarnInvalidSiteUrl) return;
+  didWarnInvalidSiteUrl = true;
+  console.warn("Ignoring NEXT_PUBLIC_SITE_URL because it is not a valid https URL.");
 }
 
 function asHttpsUrl(value: string): URL {
@@ -42,25 +50,29 @@ export const siteDescription =
 type PublicPath = "/" | "/about" | "/digest" | "/highlights" | "/players" | "/schedule" | "/standings";
 
 /**
- * Per-route canonical and Open Graph. Setting openGraph replaces the parent
- * object, so type, siteName and locale are repeated here. og:image stays on
- * the file-based opengraph-image route; og:title follows the page title.
+ * Per-route canonical and Open Graph. Next replaces the whole openGraph
+ * object, so type, siteName and locale are set again and the file-based
+ * image already resolved on the parent is copied over. That keeps its cache
+ * hash, type and alt, and the same host as twitter-image. og:title follows
+ * the page title.
  */
-export function routeMetadata(path: PublicPath, page?: { title?: string; description?: string }): Metadata {
-  const description = page?.description ?? siteDescription;
-  return {
-    ...(page?.title ? { title: page.title } : {}),
-    description,
-    alternates: { canonical: path },
-    openGraph: {
-      type: "website",
-      siteName,
-      locale: "en_US",
-      url: path,
+export function routeMetadata(path: PublicPath, page?: { title?: string; description?: string }) {
+  return async function generateMetadata(_props: unknown, parent: ResolvingMetadata): Promise<Metadata> {
+    const resolved = await parent;
+    const description = page?.description ?? siteDescription;
+    const images = resolved.openGraph?.images;
+    return {
+      ...(page?.title ? { title: page.title } : {}),
       description,
-      // File-based images live on the root segment. A child openGraph object
-      // replaces that segment, so each route points at the same image.
-      images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "NBA Feed" }],
-    },
+      alternates: { canonical: path },
+      openGraph: {
+        type: "website",
+        siteName,
+        locale: "en_US",
+        url: path,
+        description,
+        ...(images?.length ? { images } : {}),
+      },
+    };
   };
 }

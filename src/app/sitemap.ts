@@ -18,6 +18,13 @@ const publicPaths = [
 export default function sitemap(): MetadataRoute.Sitemap {
   const origin = getSiteUrl();
   return publicPaths.map((path) => ({
-    url: new URL(path, origin).href,
+    url: sitemapUrl(path, origin),
   }));
+}
+
+/** Next's canonical for "/" is the origin without a trailing slash. */
+function sitemapUrl(path: string, origin: URL): string {
+  const url = new URL(path, origin);
+  if (url.pathname === "/" && url.search === "") return url.origin;
+  return url.href;
 }

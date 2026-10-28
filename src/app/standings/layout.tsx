@@ -1,6 +1,6 @@
 import { routeMetadata } from "@/lib/site";
 
-export const metadata = routeMetadata("/standings", { title: "Standings" });
+export const generateMetadata = routeMetadata("/standings", { title: "Standings" });
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
