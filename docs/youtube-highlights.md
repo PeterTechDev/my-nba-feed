@@ -2,7 +2,7 @@
 
 ## Como funciona
 
-- O workflow **Daily YouTube Highlights** roda às **08:15 America/Bahia / 11:15 UTC**.
+- O workflow **YouTube Highlights** roda **a cada hora, no minuto 15**.
   O GitHub pode atrasar o início de tarefas agendadas.
 - A rotina consulta a playlist de uploads do canal oficial **NBA**, usando a
   YouTube Data API v3. Aceita apenas títulos de **FULL GAME HIGHLIGHTS**, identifica
@@ -12,9 +12,10 @@
 - Um vídeo salvo atende aos dois times. Os jogos já encontrados não são
   pesquisados novamente. Visitar `/highlights`, trocar de time ou atualizar a
   página **não faz chamadas à YouTube Data API**.
-- O player oficial carrega dentro da página somente depois do clique em Play.
-  A proteção contra spoilers oculta a thumbnail e impede o carregamento do player
-  até a revelação. Ocultar a prévia também remove o player e interrompe o vídeo.
+- A thumbnail permanece visível com a proteção contra spoilers. O player oficial
+  carrega dentro da página somente depois do clique em Play; fechar o player
+  interrompe o vídeo. O card Last Game abre o recap salvo diretamente no YouTube,
+  com uma busca pelo jogo como alternativa enquanto o vídeo não está no catálogo.
 - A primeira sincronização percorre até 30 dias de uploads. As seguintes consultam
   apenas uploads recentes, com 48 horas de sobreposição para publicações atrasadas.
   Um limite de 100 páginas interrompe respostas excessivas sem perder os dados salvos.
@@ -62,15 +63,15 @@ dos documentos do Digest, em um arquivo separado.
 
 1. Faça o deploy desta implementação antes de executar o workflow: ele publica
    os resultados em `https://my-nba-feed.vercel.app/api/highlights`.
-2. Abra [Actions → Daily YouTube Highlights](https://github.com/PeterTechDev/my-nba-feed/actions/workflows/youtube-highlights.yml).
+2. Abra [Actions → YouTube Highlights](https://github.com/PeterTechDev/my-nba-feed/actions/workflows/youtube-highlights.yml).
 3. Clique em **Run workflow**, escolha `main` e execute.
 4. Confirme o resultado do passo **Sync and verify saved NBA highlights**. O resumo
    mostra `status`, `apiRequests` e `added`, sem imprimir credenciais.
-5. Abra [Highlights](https://my-nba-feed.vercel.app/highlights), revele uma prévia e
+5. Abra [Highlights](https://my-nba-feed.vercel.app/highlights), escolha um jogo e
    clique em Play. O vídeo deve tocar dentro do site. Há também um link direto
    **NBA · YouTube** caso o player seja bloqueado pelo navegador ou pelo canal.
 
-Depois disso, o agendamento diário mantém o catálogo. É possível executar o mesmo
+Depois disso, o agendamento de hora em hora mantém o catálogo. É possível executar o mesmo
 workflow manualmente para buscar um upload atrasado; respeite o intervalo de 30
 minutos. Execuções do workflow são serializadas e sua ativação é renovada para
 evitar a suspensão por inatividade do repositório.

@@ -785,7 +785,7 @@ test("homepage places the end marker after the last story, names the selected te
   const useFavoriteTeams = () => ({ favoriteTeamIds: [] });
   useFavoriteTeams.persist = createPersist(true);
   const remote = (url) => ({ loading: false, error: false, retry() {},
-    data: url.includes("/api/games") ? state : { feeds: Object.fromEntries(new URL(url, "http://localhost").searchParams.get("teams").split(",").map((name) => [name, { items: name === focus.name ? stories : [], error: false }])) } });
+    data: !url || url.includes("/api/highlights") ? null : url.includes("/api/games") ? state : { feeds: Object.fromEntries(new URL(url, "http://localhost").searchParams.get("teams").split(",").map((name) => [name, { items: name === focus.name ? stories : [], error: false }])) } });
   const mocked = {
     "next/link": { default: "a" },
     "@/lib/nbaDate": dates, "@/lib/api": api, "@/lib/teams": teams, "@/lib/news": news,

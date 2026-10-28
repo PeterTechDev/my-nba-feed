@@ -565,6 +565,7 @@ test("every client fetch of news, digest and games sends the spoiler header for 
   };
   api.setSpoilerPrefs({ hideScores: true, hideHeadlines: false });
   const card = load("components/GameSection.tsx", { fetch }, {
+    "@/hooks/useRemoteData": { useRemoteData: () => ({ data: null }) },
     react,
     "next/link": { default: "a" },
     "lucide-react": { Play: () => null, ArrowUpRight: () => null },
@@ -697,6 +698,7 @@ test("the home digest sends the spoiler header and loads again when the state ch
   const api = realm.load("lib/api.ts");
   const settings = { hideScores: true, hideHeadlines: true };
   const card = realm.load("components/GameSection.tsx", {
+    "@/hooks/useRemoteData": { useRemoteData: () => ({ data: null }) },
     react,
     "next/link": { default: "a" },
     "lucide-react": { Play: () => null, ArrowUpRight: () => null },

@@ -353,6 +353,7 @@ const spoilerMock = {
   useSpoilerContext: () => settingsRef.current,
 };
 const sectionImports = {
+  "@/hooks/useRemoteData": { useRemoteData: () => ({ data: null }) },
   "@/lib/nbaDate": dates,
   "@/hooks/useGameData": { useGameData: () => ({ nextGame: null, record: { wins: 29, losses: 15 }, loading: false, error: false }) },
   "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: focusRef.current }) },

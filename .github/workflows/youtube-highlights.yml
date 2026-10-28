@@ -1,9 +1,9 @@
-name: Daily YouTube Highlights
+name: YouTube Highlights
 
 on:
   schedule:
-    # 08:15 America/Bahia (UTC-3), after the previous night's games.
-    - cron: '15 11 * * *'
+    # Pick up new recaps throughout the day, including uploads after the morning run.
+    - cron: '15 * * * *'
   workflow_dispatch:
 
 permissions:

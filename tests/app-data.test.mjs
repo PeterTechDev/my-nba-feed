@@ -30,6 +30,7 @@ const imports = {
   "@/lib/nbaDate": dates, "@/lib/gameStatus": status, "@/lib/teams": teams, "@/lib/digest": digest, "@/lib/api": api,
   "@/lib/news": newsTools,
   "@/lib/youtubeHighlights": youtubeHighlights,
+  "@/hooks/useRemoteData": { useRemoteData: () => ({ data: null }) },
 };
 
 function fixedClock(at) {
@@ -376,7 +377,7 @@ test("homepage keeps news optional after games and shows the focus-team lead onl
     "@/hooks/useLastVisit": { useLastVisit: () => ({ ready: true, lastVisitAt }) },
     "@/hooks/useRemoteData": {
       useRemoteData: (url) => ({ loading: false, error: false, retry: () => {},
-        data: url.includes("/api/games") ? state : { feeds: Object.fromEntries(new URL(url, "http://localhost").searchParams.get("teams").split(",").map((name) => [name, { items: name === "Celtics" ? news : [story(name === "NBA" ? "League update" : "Lakers latest")], error: false }])) } }),
+        data: !url || url.includes("/api/highlights") ? null : url.includes("/api/games") ? state : { feeds: Object.fromEntries(new URL(url, "http://localhost").searchParams.get("teams").split(",").map((name) => [name, { items: name === "Celtics" ? news : [story(name === "NBA" ? "League update" : "Lakers latest")], error: false }])) } }),
       useRemoteDataAll: (urls) => urls.map((url) => ({ loading: false, error: false, data: String(url).includes("/api/games") ? state : null })),
     },
     "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }) },
@@ -421,13 +422,20 @@ test("homepage keeps news optional after games and shows the focus-team lead onl
 
 test("last-game scores and outcome stay protected while highlights remain available", () => {
   let hideScores = true;
+  let video = null;
+  let daysAgo = 1;
   const focus = teams.getCeltics();
   const mocked = { ...imports,
+    "@/lib/nbaDate": { ...dates, gameDaysAgo: () => daysAgo },
     "next/link": { default: "a" },
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: focus }) },
     "@/hooks/useGameData": { useGameData: () => ({ loading: false, error: null,
       lastGame: { id: 77, date: "2026-10-26", isHome: false, homeTeam: { id: 5, name: "Bulls", abbreviation: "CHI" }, awayTeam: focus, homeScore: 99, awayScore: 134 } }) },
     "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores, hideHeadlines: true }) },
+    "@/hooks/useRemoteData": { useRemoteData: (url) => {
+      assert.equal(url, daysAgo <= 30 ? "/api/highlights?teamId=2&dates=2026-10-26" : null);
+      return { data: video ? { videos: { "2026-10-26": video } } : null };
+    } },
   };
   mocked["./ScoreReveal"] = load("components/ScoreReveal.tsx", {}, mocked).exports;
   const LastGame = load("components/GameSection.tsx", {}, mocked).exports.LastGameCard;
@@ -435,6 +443,16 @@ test("last-game scores and outcome stay protected while highlights remain availa
   assert.match(render(), /Reveal Celtics result/);
   assert.doesNotMatch(render(), />134<|>99<|>Win|>Loss/);
   assert.match(render(), /href="https:\/\/www.youtube.com\/results\?search_query=Celtics%20vs%20Bulls/);
+  assert.match(render(), /Watch game recap/);
+  assert.match(render(), /lucide-youtube/);
+  video = { id: "DTNqMLNVBC8", url: "https://www.youtube.com/watch?v=DTNqMLNVBC8" };
+  assert.match(render(), /href="https:\/\/www.youtube.com\/watch\?v=DTNqMLNVBC8"/);
+  assert.doesNotMatch(render(), /youtube.com\/results/);
+  assert.doesNotMatch(render(), />134<|>99<|>Win|>Loss/);
+  video = null;
+  assert.match(render(), /youtube.com\/results/);
+  daysAgo = 31;
+  assert.match(render(), /youtube.com\/results/);
   hideScores = false;
   assert.match(render(), />134</);
   assert.match(render(), />99</);

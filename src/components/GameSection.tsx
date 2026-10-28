@@ -2,12 +2,13 @@
 import { useEffect, useState } from "react";
 import { formatGameDate, formatTipoff, gameDaysAgo, parseGameDate } from "@/lib/nbaDate";
 import { useGameData } from "@/hooks/useGameData";
+import { useRemoteData } from "@/hooks/useRemoteData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
-import { getHighlightUrl, getOpponent, getTeamScore, getOpponentScore, revealedDigest, spoilerHeaders, subscribeDigestReveals, type GameInfo } from "@/lib/api";
+import { getHighlightUrl, getOpponent, getTeamScore, getOpponentScore, revealedDigest, spoilerHeaders, subscribeDigestReveals, type GameInfo, type HighlightsResponse } from "@/lib/api";
 import ScoreReveal from "./ScoreReveal";
 import Link from "next/link";
-import { Play, ArrowUpRight } from "lucide-react";
+import { Youtube, ArrowUpRight } from "lucide-react";
 import { getTeamById, teamByAbbreviation, type Team } from "@/lib/teams";
 import { isDigestDate, parseCoveredGames, readDigestLeagueDate, type CoveredGame, type DigestEntry } from "@/lib/digest";
 import styles from "./Home.module.css";
@@ -48,6 +49,11 @@ export function LastGameCard() {
   const { selectedTeam } = useTeam();
   const { lastGame, loading, error } = useGameData();
   const { hideScores, hideHeadlines } = useSpoilerContext();
+  const gameDate = lastGame?.date.slice(0, 10) ?? "";
+  const daysAgo = gameDaysAgo(gameDate);
+  const { data: highlights } = useRemoteData<HighlightsResponse>(
+    !loading && !error && daysAgo >= 0 && daysAgo <= 30 ? `/api/highlights?teamId=${selectedTeam.id}&dates=${gameDate}` : null
+  );
 
   if (loading) return <SkeletonCard label="Last Game" />;
   if (error) return null;
@@ -93,14 +99,14 @@ export function LastGameCard() {
       </div>
       <div className={styles.gameFooter}>
       <a
-        href={getHighlightUrl(selectedTeam.name, opponent.name, date)}
+        href={highlights?.videos[gameDate]?.url ?? getHighlightUrl(selectedTeam.name, opponent.name, date)}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex min-h-11 w-full items-center justify-between gap-2 text-sm font-medium text-amber-200 hover:text-white"
       >
-        <span className="inline-flex items-center gap-2"><Play aria-hidden="true" className="h-4 w-4" />Find game highlights</span><ArrowUpRight aria-hidden="true" className="h-4 w-4" /><span className="sr-only">on YouTube (opens in a new tab)</span>
+        <span className="inline-flex items-center gap-2"><Youtube aria-hidden="true" className="h-4 w-4" />Watch game recap</span><ArrowUpRight aria-hidden="true" className="h-4 w-4" /><span className="sr-only">on YouTube (opens in a new tab)</span>
       </a>
-      {(hideScores || hideHeadlines) && <p className="text-xs text-white/70">YouTube results may contain spoilers.</p>}
+      {(hideScores || hideHeadlines) && <p className="text-xs text-white/70">YouTube may contain spoilers.</p>}
       </div>
     </Card>
   );
