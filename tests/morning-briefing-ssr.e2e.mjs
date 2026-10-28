@@ -130,9 +130,8 @@ async function waitForListen(port, child, logs) {
 
 async function startProductionServer() {
   const port = await freePort();
-  const child = spawn("npx", ["next", "start", "-H", "127.0.0.1", "-p", String(port)], {
+  const child = spawn(process.execPath, [join(root, "node_modules", "next", "dist", "bin", "next"), "start", "-H", "127.0.0.1", "-p", String(port)], {
     cwd: root,
-    detached: true,
     stdio: ["pipe", "pipe", "pipe"],
   });
   child.stdin.end();
@@ -146,8 +145,9 @@ async function startProductionServer() {
   const logs = () => output.trim() || "(next start produced no output)";
   const stop = async () => {
     if (child.exitCode !== null || child.signalCode !== null) return;
-    try { process.kill(-child.pid, "SIGTERM"); } catch { /* already gone */ }
-    await once(child, "exit");
+    const exited = once(child, "exit");
+    child.kill("SIGTERM");
+    await exited;
   };
   try {
     await waitForListen(port, child, logs);
