@@ -15,6 +15,7 @@ interface SpoilerContextValue {
   toggleSpoiler: () => void;
   setHideScores: (hideScores: boolean) => void;
   setHideHeadlines: (hideHeadlines: boolean) => void;
+  showScoresAndHeadlines: () => void;
 }
 
 const SpoilerContext = createContext<SpoilerContextValue>({
@@ -24,6 +25,7 @@ const SpoilerContext = createContext<SpoilerContextValue>({
   toggleSpoiler: () => {},
   setHideScores: () => {},
   setHideHeadlines: () => {},
+  showScoresAndHeadlines: () => {},
 });
 
 export function SpoilerModeProvider({ children }: { children: React.ReactNode }) {
