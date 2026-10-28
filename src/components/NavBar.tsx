@@ -55,7 +55,6 @@ function RevealSpoilersDialog({ onDismiss, onConfirm, returnFocusRef }: {
     <dialog
       ref={dialogRef}
       id="reveal-spoilers"
-      role="dialog"
       aria-labelledby="reveal-spoilers-title"
       aria-describedby="reveal-spoilers-description"
       onCancel={(event) => { event.preventDefault(); onDismiss(); }}
@@ -67,7 +66,7 @@ function RevealSpoilersDialog({ onDismiss, onConfirm, returnFocusRef }: {
         <h2 id="reveal-spoilers-title" className="text-xl font-bold">Show scores and headlines?</h2>
         <p id="reveal-spoilers-description" className="mt-2 text-sm text-white/70">Scores, records and headlines will show across NBA Feed. This choice is saved in this browser.</p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <button ref={cancelRef} type="submit" autoFocus className="min-h-11 w-full rounded-lg bg-white/10 px-4 text-sm font-medium text-white hover:bg-white/20 sm:w-auto">
+          <button ref={cancelRef} type="submit" className="min-h-11 w-full rounded-lg bg-white/10 px-4 text-sm font-medium text-white hover:bg-white/20 sm:w-auto">
             Keep hidden
           </button>
           <button type="button" onClick={onConfirm} className="min-h-11 w-full rounded-lg border border-white/15 px-4 text-sm font-medium text-amber-300 hover:bg-amber-500/10 sm:w-auto">
@@ -91,7 +90,7 @@ const links = [
 
 export default function NavBar() {
   const pathname = usePathname();
-  const { spoilerFree, hideScores, hideHeadlines, toggleSpoiler, setHideScores, setHideHeadlines } = useSpoilerContext();
+  const { spoilerFree, hideScores, hideHeadlines, toggleSpoiler, setHideScores, setHideHeadlines, showScoresAndHeadlines } = useSpoilerContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [myTeamsOpen, setMyTeamsOpen] = useState(false);
   const { favoriteTeamIds } = useFavoriteTeams();
@@ -106,6 +105,10 @@ export default function NavBar() {
     if (revealNotice && (hideScores || hideHeadlines)) setRevealNotice(false);
   }, [hideScores, hideHeadlines, revealNotice]);
 
+  useEffect(() => {
+    setConfirmReveal(false);
+  }, [pathname]);
+
   function onProtectionClick() {
     if (spoilerFree) {
       setConfirmReveal(true);
@@ -116,7 +119,7 @@ export default function NavBar() {
   }
 
   function confirmShowSpoilers() {
-    toggleSpoiler();
+    showScoresAndHeadlines();
     setRevealNotice(true);
     setConfirmReveal(false);
   }
