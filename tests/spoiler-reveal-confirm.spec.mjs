@@ -33,14 +33,14 @@ const PROTECTION = {
   },
   TF: {
     settings: { hideScores: true, hideHeadlines: false },
-    label: "Scores hidden by default. Show scores and headlines by default",
+    label: "Scores hidden by default. Show scores by default",
     pressed: "mixed",
     dialog: "Show scores?",
     confirm: "Show scores",
   },
   FT: {
     settings: { hideScores: false, hideHeadlines: true },
-    label: "Headlines hidden by default. Show scores and headlines by default",
+    label: "Headlines hidden by default. Show headlines by default",
     pressed: "mixed",
     dialog: "Show headlines?",
     confirm: "Show headlines",
