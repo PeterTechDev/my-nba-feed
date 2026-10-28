@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "digest:publish": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/publish-digest.mjs",
     "digest:generate": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/generate-digest.mjs",
     "highlights:sync": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/sync-youtube-highlights.mjs"
