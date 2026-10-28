@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
 import { isFinalStatus } from "@/lib/gameStatus";
+import { compareStandings } from "@/lib/standings";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
@@ -143,11 +144,7 @@ export async function GET() {
       }
     }
 
-    const standings = Object.values(records).sort((a, b) => {
-      const pctA = a.wins / (a.wins + a.losses || 1);
-      const pctB = b.wins / (b.wins + b.losses || 1);
-      return pctB - pctA;
-    });
+    const standings = Object.values(records).sort(compareStandings);
 
     return NextResponse.json({ standings, season, asOf: seasonEnd, error: null });
   } catch {

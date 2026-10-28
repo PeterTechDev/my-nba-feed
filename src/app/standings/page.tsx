@@ -3,6 +3,7 @@ import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
 import SpoilerGuard from "@/components/SpoilerGuard";
 import { formatGameDate } from "@/lib/nbaDate";
+import { compareStandings } from "@/lib/standings";
 import { useState } from "react";
 import { teams } from "@/lib/teams";
 
@@ -29,11 +30,7 @@ export default function StandingsPage() {
   const renderConference = (conf: string, label: string) => {
     const confTeams = standings
       .filter((s) => s.conference === conf)
-      .sort((a, b) => {
-        const pctA = a.wins / (a.wins + a.losses || 1);
-        const pctB = b.wins / (b.wins + b.losses || 1);
-        return pctB - pctA;
-      });
+      .sort(compareStandings);
 
     if (confTeams.length === 0) return null;
     const leader = confTeams[0];
