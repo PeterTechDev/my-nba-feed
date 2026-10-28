@@ -1,6 +1,40 @@
 import { formatGameDate, formatTipoff } from "@/lib/nbaDate";
 import { isDigestDate, type DigestEntry } from "@/lib/digest";
 
+function mentionsTeam(line: string, team: { city: string; name: string; abbreviation: string }): boolean {
+  const padded = ` ${line.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
+  return [team.city, team.name, team.abbreviation].some((token) => {
+    const words = token.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return words.length > 1 && padded.includes(` ${words} `);
+  });
+}
+
+// Drop the focus team from the league section only. The stored edition stays unchanged.
+export function omitTeamFromLeagueSection(content: string, team: { city: string; name: string; abbreviation: string }): string {
+  const lines = content.split("\n");
+  const kept: string[] = [];
+  const league: string[] = [];
+  let inLeague = false;
+  const flush = () => {
+    if (league.some((line) => line.trim() && !/^#{1,6}\s/.test(line))) kept.push(...league);
+    league.length = 0;
+  };
+  for (const line of lines) {
+    const heading = /^#{1,6}[ \t]+(.+?)[ \t]*$/.exec(line);
+    if (heading) {
+      if (inLeague) flush();
+      inLeague = /around the league/i.test(heading[1]);
+      if (inLeague) league.push(line);
+      else kept.push(line);
+      continue;
+    }
+    if (!inLeague) kept.push(line);
+    else if (!line.trim() || !mentionsTeam(line, team)) league.push(line);
+  }
+  if (inLeague) flush();
+  return kept.join("\n");
+}
+
 export function getDigestPresentation(digest: DigestEntry) {
   const sourceHeading = /^#{1,6} +Sources\s*$/im.exec(digest.content);
   const body = sourceHeading ? digest.content.slice(0, sourceHeading.index).trim() : digest.content;
