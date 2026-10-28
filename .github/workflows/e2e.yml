@@ -7,9 +7,9 @@ permissions:
   contents: read
 
 concurrency:
-  # deployment.ref can be a commit SHA, which would never cancel a superseded
-  # preview. environment is the stable group for this job (Preview).
-  group: e2e-${{ github.event.deployment.environment }}
+  # One preview's e2e does not cancel another's. If ref arrives as a SHA,
+  # each push stays in its own group.
+  group: e2e-${{ github.event.deployment.environment }}-${{ github.event.deployment.ref }}
   cancel-in-progress: true
 
 jobs:
