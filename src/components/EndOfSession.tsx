@@ -43,7 +43,8 @@ export default function EndOfSession() {
     const data = coveredGames[index].data;
     if (!data) return false;
     if (team.id === selectedTeam.id) return Boolean(data.lastGame || data.nextGame);
-    return Boolean(data.lastGame && gameDaysAgo(data.lastGame.date) === 1);
+    const daysAgo = data.lastGame ? gameDaysAgo(data.lastGame.date) : null;
+    return Boolean(data.nextGame || daysAgo === 0 || daysAgo === 1);
   });
   const hasTeamNews = coveredTeams.some((team) => (feeds[team.name]?.items.length ?? 0) > 0);
   const severalTeams = coveredTeams.length > 1;

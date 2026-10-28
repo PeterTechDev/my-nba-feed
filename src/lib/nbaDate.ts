@@ -42,9 +42,12 @@ export function parseGameDate(value: string): Date {
 }
 
 export function gameDaysAgo(value: string, now: Date = new Date()): number {
-  const date = parseGameDate(value);
-  return Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) -
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())) / 86400000);
+  const easternNow = new Intl.DateTimeFormat("en-CA", {
+    timeZone: NBA_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(now);
+  const [year, month, day] = easternNow.split("-").map(Number);
+  const [gameYear, gameMonth, gameDay] = value.slice(0, 10).split("-").map(Number);
+  return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(gameYear, gameMonth - 1, gameDay)) / 86400000);
 }
 
 export function formatGameDate(value: string, options: Intl.DateTimeFormatOptions): string {
