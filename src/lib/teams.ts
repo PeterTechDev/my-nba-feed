@@ -82,6 +82,47 @@ export function teamByAbbreviation(abbreviation: string): Team | undefined {
   return teams.find((team) => team.abbreviation === code);
 }
 
+const LEADING_ARTICLES = new Set(["the", "a", "an"]);
+const SCORE_IN_TEXT = /\b\d{2,3}\s*[-–—]\s*\d{2,3}\b/;
+
+function textTokens(value: string): string[] {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
+}
+
+function containsTokens(words: string[], phrase: string[]): boolean {
+  return words.some((_, index) => phrase.every((part, offset) => words[index + offset] === part));
+}
+
+// Nome, apelido e cidade. Cidade sozinha só entra se nenhum outro time a divide
+// (Los Angeles é Lakers e Clippers; "LA" só vale junto do nome).
+function teamPhrases(team: Team): string[][] {
+  const phrases = [`${team.city} ${team.name}`, team.name];
+  if (team.name === "76ers") phrases.push("Sixers");
+  if (team.name === "Trail Blazers") phrases.push("Blazers", "Rip City");
+  if (team.city === "Los Angeles") phrases.push(`LA ${team.name}`);
+  const sharedCity = teams.some((other) => other.id !== team.id && other.city === team.city);
+  if (!sharedCity) phrases.push(team.city);
+  return phrases.map((phrase) => textTokens(phrase)).filter((parts) => parts.length > 0)
+    .sort((a, b) => b.length - a.length);
+}
+
+function startsWithPhrase(words: string[], phrase: string[]): boolean {
+  let index = 0;
+  while (LEADING_ARTICLES.has(words[index] ?? "")) index += 1;
+  return phrase.every((part, offset) => words[index + offset] === part);
+}
+
+// A manchete é sobre o time quando começa por ele (nome, apelido ou cidade única)
+// ou quando um placar numérico está na mesma oração que esse nome.
+// Menção depois de ponto e vírgula, sem placar, não conta.
+export function headlineIsAboutTeam(title: string, team: Team): boolean {
+  const words = textTokens(title);
+  const phrases = teamPhrases(team);
+  if (phrases.some((phrase) => startsWithPhrase(words, phrase))) return true;
+  return title.split(/[;|]/).some((clause) => SCORE_IN_TEXT.test(clause)
+    && phrases.some((phrase) => containsTokens(textTokens(clause), phrase)));
+}
+
 // Version 0 persisted these eight IDs under the wrong team identities.
 export function migrateLegacyTeamId(id: number): number {
   return ({ 12: 13, 13: 12, 15: 16, 16: 15, 24: 25, 25: 24, 26: 27, 27: 26 } as Record<number, number>)[id] ?? id;

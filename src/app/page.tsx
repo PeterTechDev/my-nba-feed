@@ -11,7 +11,8 @@ import PersonalizedFeed, { LeagueNewsSection } from "@/components/PersonalizedFe
 import { useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
 import { useTeam } from "@/hooks/useTeam";
 import { useRemoteData } from "@/hooks/useRemoteData";
-import { isTeamNews, selectHomepageNews } from "@/lib/news";
+import { selectHomepageNews } from "@/lib/news";
+import { headlineIsAboutTeam } from "@/lib/teams";
 import type { NewsFeeds } from "@/lib/api";
 import styles from "@/components/Home.module.css";
 
@@ -52,7 +53,7 @@ function FeedContent() {
           {!hasPersonalized && <NewsFeed {...focus} news={focus.news.slice(1)} />}
           {hasPersonalized && <details className="border-t border-white/10 pt-2">
             <summary className="min-h-11 cursor-pointer py-3 font-medium text-white/70 hover:text-white">Around the League</summary>
-            <LeagueNewsSection {...newsState("NBA")} news={newsState("NBA").news.filter((item) => !(item.category === "recap" && isTeamNews(item.title, selectedTeam.name)))} />
+            <LeagueNewsSection {...newsState("NBA")} news={newsState("NBA").news.filter((item) => !headlineIsAboutTeam(item.title, selectedTeam))} />
           </details>}
         </div>
       </details>
