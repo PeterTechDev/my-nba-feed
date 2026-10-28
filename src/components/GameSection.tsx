@@ -339,7 +339,7 @@ export function HomeDigestCard({ favoriteTeams }: { favoriteTeams: Team[] }) {
     const game = games.find((item) => teamSide(item, team));
     const side = game ? teamSide(game, team) : null;
     if (!game || !side) {
-      openers.push({ text: `O ${teamLabel(team)} não jogou nesta rodada.`, spoiler: false });
+      openers.push({ text: `Esta edição não traz informações de jogo do ${teamLabel(team)}.`, spoiler: false });
       continue;
     }
     const key = gameKey(game);

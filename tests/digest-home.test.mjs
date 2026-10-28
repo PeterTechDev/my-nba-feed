@@ -450,9 +450,9 @@ test("malformed covered games do not invent a result or a record", () => {
     isToday: true,
   };
   const html = renderToStaticMarkup(createElement(readyCard, { favoriteTeams: [team("BOS"), team("BKN")] }));
-  assert.match(html, /O Boston Celtics não jogou nesta rodada/);
-  assert.match(html, /O Brooklyn Nets não jogou nesta rodada/);
-  assert.doesNotMatch(html, /29-15|29–15|Campanha|venceu/);
+  assert.match(html, /Esta edição não traz informações de jogo do Boston Celtics/);
+  assert.match(html, /Esta edição não traz informações de jogo do Brooklyn Nets/);
+  assert.doesNotMatch(html, /29-15|29–15|Campanha|venceu|não jogou/);
 });
 
 const digestPage = load("app/digest/page.tsx", {
