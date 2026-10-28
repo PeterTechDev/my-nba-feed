@@ -60,7 +60,7 @@ export function LastGameCard() {
   const oppScore = getOpponentScore(lastGame);
   const opponent = getOpponent(lastGame);
   const opponentTeam = getTeamById((lastGame.isHome ? lastGame.awayTeam : lastGame.homeTeam).id);
-  const won = teamScore > oppScore;
+  const won = (teamScore ?? 0) > (oppScore ?? 0);
   const date = formatGameDate(lastGame.date, { month: "short", day: "numeric", year: "numeric" });
 
   return (

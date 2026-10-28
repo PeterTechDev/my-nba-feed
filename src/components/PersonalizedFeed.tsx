@@ -1,16 +1,27 @@
 "use client";
+import { useEffect, useState } from "react";
 import { formatGameDate, gameDaysAgo } from "@/lib/nbaDate";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import { useFavoriteTeamObjects } from "@/hooks/useFavoriteTeams";
 import { getContrastColor, type Team } from "@/lib/teams";
-import { getOpponent, getOpponentScore, getTeamScore, type GamesResponse, type NewsFeeds } from "@/lib/api";
+import { getOpponent, getOpponentScore, getTeamScore, mergeGameReveal, noteGames, revealedGameOverlay, subscribeGameReveals, type GamesResponse, type NewsFeeds } from "@/lib/api";
 import DataError from "./DataError";
 import NewsList, { NewsLinkWarning, type NewsState } from "./NewsList";
 import ScoreReveal from "./ScoreReveal";
 
+function useGameOverlay(teamId: string) {
+  const [overlay, setOverlay] = useState<GamesResponse | undefined>(undefined);
+  useEffect(() => subscribeGameReveals(() => setOverlay(revealedGameOverlay(teamId))), [teamId]);
+  return overlay;
+}
+
 function TeamNewsSection({ team, ...newsState }: NewsState & { team: Team }) {
+  const teamId = String(team.id);
   const { data: gameData, error: gameError, retry: retryGame } = useRemoteData<GamesResponse>(`/api/games?teamId=${team.id}`, 30000);
-  const lastGame = gameData?.lastGame;
+  const overlay = useGameOverlay(teamId);
+  useEffect(() => { if (gameData) noteGames(teamId, gameData); }, [gameData, teamId]);
+  const games = gameData ? mergeGameReveal(gameData, overlay) : gameData;
+  const lastGame = games?.lastGame;
   const lastNight = lastGame && gameDaysAgo(lastGame.date) === 1 ? lastGame : null;
   return <section aria-label={`${team.city} ${team.name} news`} className="self-start rounded-xl overflow-hidden border border-white/10 bg-[#111111]">
     <div className="px-4 py-4 flex items-center gap-3" style={{ background: team.primaryColor, color: getContrastColor(team.primaryColor) }}>
@@ -25,7 +36,7 @@ function TeamNewsSection({ team, ...newsState }: NewsState & { team: Team }) {
         <p className="text-sm text-white/70">Last night · {formatGameDate(lastNight.date, { month: "short", day: "numeric" })}</p>
         <ScoreReveal scope={`${team.id}:${lastNight.id}`} label={`${team.name} result`}>
           <p className="text-lg font-bold tabular-nums">{team.abbreviation} {getTeamScore(lastNight)} – {getOpponentScore(lastNight)} {getOpponent(lastNight).abbreviation}</p>
-          <p className={`text-sm ${getTeamScore(lastNight) > getOpponentScore(lastNight) ? "text-emerald-400" : "text-red-400"}`}>{getTeamScore(lastNight) > getOpponentScore(lastNight) ? "Win" : "Loss"}</p>
+          <p className={`text-sm ${(getTeamScore(lastNight) ?? 0) > (getOpponentScore(lastNight) ?? 0) ? "text-emerald-400" : "text-red-400"}`}>{(getTeamScore(lastNight) ?? 0) > (getOpponentScore(lastNight) ?? 0) ? "Win" : "Loss"}</p>
         </ScoreReveal>
       </div>}
     </div>
