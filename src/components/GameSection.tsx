@@ -348,7 +348,7 @@ export function HomeDigestCard({ favoriteTeams }: { favoriteTeams: Team[] }) {
       {quiet.map((line) => <li key={line.text}>{line.text}</li>)}
     </ul>}
     {hasScores && <div className="mt-3">
-      <ScoreReveal scope={`digest:${edition.digest.date}:${selectedTeam.id}`} label="digest results" wording={DIGEST_WORDS}>
+      <ScoreReveal protectDigest scope={`digest:${edition.digest.date}:${selectedTeam.id}:${favoriteTeams.map((team) => team.id).join("-")}`} label="digest results" wording={DIGEST_WORDS}>
         {results.length > 0 && <ul className="space-y-1 text-sm leading-6">
           {results.map((line) => <li key={line.text}>{line.text}</li>)}
         </ul>}

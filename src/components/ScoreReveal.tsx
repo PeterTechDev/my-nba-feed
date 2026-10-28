@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useSpoilerContext } from "./SpoilerModeProvider";
+import { digestContentIsProtected, useSpoilerContext } from "./SpoilerModeProvider";
 
 function ProtectedScore({ label, children, inline, wording }: { label: string; children: React.ReactNode; inline: boolean; wording?: ScoreWording }) {
   const [revealed, setRevealed] = useState(false);
@@ -22,7 +22,8 @@ function ProtectedScore({ label, children, inline, wording }: { label: string; c
 
 export interface ScoreWording { reveal: string; hide: string; revealed: string }
 
-export default function ScoreReveal({ scope, label, children, inline = false, wording }: { scope: string; label: string; children: React.ReactNode; inline?: boolean; wording?: ScoreWording }) {
-  const { hideScores } = useSpoilerContext();
-  return hideScores ? <ProtectedScore key={scope} label={label} inline={inline} wording={wording}>{children}</ProtectedScore> : <>{children}</>;
+export default function ScoreReveal({ scope, label, children, inline = false, wording, protectDigest = false }: { scope: string; label: string; children: React.ReactNode; inline?: boolean; wording?: ScoreWording; protectDigest?: boolean }) {
+  const settings = useSpoilerContext();
+  const hidden = protectDigest ? digestContentIsProtected(settings) : settings.hideScores;
+  return hidden ? <ProtectedScore key={scope} label={label} inline={inline} wording={wording}>{children}</ProtectedScore> : <>{children}</>;
 }
