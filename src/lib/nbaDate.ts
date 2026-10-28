@@ -25,6 +25,7 @@ function getNBADateParts(date: Date = new Date()): NBADateParts {
 }
 
 export function formatNBADate(date: Date = new Date()): string {
+  if (!Number.isFinite(date?.getTime?.())) return "";
   const { year, month, day } = getNBADateParts(date);
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
@@ -42,15 +43,22 @@ export function parseGameDate(value: string): Date {
 }
 
 export function gameDaysAgo(value: string, now: Date = new Date()): number {
+  if (!Number.isFinite(now?.getTime?.())) return NaN;
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const instant = new Date(value);
+  if (!dateOnly && !Number.isFinite(instant.getTime())) return NaN;
   const easternNow = formatNBADate(now);
-  const gameDay = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : formatNBADate(new Date(value));
+  const gameDay = dateOnly ? value : formatNBADate(instant);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(easternNow) || !/^\d{4}-\d{2}-\d{2}$/.test(gameDay)) return NaN;
   const [year, month, day] = easternNow.split("-").map(Number);
   const [gameYear, gameMonth, gameDayNum] = gameDay.split("-").map(Number);
   return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(gameYear, gameMonth - 1, gameDayNum)) / 86400000);
 }
 
 export function formatGameDate(value: string, options: Intl.DateTimeFormatOptions): string {
-  return parseGameDate(value).toLocaleDateString("en-US", options);
+  const date = parseGameDate(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", options);
 }
 
 export function formatTipoff(startTime?: string | null, status = ""): string {
