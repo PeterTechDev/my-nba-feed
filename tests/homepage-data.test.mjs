@@ -49,7 +49,18 @@ test("tipoff uses an actual timestamp and never invents midnight", () => {
 });
 
 test("league date-only values keep their calendar day, and age follows Eastern Time", () => {
-  assert.equal(dates.formatGameDate("2026-10-26", { month: "short", day: "numeric" }), "Oct 26");
+  const previous = process.env.TZ;
+  try {
+    for (const zone of ["UTC", "America/Los_Angeles", "Asia/Tokyo", "Pacific/Kiritimati", "America/Bahia", "America/New_York"]) {
+      process.env.TZ = zone;
+      const formatted = dates.formatGameDate("2026-10-26", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+      assert.match(formatted, /Oct 26/, zone);
+      assert.match(formatted, /12:00/, `${zone} anchors a date-only value at local noon`);
+    }
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
   const tokyoAlreadyOnThe27th = new Date("2026-10-27T01:00:00Z");
   assert.equal(dates.gameDaysAgo("2026-10-26", tokyoAlreadyOnThe27th), 0, "01:00Z is 27 Oct in Tokyo and still 26 Oct in New York");
   assert.equal(dates.gameDaysAgo("2026-10-27", tokyoAlreadyOnThe27th), -1, "that league date is still tomorrow in Eastern Time");

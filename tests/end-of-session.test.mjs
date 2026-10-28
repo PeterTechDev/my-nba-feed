@@ -5,6 +5,7 @@ import { test } from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 import { createElement } from "react";
+import { flushSync } from "react-dom";
 
 const ELEMENT_NODE = 1;
 const TEXT_NODE = 3;
@@ -187,11 +188,13 @@ function finishedGame(team, date) {
     awayTeam: { id: 3, name: "Nets", abbreviation: "BKN" }, homeScore: 110, awayScore: 101,
   };
 }
-function easternDaysAgo(value, now) {
-  const eastern = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
-  const [year, month, day] = eastern.split("-").map(Number);
-  const [gameYear, gameMonth, gameDay] = value.split("-").map(Number);
-  return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(gameYear, gameMonth - 1, gameDay)) / 86400000);
+function datesAt(iso) {
+  const stamp = Date.parse(iso);
+  class Clock extends Date {
+    constructor(...args) { super(...(args.length ? args : [stamp])); }
+    static now() { return stamp; }
+  }
+  return load("lib/nbaDate.ts", { Date: Clock });
 }
 function loadRemoteHooks(fetchImpl) {
   return load("hooks/useRemoteData.ts", {
@@ -290,6 +293,25 @@ function markerText(container) {
   const marker = endMarker(container);
   assert.equal(marker.length, 1);
   return marker[0].textContent.trim();
+}
+function renderHero(gameState, nbaDates) {
+  const mocked = {
+    "next/link": { default: "a" },
+    "@/lib/nbaDate": nbaDates, "@/lib/api": api, "@/lib/teams": teams,
+    "@/hooks/useGameData": { useGameData: () => ({ loading: false, error: null, record: { wins: 1, losses: 0 }, ...gameState }) },
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: celtics }) },
+    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }) },
+  };
+  mocked["./DataError"] = load("components/DataError.tsx");
+  mocked["./ScoreReveal"] = load("components/ScoreReveal.tsx", {}, mocked);
+  return render(createElement(load("components/GameDayHero.tsx", {}, mocked).default));
+}
+function scheduledGame(team, date, startTime) {
+  return {
+    id: 80, date, startTime, status: "Scheduled", isHome: true,
+    homeTeam: { id: team.id, name: team.name, abbreviation: team.abbreviation },
+    awayTeam: { id: 3, name: "Nets", abbreviation: "BKN" }, homeScore: 0, awayScore: 0,
+  };
 }
 
 const celticsNext = { id: 2, date: "2026-10-27", status: "Scheduled", isHome: true, homeTeam: celtics, awayTeam: { id: 3, name: "Nets", abbreviation: "BKN" }, homeScore: 0, awayScore: 0 };
@@ -417,7 +439,7 @@ test("a live focus team is up to date without being told to head out", () => {
 
 test("a favorite's final from yesterday in Eastern Time means the teams are up to date", () => {
   const yesterday = "2026-10-26";
-  assert.equal(easternDaysAgo(yesterday, new Date(NOW)), 1);
+  assert.equal(dates.gameDaysAgo(yesterday, new Date(NOW)), 1);
   const view = renderEnd({
     favorites: [lakers.id],
     games: {
@@ -436,7 +458,7 @@ test("a favorite's final from yesterday in Eastern Time means the teams are up t
 
 test("a favorite's final from today counts as a game", () => {
   const today = "2026-10-27";
-  assert.equal(easternDaysAgo(today, new Date(NOW)), 0);
+  assert.equal(dates.gameDaysAgo(today, new Date(NOW)), 0);
   const view = renderEnd({
     favorites: [lakers.id],
     games: {
@@ -453,12 +475,43 @@ test("a favorite's final from today counts as a game", () => {
   }
 });
 
-test("a favorite with only a next game counts the same way the focus does", () => {
+test("a favorite with only a next game tomorrow has nothing new", () => {
   const view = renderEnd({
     favorites: [lakers.id],
     games: {
       [celtics.id]: { data: gamesResponse() },
       [lakers.id]: { data: gamesResponse({ nextGame: lakersNext }) },
+    },
+    feeds: { Celtics: { items: [], error: false }, Lakers: { items: [], error: false }, NBA: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), NOTHING_NEW_TEAMS);
+    assert.doesNotMatch(view.container.textContent, /up to date/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("the focus with only a next game tomorrow has nothing new", () => {
+  const view = renderEnd({
+    games: { [celtics.id]: { data: gamesResponse({ nextGame: scheduledGame(celtics, "2026-10-28", "2026-10-28T23:00:00Z") }) } },
+    feeds: { Celtics: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), NOTHING_NEW);
+    assert.doesNotMatch(view.container.textContent, /up to date/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("a game scheduled later today counts for the focus and for a favorite", () => {
+  const laterToday = "2026-10-27T23:30:00Z";
+  const view = renderEnd({
+    favorites: [lakers.id],
+    games: {
+      [celtics.id]: { data: gamesResponse({ nextGame: scheduledGame(celtics, "2026-10-27", laterToday) }) },
+      [lakers.id]: { data: gamesResponse({ nextGame: scheduledGame(lakers, "2026-10-27", laterToday) }) },
     },
     feeds: { Celtics: { items: [], error: false }, Lakers: { items: [], error: false }, NBA: { items: [], error: false } },
   });
@@ -470,14 +523,14 @@ test("a favorite with only a next game counts the same way the focus does", () =
   }
 });
 
-test("the focus counts a finished game when it has no next game", () => {
+test("a two-day-old final does not count for the focus either", () => {
   const view = renderEnd({
     games: { [celtics.id]: { data: gamesResponse({ lastGame: finishedGame(celtics, "2026-10-25") }) } },
     feeds: { Celtics: { items: [], error: false } },
   });
   try {
-    assert.equal(markerText(view.container), UP_TO_DATE);
-    assert.match(markerText(view.container), /head out/);
+    assert.equal(markerText(view.container), NOTHING_NEW);
+    assert.doesNotMatch(view.container.textContent, /up to date/);
   } finally {
     view.unmount();
   }
@@ -498,7 +551,7 @@ test("the focus with no games and no team news has nothing new", () => {
 
 test("a favorite final after the Eastern today does not count", () => {
   const afterToday = "2026-10-28";
-  assert.equal(easternDaysAgo(afterToday, new Date(NOW)), -1);
+  assert.equal(dates.gameDaysAgo(afterToday, new Date(NOW)), -1);
   const view = renderEnd({
     favorites: [lakers.id],
     games: {
@@ -517,7 +570,7 @@ test("a favorite final after the Eastern today does not count", () => {
 
 test("a favorite's final from two days ago does not count", () => {
   const older = "2026-10-25";
-  assert.equal(easternDaysAgo(older, new Date(NOW)), 2);
+  assert.equal(dates.gameDaysAgo(older, new Date(NOW)), 2);
   const view = renderEnd({
     favorites: [lakers.id],
     games: {
@@ -535,9 +588,50 @@ test("a favorite's final from two days ago does not count", () => {
 });
 
 test("gameDaysAgo follows the Eastern Time calendar rather than the machine zone", () => {
-  for (const iso of ["2026-10-27T02:00:00Z", "2026-10-27T05:00:00Z", "2026-10-27T12:00:00Z"]) {
-    const now = new Date(iso);
-    assert.equal(dates.gameDaysAgo("2026-10-26", now), easternDaysAgo("2026-10-26", now), iso);
+  const rows = [
+    ["2026-10-27T16:00:00Z", "2026-10-26", 1],
+    ["2026-10-27T16:00:00Z", "2026-10-27", 0],
+    ["2026-10-27T16:00:00Z", "2026-10-25", 2],
+    ["2026-10-27T16:00:00Z", "2026-10-28", -1],
+    ["2026-10-27T16:00:00Z", "2026-10-28T02:00:00Z", 0],
+    ["2026-10-27T03:30:00Z", "2026-10-26", 0],
+    ["2026-10-27T03:30:00Z", "2026-10-27T02:00:00Z", 0],
+    ["2026-10-27T04:30:00Z", "2026-10-26", 1],
+    ["2026-10-27T05:00:00Z", "2026-10-26", 1],
+    ["2026-11-02T17:00:00Z", "2026-11-03T00:00:00Z", 0],
+    ["2026-11-01T05:30:00Z", "2026-11-01T03:30:00Z", 1],
+    ["2026-11-01T07:00:00Z", "2026-10-31", 1],
+    ["2027-03-14T06:30:00Z", "2027-03-14", 0],
+    ["2027-03-15T03:30:00Z", "2027-03-15T02:00:00Z", 0],
+  ];
+  const wrong = rows.flatMap(([now, value, expected]) => {
+    const actual = dates.gameDaysAgo(value, new Date(now));
+    return actual === expected ? [] : [`${now} ${value}: expected ${expected}, got ${actual}`];
+  });
+  assert.deepEqual(wrong, []);
+});
+
+test("a 22:00 EDT tipoff still belongs to that Eastern day on the hero", () => {
+  const clock = "2026-10-27T16:00:00Z";
+  const start = "2026-10-28T02:00:00Z";
+  const nbaDates = datesAt(clock);
+  const view = renderHero({ currentGame: null, nextGame: scheduledGame(celtics, "2026-10-28", start) }, nbaDates);
+  try {
+    assert.match(view.container.textContent, /vs Nets/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("a 19:00 EST tipoff still belongs to that Eastern day on the hero", () => {
+  const clock = "2026-11-02T17:00:00Z";
+  const start = "2026-11-03T00:00:00Z";
+  const nbaDates = datesAt(clock);
+  const view = renderHero({ currentGame: null, nextGame: scheduledGame(celtics, "2026-11-03", start) }, nbaDates);
+  try {
+    assert.match(view.container.textContent, /vs Nets/);
+  } finally {
+    view.unmount();
   }
 });
 
@@ -640,8 +734,8 @@ test("useRemoteDataAll and useRemoteData share one fetch for the same url", asyn
 });
 
 test("a response for the previous url list is ignored after the urls change", async () => {
-  const pending = new Map();
-  const hooks = loadRemoteHooks((url) => new Promise((resolve) => { pending.set(String(url), resolve); }));
+  const pending = [];
+  const hooks = loadRemoteHooks((url) => new Promise((resolve) => { pending.push({ url: String(url), resolve }); }));
   function View({ urls }) {
     const rows = hooks.useRemoteDataAll(urls);
     const text = rows.map((row) => row.loading ? "loading" : row.error ? "error" : row.data?.id).join("|");
@@ -651,16 +745,32 @@ test("a response for the previous url list is ignored after the urls change", as
   const root = createRoot(container);
   const lakers = "/api/games?teamId=14";
   const celticsUrl = "/api/games?teamId=2";
+  const bulls = "/api/games?teamId=5";
+  const hawks = "/api/games?teamId=1";
+  const fulfill = (url, id) => pending.find((entry) => entry.url === url).resolve({ ok: true, json: async () => ({ id }) });
   try {
     await act(async () => { root.render(createElement(View, { urls: [lakers] })); });
-    await act(async () => { root.render(createElement(View, { urls: [celticsUrl] })); });
-    pending.get(celticsUrl)({ ok: true, json: async () => ({ id: "Celtics" }) });
+    fulfill(lakers, "Lakers");
+    await settle();
+    assert.equal(container.textContent, "Lakers");
+    let whileSwitching = "";
+    act(() => {
+      flushSync(() => { root.render(createElement(View, { urls: [celticsUrl] })); });
+      whileSwitching = container.textContent;
+    });
+    assert.equal(whileSwitching, "loading");
+    fulfill(celticsUrl, "Celtics");
     await settle();
     assert.equal(container.textContent, "Celtics");
-    pending.get(lakers)({ ok: true, json: async () => ({ id: "Lakers" }) });
+    await act(async () => { root.render(createElement(View, { urls: [bulls] })); });
+    await act(async () => { root.render(createElement(View, { urls: [hawks] })); });
+    fulfill(hawks, "Hawks");
     await settle();
-    assert.equal(container.textContent, "Celtics");
-    assert.doesNotMatch(container.textContent, /Lakers/);
+    assert.equal(container.textContent, "Hawks");
+    fulfill(bulls, "Stale");
+    await settle();
+    assert.equal(container.textContent, "Hawks");
+    assert.doesNotMatch(container.textContent, /Stale|Bulls/);
   } finally {
     act(() => { root.unmount(); });
   }
