@@ -496,6 +496,25 @@ test("the focus with no games and no team news has nothing new", () => {
   }
 });
 
+test("a favorite final after the Eastern today does not count", () => {
+  const afterToday = "2026-10-28";
+  assert.equal(easternDaysAgo(afterToday, new Date(NOW)), -1);
+  const view = renderEnd({
+    favorites: [lakers.id],
+    games: {
+      [celtics.id]: { data: gamesResponse() },
+      [lakers.id]: { data: gamesResponse({ lastGame: finishedGame(lakers, afterToday) }) },
+    },
+    feeds: { Celtics: { items: [], error: false }, Lakers: { items: [], error: false }, NBA: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), NOTHING_NEW_TEAMS);
+    assert.doesNotMatch(view.container.textContent, /up to date/);
+  } finally {
+    view.unmount();
+  }
+});
+
 test("a favorite's final from two days ago does not count", () => {
   const older = "2026-10-25";
   assert.equal(easternDaysAgo(older, new Date(NOW)), 2);
