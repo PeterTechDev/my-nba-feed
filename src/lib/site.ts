@@ -41,11 +41,11 @@ function warnInvalidSiteUrl(name: string) {
 
 export const siteName = "NBA Feed";
 
-/** Teams, news, games and the daily digest. Scores stay hidden until reveal. */
+/** Team news and games. Scores stay hidden until reveal. */
 export const siteDescription =
-  "Your teams' news, games and daily digest, with scores hidden until you reveal them.";
+  "Your teams' news and games, with scores hidden until you reveal them.";
 
-type PublicPath = "/" | "/about" | "/digest" | "/highlights" | "/top-plays" | "/players" | "/schedule" | "/standings";
+type PublicPath = "/" | "/about" | "/highlights" | "/top-plays" | "/players" | "/schedule";
 
 /**
  * Per-route canonical and Open Graph. Next replaces the whole openGraph

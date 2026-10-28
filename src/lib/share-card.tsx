@@ -5,7 +5,7 @@ import { brandMark } from "@/lib/brand-icon";
 export const shareImageSize = { width: 1200, height: 630 };
 
 export const shareImageAlt =
-  "NBA Feed. The result can wait. News, games, highlights and standings, with scores hidden until you reveal them.";
+  "NBA Feed. The result can wait. News, games, highlights, with scores hidden until you reveal them.";
 
 export function shareCard() {
   const host = getSiteUrl().host;
@@ -53,7 +53,7 @@ export function shareCard() {
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ fontSize: 24, color: "rgba(255,255,255,0.72)" }}>
-              News, games, highlights, standings. Scores stay hidden until you reveal them.
+              News, games, highlights. Scores stay hidden until you reveal them.
             </div>
             <div style={{ marginTop: 12, fontSize: 22, color: "rgba(255,255,255,0.45)" }}>{host}</div>
           </div>

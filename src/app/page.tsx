@@ -2,7 +2,7 @@
 import { ChevronDown } from "lucide-react";
 import TeamHeader from "@/components/TeamHeader";
 import GameDayHero from "@/components/GameDayHero";
-import { HomeDigestCard, LastGameCard, NextGameCard } from "@/components/GameSection";
+import { LastGameCard, NextGameCard } from "@/components/GameSection";
 import NewsFeed from "@/components/NewsFeed";
 import GameDataProvider from "@/components/GameDataProvider";
 import TopPlaysCard from "@/components/TopPlaysCard";
@@ -31,9 +31,7 @@ function FeedContent() {
   return (
     <>
       <TeamHeader />
-      <div className={styles.content}>
-      <HomeDigestCard favoriteTeams={favoriteTeams} />
-      <section id="home-games" aria-label={`${selectedTeam.name} games`} className={styles.games} tabIndex={-1}>
+      <div className={styles.content}>      <section id="home-games" aria-label={`${selectedTeam.name} games`} className={styles.games} tabIndex={-1}>
         <h2 className={styles.sectionHeading}>Games</h2>
         <div className={styles.gameGrid}>
           <LastGameCard />

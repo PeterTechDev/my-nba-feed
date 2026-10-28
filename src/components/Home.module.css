@@ -218,13 +218,6 @@
   padding-top: 28px;
 }
 
-.digest {
-  margin-top: 28px;
-  padding: 24px;
-  border: 1px solid #383027;
-  border-radius: 12px;
-  background: #1b1814;
-}
 
 .sectionHeading {
   margin-bottom: 16px;
@@ -421,9 +414,6 @@
     margin-top: 24px;
   }
 
-  .digest {
-    padding: 20px;
-  }
 
   .gameGrid {
     grid-template-columns: minmax(0, 1fr);

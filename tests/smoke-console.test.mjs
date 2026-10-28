@@ -9,7 +9,7 @@ const message = (path) => ({
 });
 
 test("503 tolerance is an exact path list and stays off unless the env is 1", () => {
-  for (const path of ["/api/games", "/api/standings", "/api/digest"]) {
+  for (const path of ["/api/games"]) {
     assert.equal(isTolerated503(message(path), "1"), true, path);
     assert.equal(isTolerated503(message(path), ""), false, path);
   }

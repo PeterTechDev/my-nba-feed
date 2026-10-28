@@ -1,4 +1,4 @@
-import { leagueServices, publishStandings } from "./helpers/league-services.mjs";
+import { leagueServices } from "./helpers/league-services.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -23,13 +23,12 @@ function load(file, globals = {}, imports = {}) {
 const dates = load("lib/nbaDate.ts").exports;
 const status = load("lib/gameStatus.ts").exports;
 const teams = load("lib/teams.ts").exports;
-const digest = load("lib/digest.ts").exports;
 const api = load("lib/api.ts").exports;
 const youtubeHighlights = load("lib/youtubeHighlights.ts").exports;
 const newsTools = load("lib/news.ts", { Date: class extends Date { static now() { return Date.parse("2026-10-27T14:00:00Z"); } } }, { "./api": api, "./teams": teams }).exports;
 const imports = {
   "next/server": { NextResponse: { json: (body, options) => ({ status: options?.status ?? 200, body }) } },
-  "@/lib/nbaDate": dates, "@/lib/gameStatus": status, "@/lib/teams": teams, "@/lib/digest": digest, "@/lib/api": api,
+  "@/lib/nbaDate": dates, "@/lib/gameStatus": status, "@/lib/teams": teams, "@/lib/api": api,
   "@/lib/news": newsTools,
   "@/lib/youtubeHighlights": youtubeHighlights,
   "@/hooks/useRemoteData": { useRemoteData: () => ({ data: null }) },
@@ -64,7 +63,6 @@ function loadDatedLeagueRoutes(at, fetch) {
   return {
     nbaDates,
     schedule: load("app/api/schedule/route.ts", globals, routeImports).exports,
-    standings: load("app/api/standings/route.ts", globals, routeImports).exports,
   };
 }
 
@@ -74,7 +72,7 @@ function loadHighlightsRoute(at, storage) {
     fetch: () => { throw new Error("A page read must never call YouTube"); } }, { ...imports,
     "@/lib/nbaDate": load("lib/nbaDate.ts", { Date: FixedDate }).exports,
     "@/lib/youtubeHighlights": load("lib/youtubeHighlights.ts", { Date: FixedDate }).exports,
-    "@/lib/digestStorage": storage,
+    "@/lib/blobStorage": storage,
   }).exports;
   return { now, route };
 }
@@ -83,8 +81,8 @@ test("highlights read saved YouTube videos without calling YouTube, and authenti
   const at = "2026-10-27T14:00:00Z";
   let state, unavailable = false, reads = 0;
   const { now, route } = loadHighlightsRoute(at, {
-    readDigestDocument: async () => { reads++; if (unavailable) throw new Error("offline"); return state; },
-    updateDigestDocument: async (_name, _empty, update) => { state = update(state); return state; },
+    readBlobDocument: async () => { reads++; if (unavailable) throw new Error("offline"); return state; },
+    updateBlobDocument: async (_name, _empty, update) => { state = update(state); return state; },
   });
   const clip = { id: "DTNqMLNVBC8", date: "2026-10-26", awayTeamId: 5, homeTeamId: 2,
     title: "BULLS at CELTICS | FULL GAME HIGHLIGHTS | October 26, 2026", thumbnail: "https://i.ytimg.com/vi/DTNqMLNVBC8/hqdefault.jpg", duration: 600, retrievedAt: now.toISOString() };
@@ -130,7 +128,7 @@ test("highlights read saved YouTube videos without calling YouTube, and authenti
 });
 
 test("highlight dates follow America/New_York across midnight, including the DST offset", async () => {
-  const storage = { readDigestDocument: async () => ({ syncedAt: null, videos: [] }), updateDigestDocument: async () => { throw new Error("not used"); } };
+  const storage = { readBlobDocument: async () => ({ syncedAt: null, videos: [] }), updateBlobDocument: async () => { throw new Error("not used"); } };
   const edges = [
     ["2026-10-28T03:59:59.999Z", "2026-10-27", "2026-09-27"],
     ["2026-10-28T04:00:00.000Z", "2026-10-28", "2026-09-28"],
@@ -560,30 +558,6 @@ test("briefing preserves protected headlines and offers loading, empty and retry
   assert.match(render(), /Try again/);
 });
 
-test("Markdown always terminates, preserves inline emphasis and escapes HTML", () => {
-  const module = load("components/MarkdownContent.tsx");
-  for (const content of ["**Celtics recap**", "*italic opening*", "#### Fourth-level heading", "-10 point differential", ">quote without space", "#", "*", "-", "Plain paragraph"]) {
-    module.scope.content = content;
-    const element = vm.runInNewContext("exports.default({ content })", module.scope, { timeout: 500 });
-    assert.ok(renderToStaticMarkup(element).length > 0, content);
-  }
-  const html = renderToStaticMarkup(module.exports.default({ content: "**Bold**\n\n<script>alert(1)</script>" }));
-  assert.match(html, /<strong[^>]*>Bold<\/strong>/);
-  assert.ok(!html.includes("<script>"));
-  const headings = renderToStaticMarkup(module.exports.default({ content: "# Recap\n\n#### Detail" }));
-  assert.match(headings, /<h3[^>]*>Recap<\/h3>/);
-  assert.match(headings, /<h4[^>]*>Detail<\/h4>/);
-});
-
-test("digest payload validation rejects malformed dates and nested content", () => {
-  const body = { date: "2026-10-27", style: "analytical", title: "Daily recap", content: "A summary." };
-  assert.equal(digest.parseDigest(body).title, body.title);
-  for (const patch of [{ date: "2026-02-30" }, { title: {} }, { content: {} }, { games_covered: [1] }, { metadata: { model: "x", generation_time_ms: -1 } }]) {
-    assert.throws(() => digest.parseDigest({ ...body, ...patch }));
-  }
-  assert.throws(() => digest.parseDigest(null));
-});
-
 test("all team identities and legacy preferences remain one-to-one", () => {
   assert.equal(new Set(teams.teams.map((team) => team.id)).size, 30);
   for (const [name, expected] of [["Pacers", 12], ["Heat", 16], ["Trail Blazers", 25], ["Clippers", 13], ["Suns", 24], ["Kings", 26], ["Grizzlies", 15], ["Spurs", 27]]) {
@@ -637,43 +611,13 @@ test("Blob updates use origin ETags and retry conflicts without losing concurren
       blobs.set(name, { data: JSON.parse(body), etag: String(++version) });
     },
   };
-  const store = load("lib/digestStorage.ts", { process: { env: { BLOB_STORE_ID: "fixture" } } }, { "@vercel/blob": sdk }).exports;
-  await Promise.all([1, 2, 3].map(() => store.updateDigestDocument("votes.json", 0, (count) => count + 1)));
-  assert.equal(await store.readDigestDocument("votes.json", 0), 3);
+  const store = load("lib/blobStorage.ts", { process: { env: { BLOB_STORE_ID: "fixture" } } }, { "@vercel/blob": sdk }).exports;
+  await Promise.all([1, 2, 3].map(() => store.updateBlobDocument("votes.json", 0, (count) => count + 1)));
+  assert.equal(await store.readBlobDocument("votes.json", 0), 3);
   sdk.put = async () => { throw new Error("Storage offline"); };
-  await assert.rejects(store.updateDigestDocument("votes.json", 0, (count) => count + 1), /offline/);
-  const missing = load("lib/digestStorage.ts", { process: { env: {} } }, { "@vercel/blob": sdk }).exports;
-  await assert.rejects(missing.readDigestDocument("votes.json", []), /not configured/);
-});
-
-test("digest routes preserve reads, require publisher authentication and persist reactions", async () => {
-  const data = new Map();
-  const storage = {
-    readDigestDocument: async (key, empty) => data.get(key) ?? empty,
-    updateDigestDocument: async (key, empty, update) => { const value = update(data.get(key) ?? empty); data.set(key, value); return value; },
-  };
-  const route = load("app/api/digest/route.ts", { process: { env: { DIGEST_PUBLISH_TOKEN: "fixture-token" } } }, { ...imports, "@/lib/digestStorage": storage }).exports;
-  const request = (body, auth, spoilers) => ({
-    json: async () => body,
-    headers: new Headers({ ...(auth ? { authorization: auth } : {}), ...(spoilers ? { "x-nba-spoilers": spoilers } : {}) }),
-    nextUrl: new URL("http://localhost/api/digest"),
-  });
-  const entry = { date: "2026-10-27", style: "casual", title: "Recap", content: "A summary." };
-  assert.equal((await route.POST(request(entry))).status, 401);
-  assert.equal((await route.POST(request(entry, "Bearer fixture-token"))).status, 201);
-  const closed = await route.GET(request());
-  assert.equal(closed.body.digest.title, "NBA daily breakdown");
-  assert.equal(closed.body.digest.redacted, true);
-  assert.equal((await route.GET(request(undefined, undefined, "none"))).body.digest.title, "Recap");
-  await route.POST(request({ ...entry, title: "Updated recap" }, "Bearer fixture-token"));
-  assert.equal(data.get("digests.json").length, 1);
-  const feedback = load("app/api/digest/feedback/route.ts", {}, { ...imports, "@/lib/digestStorage": storage }).exports;
-  assert.equal((await feedback.POST(request({ date: entry.date, reaction: "fire" }))).status, 201);
-  assert.equal((await feedback.GET()).body.feedback[0].fire, 1);
-  assert.equal((await feedback.POST(request({ date: "2026-10-26", reaction: "fire" }))).status, 404);
-  assert.equal((await feedback.POST(request({ date: entry.date, reaction: "invalid" }))).status, 400);
-  storage.readDigestDocument = async () => { throw new Error("offline"); };
-  assert.equal((await route.GET(request())).status, 503);
+  await assert.rejects(store.updateBlobDocument("votes.json", 0, (count) => count + 1), /offline/);
+  const missing = load("lib/blobStorage.ts", { process: { env: {} } }, { "@vercel/blob": sdk }).exports;
+  await assert.rejects(missing.readBlobDocument("votes.json", []), /not configured/);
 });
 
 test("active roster uses the active endpoint, and ESPN fallback never returns historical search results", async () => {
@@ -696,91 +640,23 @@ test("active roster uses the active endpoint, and ESPN fallback never returns hi
   assert.ok(urls.at(-1).includes("/teams/mia/roster"));
 });
 
-test("schedule preserves tipoff/postponement and overtime finals count in standings", async () => {
+test("schedule preserves tipoff and postponement", async () => {
   const home_team = { id: 2, name: "Celtics", abbreviation: "BOS" }, visitor_team = { id: 3, name: "Nets", abbreviation: "BKN" };
   let games = [{ id: 1, date: "2026-10-27", datetime: "2026-10-27T23:30:00Z", status: "Scheduled", postponed: true, home_team, visitor_team, home_team_score: 0, visitor_team_score: 0 }];
   const fetch = async () => ({ ok: true, json: async () => ({ data: games }) });
-  const { schedule, standings } = loadDatedLeagueRoutes("2026-10-27T18:00:00Z", fetch);
+  const { schedule } = loadDatedLeagueRoutes("2026-10-27T18:00:00Z", fetch);
   const result = await schedule.GET({ nextUrl: new URL("http://localhost/api/schedule?teamId=2") });
   assert.equal(result.body.games[0].startTime, "2026-10-27T23:30:00.000Z");
   assert.equal(result.body.games[0].status, "Postponed");
-  games = [{ ...games[0], postponed: false, status: "Final/OT", home_team_score: 118, visitor_team_score: 114 }];
-  await publishStandings(standings);
-  const table = await standings.GET();
-  assert.equal(table.body.standings.find((team) => team.id === 2).wins, 1);
-  assert.equal(table.body.season, 2026);
-  assert.equal(table.body.asOf, "2026-10-27");
-  const beforeMidnight = loadDatedLeagueRoutes("2026-10-28T03:00:00Z", fetch);
-  await publishStandings(beforeMidnight.standings);
-  const evening = await beforeMidnight.standings.GET();
-  assert.equal(evening.body.asOf, "2026-10-27", "2026-10-28T03:00:00Z is still 2026-10-27 in America/New_York");
-  assert.equal(evening.body.season, 2026);
+
 });
 
-test("the NBA season changes on October 1 in America/New_York", async () => {
-  const fetch = async () => ({ ok: true, json: async () => ({ data: [] }) });
+test("the NBA season changes on October 1 in America/New_York", () => {
   const edges = [
     ["2026-10-01T03:59:59Z", 2025, "2026-09-30 ET"],
     ["2026-10-01T04:00:00Z", 2026, "2026-10-01 ET"],
   ];
   for (const [at, season, label] of edges) {
-    const { standings } = loadDatedLeagueRoutes(at, fetch);
-    await publishStandings(standings);
-    const table = await standings.GET();
-    assert.equal(table.body.season, season, label);
+    assert.equal(dates.getNBASeason(new Date(at)), season, label);
   }
-});
-
-test("standings omit all result content until scores are revealed", () => {
-  let hideScores = true;
-  const snapshot = { season: 2026, asOf: "2026-10-27", standings: [{ id: 2, name: "Boston Celtics", abbreviation: "BOS", conference: "East", wins: 17, losses: 9 }] };
-  const remote = { data: snapshot, loading: false, error: false, retry() {} };
-  const mocked = { ...imports,
-    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { abbreviation: "BOS" } }) },
-    "@/hooks/useRemoteData": { useRemoteData: () => remote },
-    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores }) },
-    "@/components/DataError": load("components/DataError.tsx").exports,
-  };
-  mocked["@/components/SpoilerGuard"] = load("components/SpoilerGuard.tsx", {}, mocked).exports;
-  const Standings = load("app/standings/page.tsx", {}, mocked).exports.default;
-  const render = () => renderToStaticMarkup(createElement(Standings));
-  assert.match(render(), /Reveal standings/);
-  assert.doesNotMatch(render(), /<table|Playoff position|\.654/);
-  hideScores = false;
-  assert.match(render(), /<table/);
-  assert.match(render(), /\.654/);
-  hideScores = true;
-  remote.error = true;
-  assert.match(render(), /Try again/);
-  remote.error = false;
-  remote.loading = true;
-  assert.match(render(), /Loading standings/);
-});
-
-test("digest presentation separates coverage, localizes old UTC prose and names safe source links", () => {
-  const { getDigestPresentation } = load("lib/digestPresentation.ts", {}, imports).exports;
-  const entry = { title: "NBA Morning Briefing: 2026-10-26", content: "## Next game\n\nBoston plays on 2026-10-27 at 23:30 UTC.\n\n## Sources\n\nLeague date: 2026-10-26. Retrieved 2026-10-27T11:00:00Z.\n\nESPN scoreboard: https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261026\n\nBoston next game: https://my-nba-feed.vercel.app/api/games?teamId=2" };
-  const result = getDigestPresentation(entry);
-  assert.equal(result.title, "NBA Morning Briefing");
-  assert.equal(result.coverageDate, "2026-10-26");
-  const tipoff = dates.formatTipoff("2026-10-27T23:30:00Z");
-  assert.match(result.content, new RegExp(tipoff.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.doesNotMatch(result.content, /Sources|Retrieved|23:30 UTC/);
-  const Markdown = load("components/MarkdownContent.tsx").exports.default;
-  const html = renderToStaticMarkup(Markdown({ content: result.sources + "\n\n[Unsafe](javascript:alert(1))\n\n<script>bad</script>" }));
-  assert.match(html, /href="https:\/\/site.api.espn.com\/apis\/site\/v2\/sports\/basketball\/nba\/scoreboard\?dates=20261026"/);
-  assert.match(html, />ESPN scoreboard<\/a>/);
-  assert.match(html, />ESPN scoreboard<\/a><\/p><p[^>]*><a[^>]*>Boston next game<\/a>/);
-  assert.doesNotMatch(html, /href="javascript:|<script>/);
-  const readers = renderToStaticMarkup(Markdown({ content: result.readerSources }));
-  assert.match(readers, /href="https:\/\/www.espn.com\/nba\/scoreboard\/_\/date\/20261026"/);
-  assert.match(readers, /href="https:\/\/www.nba.com\/celtics\/schedule"/);
-  assert.doesNotMatch(readers, /api\/games|site.api.espn.com/);
-  for (const invalid of [
-    entry.content.replaceAll("https://", "http://"),
-    entry.content.replace("20261026", "20260230").replace("teamId=2", "teamId=14"),
-    entry.content.replace("site.api.espn.com", "site.api.espn.com.evil.test").replace("my-nba-feed.vercel.app", "my-nba-feed.vercel.app.evil.test"),
-  ]) assert.equal(getDigestPresentation({ ...entry, content: invalid }).readerSources, "");
-  assert.equal(getDigestPresentation({ title: "Special edition", content: "No source section" }).title, "Special edition");
-  assert.equal(getDigestPresentation({ ...entry, content: entry.content.replace("League date: 2026-10-26", "League date: 2026-02-30") }).coverageDate, null);
 });

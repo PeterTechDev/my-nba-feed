@@ -8,12 +8,10 @@ import { getSiteUrl } from "@/lib/site";
 const publicPaths = [
   "/",
   "/about",
-  "/digest",
   "/highlights",
   "/top-plays",
   "/players",
   "/schedule",
-  "/standings",
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

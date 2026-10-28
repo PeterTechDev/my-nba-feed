@@ -1,4 +1,4 @@
-const EXACT_503 = new Set(["/api/games", "/api/standings", "/api/digest"]);
+const EXACT_503 = new Set(["/api/games"]);
 
 export function isTolerated503(message, allow = process.env.SMOKE_ALLOW_MISSING_API_KEY) {
   if (allow !== "1") return false;

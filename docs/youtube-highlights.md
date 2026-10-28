@@ -46,9 +46,11 @@
 
 ## 2. Cadastrar a chave no GitHub
 
-1. Abra [Settings → Secrets and variables → Actions](https://github.com/PeterTechDev/my-nba-feed/settings/secrets/actions).
-2. Clique em **New repository secret**.
-3. Nome: `YOUTUBE_API_KEY`. Valor: a chave criada no Google Cloud.
+1. Abra as configurações do repositório e selecione **Environments → YOUTUBE_API_KEY**.
+   Crie esse ambiente se ainda não existir: o job `sync` declara esse nome no workflow.
+2. Adicione um **environment secret** ao ambiente.
+3. Nome: `YOUTUBE_API_KEY`. Valor: a chave criada no Google Cloud. O workflow também
+   aceita um repository secret com esse nome quando não há um valor no ambiente.
 4. O workflow também usa o secret **já existente** `DIGEST_PUBLISH_TOKEN` para
    publicar os dados na Vercel. Ele deve corresponder ao token de produção.
 
@@ -56,8 +58,10 @@ A chave do Google fica apenas no passo de sincronização do GitHub Actions.
 O job usa o ambiente GitHub `YOUTUBE_API_KEY`, onde a chave foi cadastrada;
 o secret de publicação continua disponível no nível do repositório.
 Não precisa ser cadastrada na Vercel e nunca usa o prefixo `NEXT_PUBLIC_`.
-O armazenamento usa a conexão Blob existente e o mesmo controle de concorrência
-dos documentos do Digest, em um arquivo separado.
+O armazenamento usa a conexão Blob existente e o controle de concorrência de
+`src/lib/blobStorage.ts`, em um documento separado. O nome legado
+`DIGEST_PUBLISH_TOKEN` continua sendo usado pelo publicador de highlights;
+as rotas do Digest e a publicação diária foram removidas.
 
 ## 3. Publicar o código e fazer a primeira sincronização
 
@@ -127,7 +131,7 @@ npm run build
 ## Nightly Top Plays
 
 `/top-plays` shows the NBA channel's dated Top 10 and Top 5 Plays of the Night,
-newest first, with previous nights underneath. It uses the same daily workflow,
+newest first, with previous nights underneath. It uses the same hourly workflow,
 credentials and private document as full-game highlights. No extra API key is needed.
 `GET /api/highlights?kind=top-plays` returns only countdowns; team queries still
 return only matching game recaps. Preview reveal and playback respect spoiler defaults.
@@ -138,8 +142,8 @@ API before running the updated workflow. Until the first successful sync, the
 page shows an empty state with an official-channel search link. Titles must identify
 Top 5/10 Plays of the Night and a valid date; weekly and player compilations are excluded.
 
-The main navigation and the homepage's **More from the NBA** disclosure link to
-the page. With protection enabled, reveal the preview before playing; **Hide
+The main navigation links to the page. With protection enabled, reveal the
+preview before playing; **Hide
 preview** also stops playback. **Close player** restores the visible preview.
 Loading, empty and retryable error states use the existing dashboard controls.
 

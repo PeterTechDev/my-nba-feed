@@ -790,7 +790,6 @@ test("homepage places the end marker after the last story, names the selected te
   const mocked = {
     "next/link": { default: "a" },
     "@/lib/nbaDate": dates, "@/lib/api": api, "@/lib/teams": teams, "@/lib/news": news,
-    "@/lib/digest": load("lib/digest.ts"),
     "@/hooks/useFavoriteTeams": { useFavoriteTeams, useFavoriteTeamObjects: () => [] },
     "@/hooks/useTeam": { useTeam },
     "@/hooks/useGameData": { useGameData: () => state },
@@ -805,7 +804,6 @@ test("homepage places the end marker after the last story, names the selected te
   for (const name of ["GameDayHero", "GameSection", "MorningBriefingCard", "PersonalizedFeed", "NewsFeed", "TopPlaysCard", "EndOfSession"]) {
     mocked["@/components/" + name] = load("components/" + name + ".tsx", {}, mocked);
   }
-  mocked["@/components/GameSection"].HomeDigestCard = () => null;
   mocked["@/components/TeamHeader"] = { default: () => null };
   mocked["@/components/GameDataProvider"] = { default: ({ children }) => children };
   const view = render(createElement(load("app/page.tsx", {}, mocked).default));

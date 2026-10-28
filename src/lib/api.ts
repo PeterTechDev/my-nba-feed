@@ -144,7 +144,7 @@ export function subscribeSpoilerPrefs(listener: () => void) {
 
 export function protectedSpoilerUrl(url: string) {
   const path = url.split("?")[0];
-  return path === "/api/news" || path === "/api/digest" || path === "/api/games";
+  return path === "/api/news" || path === "/api/games";
 }
 
 const refreshingScores = new Set<string>();
@@ -221,8 +221,6 @@ export function mergeGameReveal(base: GamesResponse, extra?: GamesResponse | nul
 }
 
 function parseGameScope(scope: string) {
-  const digest = /^digest:(\d{4}-\d{2}-\d{2})(?::|$)/.exec(scope);
-  if (digest) return { teamId: "", reveal: digest[1], kind: "digest" as const };
   const live = /^live:(\d+):(\d+)$/.exec(scope);
   if (live) return { teamId: live[1], reveal: live[2], kind: "game" as const };
   const record = /^(\d+):record$/.exec(scope);
@@ -237,39 +235,9 @@ function needsScoreReveal(data: GamesResponse, reveal: string) {
   return [data.lastGame, data.currentGame, data.nextGame].some((game) => game && String(game.id) === reveal && game.scoresRedacted);
 }
 
-interface DigestRevealBag { revealed: Map<string, { redacted?: boolean }>; listeners: Set<() => void> }
-
-function digestBag(): DigestRevealBag {
-  const host = globalThis as typeof globalThis & { __nbaDigestReveals?: DigestRevealBag };
-  if (!host.__nbaDigestReveals) host.__nbaDigestReveals = { revealed: new Map(), listeners: new Set() };
-  return host.__nbaDigestReveals;
-}
-
-export function revealedDigest(date: string) {
-  return digestBag().revealed.get(date);
-}
-
-export function subscribeDigestReveals(listener: () => void) {
-  const bag = digestBag();
-  bag.listeners.add(listener);
-  return () => { bag.listeners.delete(listener); };
-}
-
 export function requestScoreReveal(scope: string): Promise<void> | null {
   const parsed = parseGameScope(scope);
   if (!parsed) return null;
-  if (parsed.kind === "digest") {
-    const cached = digestBag().revealed.get(parsed.reveal);
-    if (cached && !cached.redacted) return null;
-    const params = new URLSearchParams({ date: parsed.reveal, reveal: parsed.reveal });
-    return fetch(`/api/digest?${params}`, { headers: spoilerHeaders() }).then(async (response) => {
-      if (!response.ok) throw new Error("Digest reveal failed");
-      const body = await response.json() as { digest?: { redacted?: boolean } | null };
-      if (!body.digest || body.digest.redacted) throw new Error("Digest reveal failed");
-      digestBag().revealed.set(parsed.reveal, body.digest);
-      digestBag().listeners.forEach((listener) => listener());
-    });
-  }
   const bag = gamesBag();
   const base = bag.latest.get(parsed.teamId);
   if (!base || !needsScoreReveal(mergeGameReveal(base, bag.revealed.get(parsed.teamId)), parsed.reveal)) return null;
@@ -303,14 +271,6 @@ export async function revealNewsItem(item: NewsItem): Promise<NewsItem | null> {
     if (found) return found;
   }
   return null;
-}
-
-export async function revealDigest(date: string): Promise<{ redacted?: boolean } | null> {
-  const params = new URLSearchParams({ date, reveal: date, hideScores: "1", hideHeadlines: "1" });
-  const response = await fetch(`/api/digest?${params}`, { headers: spoilerHeaders() });
-  if (!response.ok) return null;
-  const data = await response.json() as { digest?: { redacted?: boolean } | null };
-  return data.digest && !data.digest.redacted ? data.digest : null;
 }
 
 (globalThis as typeof globalThis & { __nbaRequestScoreReveal?: typeof requestScoreReveal }).__nbaRequestScoreReveal = requestScoreReveal;

@@ -12,7 +12,7 @@ NBA fans catching up on their teams, including fans who watch games after they f
 
 ## Product Purpose
 
-Bring team news, games, schedules, standings and highlights together, with control over when results are revealed.
+Bring team news, games, schedules and highlights together, with control over when results are revealed.
 
 ## Capabilities and Constraints
 

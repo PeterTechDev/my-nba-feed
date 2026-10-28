@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { BarChart3, Calendar, Play, Trophy, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
+import { Calendar, Play, Trophy, Eye, EyeOff, Menu, X, Settings, Heart, Info } from "lucide-react";
 import Modal from "./Modal";
 import FavoriteTeamsModal from "./FavoriteTeamsModal";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
@@ -104,11 +104,9 @@ function RevealSpoilersDialog({ hideScores, hideHeadlines, onDismiss, onConfirm,
 }
 
 const links = [
-  { href: "/standings", label: "Standings", icon: BarChart3 },
   { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/highlights", label: "Highlights", icon: Play },
   { href: "/top-plays", label: "Top Plays", icon: Trophy },
-  { href: "/digest", label: "Digest", icon: BookOpen },
   { href: "/about", label: "About", icon: Info },
 ];
 
@@ -233,12 +231,12 @@ export default function NavBar() {
     </nav>
     {settingsOpen && (
       <Modal title="Spoiler settings" onClose={() => setSettingsOpen(false)}>
-          <p className="text-sm text-white/70">Choose what stays hidden by default. Revealing a post, digest or results view shows only that content without changing these defaults.</p>
+          <p className="text-sm text-white/70">Choose what stays hidden by default. Revealing a post or results view shows only that content without changing these defaults.</p>
           <div className="mt-5 space-y-3">
             <label className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Hide scores and records</p>
-                <p className="text-xs text-white/70 mt-1">Protects game scores, records and standings until reveal.</p>
+                <p className="text-xs text-white/70 mt-1">Protects game scores and records until reveal.</p>
               </div>
               <input
                 type="checkbox"

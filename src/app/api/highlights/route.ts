@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getTeamById, teams } from "@/lib/teams";
 import { formatNBADate } from "@/lib/nbaDate";
-import { readDigestDocument, updateDigestDocument } from "@/lib/digestStorage";
+import { readBlobDocument, updateBlobDocument } from "@/lib/blobStorage";
 import { EMPTY_HIGHLIGHTS, HIGHLIGHTS_DOCUMENT, parseHighlightPublication, highlightKey, recentHighlights, type YouTubeHighlights } from "@/lib/youtubeHighlights";
 import type { HighlightVideo } from "@/lib/api";
 
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   if (req.nextUrl.searchParams.get("sync") === "1") {
     if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     try {
-      const state = await readDigestDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS);
+      const state = await readBlobDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS);
       return NextResponse.json({ ...state, videos: recentHighlights(state) }, { headers: { "Cache-Control": "no-store" } });
     } catch {
       return NextResponse.json({ error: "Highlights storage unavailable" }, { status: 503 });
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   }
   if (req.nextUrl.searchParams.get("kind") === "top-plays") {
     try {
-      const state = await readDigestDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS);
+      const state = await readBlobDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS);
       return NextResponse.json({ videos: recentHighlights(state).filter((video) => video.topCount)
         .sort((a, b) => b.date.localeCompare(a.date) || (b.topCount ?? 0) - (a.topCount ?? 0)), syncedAt: state.syncedAt });
     } catch {
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Valid teamId and up to 15 recent game dates required" }, { status: 400 });
   }
   try {
-    const state = await readDigestDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS);
+    const state = await readBlobDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS);
     const videos: Record<string, HighlightVideo> = {};
     for (const video of recentHighlights(state)) {
       if (dates.includes(video.date) && [video.awayTeamId, video.homeTeamId].includes(team.id)) {
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid highlights publication" }, { status: 400 });
   }
   try {
-    await updateDigestDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS, (current) => {
+    await updateBlobDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS, (current) => {
       const byGame = new Map(recentHighlights(current).map((video) => [highlightKey(video), video]));
       for (const video of publication.videos) byGame.set(highlightKey(video), video);
       return { topPlaysEnabled: current.topPlaysEnabled || publication.topPlaysEnabled, syncedAt: current.syncedAt && current.syncedAt > publication.syncedAt! ? current.syncedAt : publication.syncedAt, videos: [...byGame.values()] };

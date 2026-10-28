@@ -33,7 +33,7 @@ export default function AboutPage() {
           <p className="mt-4 leading-7 text-white/70">
             Follow your favorites in <span className="font-medium text-white">My Teams</span>.
             Choose a focus team on the home page for its last game, next matchup
-            and news. Explore the schedule, standings and player rosters when you
+            and news. Explore the schedule and player rosters when you
             want the wider picture.
           </p>
         </section>
@@ -41,7 +41,7 @@ export default function AboutPage() {
           <h2 id="spoiler-protection" className="text-2xl font-semibold tracking-tight">The result can wait.</h2>
           <p className="mt-4 leading-7 text-white/70">
             Watching later? Scores and result headlines are hidden by default.
-            Reveal a game, post, video preview or digest when you’re ready;
+            Reveal a game, post, video preview when you’re ready;
             revealing an item keeps your default protection in place.
           </p>
           <p className="mt-4 leading-7 text-white/70">
@@ -65,7 +65,7 @@ export default function AboutPage() {
           <div>
             <dl className="divide-y divide-white/10 text-sm leading-6">
               <div className="pb-4">
-                <dt className="font-medium">Games, standings & players</dt>
+                <dt className="font-medium">Games & players</dt>
                 <dd className="mt-1 text-white/70">BALLDONTLIE supplies game and team data. ESPN provides a roster fallback.</dd>
               </div>
               <div className="py-4">
@@ -75,10 +75,6 @@ export default function AboutPage() {
               <div className="py-4">
                 <dt className="font-medium">Highlights</dt>
                 <dd className="mt-1 text-white/70">Videos from the NBA’s YouTube channel, with YouTube search available when a matched video isn’t available.</dd>
-              </div>
-              <div className="pt-4">
-                <dt className="font-medium">Daily digest</dt>
-                <dd className="mt-1 text-white/70">AI-generated basketball briefings with source details in each edition. AI can make mistakes; check the linked sources for the full picture.</dd>
               </div>
             </dl>
             <p className="mt-6 text-sm leading-6 text-white/70">Updates depend on upstream sources and may be delayed or temporarily unavailable.</p>

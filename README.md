@@ -4,7 +4,8 @@
 
 **Live →** [my-nba-feed.vercel.app](https://my-nba-feed.vercel.app)
 
-API caching, shared quota limits and standings snapshot setup: [API cache](docs/api-cache.md).
+Development, configuration and checks are documented below. Operational details:
+[API cache and quota](docs/api-cache.md) · [YouTube sync](docs/youtube-highlights.md).
 
 ---
 
@@ -28,12 +29,18 @@ Just basketball, on your terms.
 
 ## Features
 
-- **Live Scores** — Real-time game scores for today's matchups across the league
-- **Team Dashboard** — Last game result, next game preview, and current W/L record — all in one view
-- **Standings** — Full conference standings updated live
-- **Schedule** — Upcoming games for any team
-- **Spoiler-Free Mode** — Hide scores until you're ready to see them. Remembered across sessions.
-- **Team Selector** — Switch between all 30 NBA teams. Picks up the team's colors automatically.
+- **Team Dashboard** — Last, current and next game, plus the selected team's W/L record. Game data refreshes every 30 seconds, subject to source availability and shared quota.
+- **Followed Teams and News** — Choose a focus team and follow multiple teams. Open a finite news feed when ready, with related coverage grouped together.
+- **Schedule** — Calendar and agenda views, Google Calendar links and game recaps.
+- **Highlights and Top Plays** — Official NBA full-game recaps and nightly Top 5/10 countdowns, synchronized hourly and played on demand.
+- **Roster** — Active players and their profile details, with an ESPN fallback. Box scores and player performance statistics are not implemented.
+- **Spoiler Protection** — Scores, records and spoiler headlines are hidden by default, with separate settings and individual reveals. Turning protection off asks for confirmation.
+- **Team Selector** — All 30 NBA teams, local official logos and contextual team colors. The focus team, followed teams and protection settings are saved in this browser; Boston is the initial focus team.
+
+External articles, video thumbnails, playback and YouTube can reveal results.
+Full-game thumbnails remain visible with protection enabled; Top Plays previews
+require a reveal while protection is enabled. The app has no advertising of its
+own, but embedded YouTube videos may show ads and recommendations.
 
 ---
 
@@ -55,10 +62,12 @@ as its short name.
 
 | Layer | Tech |
 |---|---|
-| Framework | Next.js 16 (App Router) |
+| Framework | Next.js 16.4.3 (App Router, installed version) |
 | Language | TypeScript |
-| Styling | Tailwind CSS |
-| Data | balldontlie API + Google News RSS |
+| UI | React 18, Tailwind CSS 3, Lucide React |
+| State | Zustand for persisted team choices; React context for games and spoiler settings |
+| Data | BALLDONTLIE, Google News RSS, ESPN roster fallback, official NBA YouTube uploads |
+| Storage | Private Vercel Blob documents and Next.js Data Cache |
 | Deployment | Vercel |
 
 ---
@@ -66,45 +75,46 @@ as its short name.
 ## Project Structure
 
 ```
-src/
-├── app/
-│   ├── page.tsx              # Main team dashboard
-│   ├── standings/            # League standings
-│   ├── schedule/             # Team schedule
-│   ├── highlights/           # Highlights feed
-│   └── api/                  # Server-side API routes
-│       ├── games/            # Game data + live scores
-│       ├── standings/        # Standings data
-│       ├── schedule/         # Schedule data
-│       └── players/          # Player data
-├── components/
-│   ├── TeamHeader.tsx        # Team banner with dynamic colors
-│   ├── GameSection.tsx       # Last game + next game cards
-│   ├── LiveScores.tsx        # Live scoreboard ticker
-│   ├── NewsFeed.tsx          # Team news feed
-│   ├── TeamSelector.tsx      # Team picker (all 30 teams)
-│   └── ...
-├── hooks/
-│   ├── useGameData.ts        # Game data fetching + polling
-│   ├── useTeam.ts            # Selected team state
-│   └── useSpoilerMode.ts     # Spoiler-free toggle (localStorage)
-└── lib/
-    ├── api.ts                # API client + TypeScript interfaces
-    ├── teams.ts              # All 30 teams with IDs and colors
-    └── nbaDate.ts            # NBA timezone-aware date helpers
+src/app/                     # Pages, metadata and API route handlers
+src/components/              # Arena header, games, news, media and shared controls
+src/hooks/                   # Team preferences, spoiler state and shared fetching
+src/lib/                     # Data contracts, sources, dates, quota and Blob helpers
+scripts/                     # YouTube publisher
+tests/                       # Node tests, local Playwright specs and regressions
+tests/preview/               # Playwright checks for deployed previews
+.github/workflows/           # CI, preview checks and hourly data syncs
+public/                      # Branding, arena image and local NBA team logos
+docs/                        # Operations and asset guides
 ```
+
+| Page | Purpose |
+|---|---|
+| `/` | Focus-team dashboard, games, highlights and opt-in news |
+| `/schedule` | Team calendar and agenda |
+| `/highlights` | Full-game videos for the selected team |
+| `/top-plays` | Nightly NBA Top 5/10 countdowns |
+| `/players` | Selected team's active roster |
+| `/about` | Product purpose and creator |
 
 ---
 
 ## Getting Started
 
-```bash
+Use Node.js **22.21.1**, the version used in CI, and npm. `package.json` requires
+Node.js `>=22.9.0`.
+
+```powershell
 # Clone
 git clone https://github.com/PeterTechDev/my-nba-feed.git
 cd my-nba-feed
 
 # Install
-npm install
+npm ci
+
+# Copy the environment template (do not overwrite an existing .env.local)
+Copy-Item .env.example .env.local
+
+# Fill in .env.local, then start the app
 
 # Run locally
 npm run dev
@@ -112,11 +122,59 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Set `BALLDONTLIE_KEY` in your environment before starting the app.
+On macOS/Linux, use `cp .env.example .env.local` instead of `Copy-Item`.
+Keep `.env.local` at the repository root. It is ignored by Git. Restart the dev
+server after changing environment variables.
+
+### Environment variables
+
+| Variable | Where and why |
+|---|---|
+| `BALLDONTLIE_KEY` | App server: games, schedule, active rosters |
+| `BLOB_STORE_ID` / `BLOB_READ_WRITE_TOKEN` | App server: private Blob storage for the shared API budget and highlights. For local access, add `BLOB_READ_WRITE_TOKEN` for the connected store to `.env.local`; a store ID alone is not a local credential. |
+| `DIGEST_PUBLISH_TOKEN` | App server and GitHub Actions: matching secret used as a Bearer token by the highlights publisher |
+| `YOUTUBE_API_KEY` | YouTube sync runner only: GitHub Actions or local `highlights:sync`. Not required by the app server. |
+| `NEXT_PUBLIC_SITE_URL` | Optional canonical HTTPS origin for metadata, sitemap and robots; defaults to `VERCEL_PROJECT_PRODUCTION_URL`, then the production site |
+
+API and publisher keys are server secrets; never prefix them with `NEXT_PUBLIC_`.
+The environment template lists the core variables; add the optional values you
+need. Without a BALLDONTLIE key or working Blob access, game requests cannot
+refresh. News does not require an API key; rosters can fall back to ESPN.
+
+### Commands
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start the development server |
+| `npm run build` | Create the production build |
+| `npm start` | Serve an existing production build |
+| `npm run lint` | Run ESLint |
+| `npm run typecheck` | Check TypeScript without emitting files |
+| `npm test` | Run the Node `*.test.mjs` suite |
+| `npm run test:ssr` | Check the Morning Briefing server-rendered placeholder; requires a current build unless `BASE_URL` is supplied |
+| `npm run test:e2e` | Run Playwright; configure the target as described below |
+| `npm run highlights:sync` | Fetch official videos and **publish to production**; loads `.env.local` |
+
+### API routes
+
+| Method and route | Input / behavior |
+|---|---|
+| `GET /api/games` | `teamId`; last, current and next game plus record; spoiler-aware |
+| `GET /api/games/live` | Today's league games; raw scores |
+| `GET /api/schedule` | `teamId`, optional `start` and `end` (`YYYY-MM-DD`); raw game results, at most a 366-day range |
+| `GET /api/news` | `team` or comma-separated `teams`; spoiler-aware RSS coverage |
+| `GET /api/players` | `teamId`; active roster with source attribution |
+| `GET /api/highlights` | `teamId` and up to 15 comma-separated recent `dates`, or `kind=top-plays`; saved video metadata |
+| `GET /api/highlights?sync=1` | Bearer token required; read synchronization state |
+| `POST /api/highlights` | Bearer token required; validate and merge video metadata |
+
+Team IDs come from `src/lib/teams.ts`. API spoiler redaction applies to
+`/api/games` and `/api/news`; the live and schedule endpoints expose
+results. Spoiler protection is a viewing preference, not an authorization boundary.
 
 ### Spoiler API
 
-`GET /api/news`, `GET /api/digest` and `GET /api/games` are closed unless the caller asks for the open payload. Every response, open or redacted, sends `Vary: x-nba-spoilers` and `Cache-Control: private, no-store`.
+`GET /api/news` and `GET /api/games` are closed unless the caller asks for the open payload. Every response, open or redacted, sends `Vary: x-nba-spoilers` and `Cache-Control: private, no-store`.
 
 | Signal | Result |
 |---|---|
@@ -126,87 +184,70 @@ Set `BALLDONTLIE_KEY` in your environment before starting the app.
 | `scores` and/or `headlines` (comma or semicolon, any case, trimmed), with no `none` | Those parts stay redacted; the other part is included |
 | `hideScores=1` or `hideHeadlines=true` (name and value are case-insensitive; `1` or `true`) | Forces that part to stay redacted |
 
-`reveal=<id>` opens only that item. Every other headline, including others in the same related-coverage group, stays redacted the same way as a request without `reveal`. The id is a news link or identity, a digest date, a game id, or `record`. `?team=` and `?teams=` use that same grouping and redaction. The app sends the header on every one of these calls, including `none` when spoiler protection is off.
+`reveal=<id>` opens only that item. Every other headline, including others in the same related-coverage group, stays redacted the same way as a request without `reveal`. The id is a news link or identity, a game id, or `record`. `?team=` and `?teams=` use that same grouping and redaction. The app sends the header on every one of these calls, including `none` when spoiler protection is off.
 
-### Digest storage and publishing
+### Shared storage
 
-Connect a **private Vercel Blob store** to the project. Production uses the
-automatically configured `BLOB_STORE_ID` and Vercel OIDC; no browser receives a
-storage credential. Include **Development** in the store's project connections;
-a Production/Preview-only connection leaves local digest APIs returning 503.
-For local development Blob access, pull development credentials
-with `vercel env pull .env.development.local`. Keep all secrets in ignored environment
-files and preserve the publisher token in `.env.local` when pulling development values.
-Refresh the pulled credentials when the short-lived local OIDC token expires.
+Connect a private Vercel Blob store for highlights and API quota storage.
+The existing `DIGEST_PUBLISH_TOKEN` name is retained for the highlights publisher.
+Digest and standings pages, APIs and publication jobs have been removed; stored
+historical documents are untouched.
 
-Set a server-only `DIGEST_PUBLISH_TOKEN` for the external digest publisher.
-Publish to `POST /api/digest` with `Authorization: Bearer <DIGEST_PUBLISH_TOKEN>`
-and a JSON body containing `date` (YYYY-MM-DD), `style` (hype, analytical, casual
-or storyteller), `title`, `content` (Markdown), and optional `games_covered`,
-`stats_highlighted` and `metadata`. Publishing the same date replaces that entry.
-Digests and aggregated reactions persist in private Blob documents; conditional
-writes prevent concurrent updates from silently overwriting each other.
-
-The [Daily NBA Digest cloud workflow](https://github.com/PeterTechDev/my-nba-feed/actions/workflows/digest.yml)
-runs on GitHub Actions at 08:00 America/Bahia, using a free Qwen model on the cloud
-runner's CPU and the authenticated publisher. It needs no paid inference API,
-local computer or Codex session. Configure `DIGEST_PUBLISH_TOKEN` as a repository Actions secret. Existing daily editions
-are preserved unless a manual recovery run explicitly replaces today's edition.
-An independent maintenance job renews the workflow's activation automatically,
-preventing GitHub's 60-day inactivity suspension without human commits or a local
-computer. See [the publisher runbook](docs/digest-publisher.md) for verification,
-permissions and the free public-runner requirement.
-Empty content is shown only after a successful read; storage failures have a retry action.
-
-### Data fallbacks
-
-Rosters use BALLDONTLIE active players, falling back to the current ESPN roster
-when the API plan or service does not provide active players.
+The **YouTube Highlights** workflow runs hourly at minute 15 (UTC schedule),
+from `main`, and can also be triggered manually. Page visits never call the
+YouTube Data API. See the [cache guide](docs/api-cache.md) and
+[YouTube guide](docs/youtube-highlights.md) for first-run setup and recovery.
 
 ### Regression checks
 
-Run `node scripts/test-digest-writes.mjs` with development Blob credentials to
-check publishing, replacement, validation and concurrent reactions against real
-storage. It uses a unique test folder and deletes its documents afterward.
+The main CI workflow runs lint, typecheck, Node tests and build:
 
-Highlights use full-game videos from the NBA's official YouTube channel, with an
-inline player loaded only after clicking Play. A daily GitHub Actions job uses the
-official API and saves matches in private Blob storage; page visits never call
-the YouTube Data API. Previews and players respect spoiler protection. Configure
-the `YOUTUBE_API_KEY` Actions secret using the [setup guide](docs/youtube-highlights.md).
+```powershell
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run test:ssr
+```
 
-Run `npm test` for the Node suite and `npm run test:ssr` for the Morning Briefing
-server render. Playwright specs live in two places. `tests/preview/` is the
-preview job (`PLAYWRIGHT_PREVIEW=1`, `npm run test:e2e` against `BASE_URL`).
-Specs directly under `tests/`, including bypass checks and any later
-`digest-reveal-gating` or `spoiler-reveal-confirm` spec, are local and are not
-part of that job. CI runs the local bypass specs against servers they start
-themselves. `VERCEL_BYPASS` is required when `BASE_URL` is not localhost. The
+Playwright needs Chromium (`npx playwright install chromium`). For local checks,
+start the app in another terminal, then run:
+
+```powershell
+$env:BASE_URL = 'http://localhost:3000'
+npm run test:e2e
+```
+
+`playwright.config.mjs` does not start the app. The bypass specs create their own
+fixture servers; the reveal-confirmation and preview specs need `BASE_URL`.
+By default, Playwright includes both top-level specs and `tests/preview/`.
+For a deployed preview, set `PLAYWRIGHT_PREVIEW=1` to run only `tests/preview/`
+against `BASE_URL`, and set `VERCEL_BYPASS` to the deployment protection bypass
+secret. These preview helpers require it for non-local origins. The
 bypass header is sent only to that origin. Same-origin redirects are followed
 with the header for up to 5 hops. POST on 301, 302, or 303 becomes GET and
 drops the body. A 307 or 308 keeps the method and body. A redirect to any other origin is returned
-as-is, without the header. `SMOKE_ALLOW_MISSING_API_KEY` defaults to empty,
+as-is, without the header.
+
+The **Preview bypass tests** workflow runs the two bypass specs locally. The
+**e2e** workflow runs after successful Vercel Preview deployments and uses the
+repository secret `VERCEL_AUTOMATION_BYPASS_SECRET` as `VERCEL_BYPASS`.
+`SMOKE_ALLOW_MISSING_API_KEY` defaults to empty,
 which does not tolerate any 503 console line. Set the repository variable to
-`1` only when the preview has no BALLDONTLIE key or digest storage. That value
-tolerates 503 for the exact paths `/api/games`, `/api/standings`, and
-`/api/digest`. `/api/digest/feedback` is not tolerated.
+`1` only when the preview has no BALLDONTLIE key or shared storage. That value
+tolerates 503 only for the exact path `/api/games`.
 
 ---
 
-## Screenshots
+## Design and Assets
 
-> Dashboard showing team record, last game and next game.
+- [Product context](PRODUCT.md) and [design system](DESIGN.md)
+- [Brand guide and logo assets](docs/branding.md)
+- [Arena image provenance](docs/arena-atmosphere.md)
+- [Official team logos](public/teams/README.md)
 
-*Coming soon*
-
----
-
-## Roadmap
-
-- [ ] Push notifications for game start and final score
-- [ ] Player stats page
-- [ ] Playoff bracket view
-- [ ] Mobile PWA support
+The app includes a web manifest and install icons. Offline caching and push
+notifications are not implemented.
 
 ---
 

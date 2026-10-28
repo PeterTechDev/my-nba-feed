@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { unstable_cache } from "next/cache";
-import { updateDigestDocument } from "./digestStorage";
+import { updateBlobDocument } from "./blobStorage";
 
 interface Budget { key: string; calls: number[]; blockedUntil: number; rosterDeniedUntil: number }
 const EMPTY: Budget = { key: "", calls: [], blockedUntil: 0, rosterDeniedUntil: 0 };
@@ -18,7 +18,7 @@ export async function fetchBallDontLie(url: string, revalidate: number): Promise
   try {
     // Keep the existing Data Cache; reserve quota only when a cached response needs refreshing.
     const read = unstable_cache(async () => {
-      await updateDigestDocument<Budget>("bdl-budget.json", EMPTY, (stored) => {
+      await updateBlobDocument<Budget>("bdl-budget.json", EMPTY, (stored) => {
         const now = Date.now();
         const state = stored.key === identity ? stored : { ...EMPTY, key: identity };
         if (roster && state.rosterDeniedUntil > now) throw new UpstreamError(403);
@@ -36,7 +36,7 @@ export async function fetchBallDontLie(url: string, revalidate: number): Promise
           retryAfter = Math.max(60, Number.isFinite(seconds) ? seconds : Math.ceil((Date.parse(value ?? "") - Date.now()) / 1000) || 60);
         }
         if (response.status === 429 || roster && [401, 403].includes(response.status)) {
-          await updateDigestDocument<Budget>("bdl-budget.json", EMPTY, (state) => ({
+          await updateBlobDocument<Budget>("bdl-budget.json", EMPTY, (state) => ({
             ...state,
             blockedUntil: response.status === 429 ? Math.max(state.blockedUntil, Date.now() + retryAfter * 1000) : state.blockedUntil,
             rosterDeniedUntil: roster && [401, 403].includes(response.status) ? Date.now() + 3600000 : state.rosterDeniedUntil,

@@ -115,7 +115,7 @@ function segmentHasOwnShareImage(routePath) {
 const inheritedOgImage = {
   href: "https://preview.my-nba-feed.vercel.app/opengraph-image?1ad8b1e68c4af42a",
   type: "image/png",
-  alt: "NBA Feed. The result can wait. News, games, highlights and standings, with scores hidden until you reveal them.",
+  alt: "NBA Feed. The result can wait. News, games, highlights, with scores hidden until you reveal them.",
   width: 1200,
   height: 630,
 };

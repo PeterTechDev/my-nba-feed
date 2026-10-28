@@ -201,42 +201,6 @@ test("grupo com um spoiler no related sai todo redigido sem header e inteiro com
   assert.equal(JSON.stringify(openedParent.body).includes(beatUrl), false);
 });
 
-test("digest stays redacted until x-nba-spoilers is none", async () => {
-  const stored = [{
-    date: "2026-10-27", style: "casual", title: beat, content: "Boston won 118-107.",
-    games_covered: ["BKN 107-118 BOS"], stats_highlighted: ["Tatum 40"],
-    metadata: { model: "test", generation_time_ms: 1 }, created_at: "2026-10-27T00:00:00.000Z",
-  }];
-  const dates = load("lib/nbaDate.ts").exports;
-  const digestLib = load("lib/digest.ts").exports;
-  const route = load("app/api/digest/route.ts", {}, {
-    ...server,
-    "@/lib/digest": digestLib,
-    "@/lib/nbaDate": dates,
-    "@/lib/digestStorage": { readDigestDocument: async () => stored, updateDigestDocument: async () => stored },
-  }).exports;
-  const call = (spoilers, query = "date=2026-10-27") => route.GET({
-    nextUrl: new URL("http://localhost/api/digest?" + query),
-    headers: spoilers ? new Headers({ "x-nba-spoilers": spoilers }) : new Headers(),
-  });
-  const closed = await call();
-  assert.equal(closed.status, 200);
-  assertCache(closed, "digest closed");
-  assert.equal(closed.body.digest.title, "NBA daily breakdown");
-  assert.equal(closed.body.digest.redacted, true);
-  assert.deepEqual(Array.from(closed.body.digest.games_covered), []);
-  assert.equal(closed.body.digest.content.includes("118-107"), false);
-  const revealed = await call("none");
-  assertCache(revealed, "digest revealed");
-  assert.equal(revealed.body.digest.title, beat);
-  assert.equal(revealed.body.digest.redacted, undefined);
-  assert.equal(revealed.body.digest.content, "Boston won 118-107.");
-  assert.deepEqual(Array.from(revealed.body.digest.games_covered), ["BKN 107-118 BOS"]);
-  assertCache(await call(undefined, "date=nope"), "digest 400");
-  assert.equal((await call(undefined, "date=nope")).status, 400);
-  await staysClosed((spoilers) => call(spoilers), "118-107");
-});
-
 test("games stay redacted until x-nba-spoilers is none", async () => {
   const dates = load("lib/nbaDate.ts").exports;
   const status = load("lib/gameStatus.ts").exports;
@@ -446,10 +410,9 @@ function clientSpoilerCalls() {
   for (const path of walkClient(fileURLToPath(new URL("../src/", import.meta.url)))) {
     const source = readFileSync(path, "utf8");
     const file = relative(fileURLToPath(root), path).replaceAll("\\", "/");
-    const pattern = /\/api\/(?:news|digest|games)\b/g;
+    const pattern = /\/api\/(?:news|games)\b/g;
     for (const match of source.matchAll(pattern)) {
       const after = source.slice(match.index + match[0].length, match.index + match[0].length + 12);
-      if (match[0] === "/api/digest" && after.startsWith("/feedback")) continue;
       if (match[0] === "/api/games" && after.startsWith("/live")) continue;
       const before = source.slice(Math.max(0, match.index - 500), match.index);
       const around = before + source.slice(match.index, match.index + match[0].length + 160);
@@ -466,7 +429,7 @@ function clientSpoilerCalls() {
   return calls;
 }
 
-test("every client fetch of news, digest and games sends the spoiler header for the reveal state", async () => {
+test("every client fetch of news and games sends the spoiler header for the reveal state", async () => {
   const calls = clientSpoilerCalls();
   const fetches = calls.filter((call) => call.kind === "fetch");
   const delegated = calls.filter((call) => call.kind === "useRemoteData");
@@ -477,19 +440,16 @@ test("every client fetch of news, digest and games sends the spoiler header for 
     return counts;
   }, {})).sort(([a], [b]) => a.localeCompare(b)));
   assert.deepEqual(tally(fetches), {
-    "src/app/digest/page.tsx": 1,
-    "src/components/GameSection.tsx": 1,
-    "src/lib/api.ts": 5,
+    "src/lib/api.ts": 3,
   });
   assert.deepEqual(tally(delegated), {
-    "src/app/digest/page.tsx": 2,
     "src/app/page.tsx": 1,
     ...(existsSync(new URL("../src/components/EndOfSession.tsx", import.meta.url)) ? { "src/components/EndOfSession.tsx": 2 } : {}),
     "src/components/PersonalizedFeed.tsx": 1,
     "src/hooks/useGameData.ts": 1,
   });
-  assert.deepEqual(tally(guards), { "src/lib/api.ts": 3 });
-  assert.deepEqual(tally(mentions), { "src/lib/digestPresentation.ts": 1 });
+  assert.deepEqual(tally(guards), { "src/lib/api.ts": 2 });
+  assert.deepEqual(tally(mentions), {});
   for (const call of fetches) {
     assert.match(call.around, /spoilerHeaders\s*\(|x-nba-spoilers/, call.file);
   }
@@ -503,8 +463,6 @@ test("every client fetch of news, digest and games sends the spoiler header for 
     const path = String(url).split("?")[0];
     const body = path === "/api/news"
       ? [{ title: "Open", redacted: false, identity: "abc", link: "https://example.com/a" }]
-      : path === "/api/digest"
-        ? { digest: { date: "2026-10-27", title: "Open", content: "Full", redacted: false, games_covered: [] } }
         : {
           lastGame: { id: 9, status: "Final", scoresRedacted: false, homeScore: 118, awayScore: 107 },
           currentGame: null, nextGame: null,
@@ -523,7 +481,7 @@ test("every client fetch of news, digest and games sends the spoiler header for 
   assert.equal(api.spoilerHeaders()["x-nba-spoilers"], "scores,headlines");
   for (const [prefs, signal] of states) {
     api.setSpoilerPrefs(prefs);
-    for (const url of ["/api/news?team=Celtics", "/api/digest?range=15", "/api/games?teamId=2"]) {
+    for (const url of ["/api/news?team=Celtics", "/api/games?teamId=2"]) {
       seen.length = 0;
       await remote.fetchRemoteData(url, true);
       assert.equal(seen.length, 1, url);
@@ -537,12 +495,6 @@ test("every client fetch of news, digest and games sends the spoiler header for 
   const revealedNews = await api.revealNewsItem({ redacted: true, feed: "Celtics", identity: "abc", link: "https://example.com/a" });
   assert.equal(revealedNews.title, "Open");
   assert.equal(seen.at(-1).url.startsWith("/api/news?"), true);
-  assert.equal(seen.at(-1).value, "scores,headlines");
-  await api.revealDigest("2026-10-27");
-  assert.equal(seen.at(-1).url.startsWith("/api/digest?"), true);
-  assert.equal(seen.at(-1).value, "scores,headlines");
-  await api.requestScoreReveal("digest:2026-10-27");
-  assert.equal(seen.at(-1).url.startsWith("/api/digest?"), true);
   assert.equal(seen.at(-1).value, "scores,headlines");
   api.noteGames("2", {
     lastGame: { id: 9, status: "Final", scoresRedacted: true },
@@ -562,55 +514,7 @@ test("every client fetch of news, digest and games sends the spoiler header for 
   assert.equal(seen.at(-1).url.startsWith("/api/games?"), true);
   assert.equal(seen.at(-1).value, "none");
 
-  const effects = [];
-  const react = {
-    useEffect(fn) { effects.push(fn); },
-    useState(init) { return [typeof init === "function" ? init() : init, () => {}]; },
-  };
-  api.setSpoilerPrefs({ hideScores: true, hideHeadlines: false });
-  const card = load("components/GameSection.tsx", { fetch }, {
-    "@/hooks/useRemoteData": { useRemoteData: () => ({ data: null }) },
-    react,
-    "next/link": { default: "a" },
-    "lucide-react": { Play: () => null, ArrowUpRight: () => null },
-    "@/lib/nbaDate": load("lib/nbaDate.ts").exports,
-    "@/hooks/useGameData": { useGameData: () => ({ nextGame: null, loading: false, error: null }) },
-    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics", city: "Boston", abbreviation: "BOS" } }) },
-    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: false }) },
-    "@/lib/api": api,
-    "./GoogleCalendarLink": { default: () => null },
-    "./ScoreReveal": { default: () => null },
-    "@/lib/teams": load("lib/teams.ts").exports,
-    "@/lib/digest": load("lib/digest.ts").exports,
-  }).exports.HomeDigestCard;
-  card({ favoriteTeams: [] });
-  const stop = effects.at(-1)();
-  assert.equal(seen.at(-1).url, "/api/digest");
-  assert.equal(seen.at(-1).value, "scores");
-  stop?.();
 
-  const pageBox = load("app/digest/page.tsx", { fetch }, {
-    react: require("react"),
-    "lucide-react": new Proxy({}, { get: () => () => null }),
-    "@/components/MarkdownContent": { default: () => null },
-    "@/components/DataError": { default: () => null },
-    "@/components/SpoilerModeProvider": { digestContentIsProtected: () => true, useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }) },
-    "@/hooks/useRemoteData": { useRemoteData: () => ({ data: null, loading: false, error: false, retry() {} }) },
-    "@/lib/nbaDate": { formatGameDate: () => "date" },
-    "@/lib/digest": {},
-    "@/lib/digestPresentation": { getDigestPresentation: (entry) => entry },
-  }, "\nexports.__reveal = revealDigest;\n");
-  delete pageBox.sandbox.__nbaSpoilerBus;
-  seen.length = 0;
-  await pageBox.exports.__reveal("2026-10-27");
-  assert.equal(seen[0].url.startsWith("/api/digest?"), true);
-  assert.equal(seen[0].value, "scores,headlines");
-  pageBox.sandbox.__nbaSpoilerBus = { prefs: { hideScores: false, hideHeadlines: false } };
-  await pageBox.exports.__reveal("2026-10-26");
-  assert.equal(seen.at(-1).value, "none");
-  pageBox.sandbox.__nbaSpoilerBus = { prefs: { hideScores: false, hideHeadlines: true } };
-  await pageBox.exports.__reveal("2026-10-25");
-  assert.equal(seen.at(-1).value, "headlines");
 });
 
 function createRealm(globals) {
@@ -664,70 +568,6 @@ test("confirming the reveal refetches with x-nba-spoilers none", async () => {
   assert.ok(seen.length >= 2, "confirming publishes the bus and the protected request runs again");
   assert.equal(seen.at(-1).url.split("?")[0], "/api/news");
   assert.equal(seen.at(-1).value, "none");
-});
-
-test("the home digest sends the spoiler header and loads again when the state changes", () => {
-  const seen = [];
-  const fetch = (url, options = {}) => {
-    seen.push({ url: String(url), value: headerValue(options.headers) });
-    return Promise.resolve({ ok: true, json: async () => ({ digest: null }) });
-  };
-  const slots = [];
-  let cursor = 0;
-  const react = {
-    useState(init) {
-      const index = cursor++;
-      if (slots[index] === undefined) slots[index] = { state: typeof init === "function" ? init() : init };
-      const slot = slots[index];
-      return [slot.state, (value) => { slot.state = typeof value === "function" ? value(slot.state) : value; }];
-    },
-    useEffect(fn, deps) {
-      const index = cursor++;
-      const previous = slots[index];
-      const changed = !previous || !deps || deps.some((dep, i) => !Object.is(dep, previous.deps[i]));
-      if (!previous) slots[index] = { deps, fn: changed ? fn : null };
-      else { previous.deps = deps; previous.fn = changed ? fn : null; }
-    },
-  };
-  const flush = () => {
-    for (const slot of slots) {
-      if (slot && slot.fn) {
-        slot.cleanup?.();
-        const fn = slot.fn;
-        slot.fn = null;
-        slot.cleanup = fn() || undefined;
-      }
-    }
-  };
-  const realm = createRealm({ fetch });
-  const api = realm.load("lib/api.ts");
-  const settings = { hideScores: true, hideHeadlines: true };
-  const card = realm.load("components/GameSection.tsx", {
-    "@/hooks/useRemoteData": { useRemoteData: () => ({ data: null }) },
-    react,
-    "next/link": { default: "a" },
-    "lucide-react": { Play: () => null, ArrowUpRight: () => null },
-    "@/lib/nbaDate": realm.load("lib/nbaDate.ts"),
-    "@/hooks/useGameData": { useGameData: () => ({ nextGame: null, loading: false, error: null }) },
-    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics", city: "Boston", abbreviation: "BOS" } }) },
-    "./SpoilerModeProvider": { useSpoilerContext: () => settings },
-    "@/lib/api": api,
-    "./GoogleCalendarLink": { default: () => null },
-    "./ScoreReveal": { default: () => null },
-    "@/lib/teams": realm.load("lib/teams.ts"),
-    "@/lib/digest": realm.load("lib/digest.ts"),
-  }).HomeDigestCard;
-  const render = () => { cursor = 0; card({ favoriteTeams: [] }); flush(); };
-  render();
-  assert.equal(seen.at(-1).url, "/api/digest");
-  assert.equal(seen.at(-1).value, "scores,headlines");
-  settings.hideScores = false;
-  settings.hideHeadlines = false;
-  api.setSpoilerPrefs({ hideScores: false, hideHeadlines: false });
-  render();
-  assert.equal(seen.length, 2);
-  assert.equal(seen.at(-1).value, "none");
-  for (const slot of slots) slot?.cleanup?.();
 });
 
 test("a revealed live score refetches when the game status changes", async () => {
@@ -949,7 +789,7 @@ test("Record hidden offers Reveal record without showing scores or headlines", (
     "./GoogleCalendarLink": { default: () => null },
     "./ScoreReveal": load("components/ScoreReveal.tsx", {}, {
       react,
-      "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }), digestContentIsProtected: () => true },
+      "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }), },
     }).exports,
   }).exports.default;
   const html = renderToStaticMarkup(react.createElement(Badge));
@@ -1098,7 +938,7 @@ function mountRecordBadge() {
     "./GoogleCalendarLink": { default: () => null },
     "./ScoreReveal": realm.load("components/ScoreReveal.tsx", {
       react: React,
-      "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }), digestContentIsProtected: () => true },
+      "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }), },
     }),
   }).default;
   const host = document.createElement("div");

@@ -4,7 +4,6 @@ import { createRequire } from "node:module";
 import vm from "node:vm";
 import ts from "typescript";
 import { test } from "node:test";
-import { syncStandings } from "../scripts/sync-standings.mjs";
 const require = createRequire(import.meta.url);
 function load(file, imports, globals = {}) {
   const exports = {};
@@ -17,11 +16,11 @@ function fixture() {
   let now = Date.parse("2026-10-28T12:00:00Z"), calls = 0, status = 200;
   class Clock extends Date { static now() { return now; } }
   const storage = {
-    readDigestDocument: async (name, empty) => documents.get(name) ?? empty,
-    updateDigestDocument: async (name, empty, update) => { const value = update(documents.get(name) ?? empty); documents.set(name, value); return value; },
+    readBlobDocument: async (name, empty) => documents.get(name) ?? empty,
+    updateBlobDocument: async (name, empty, update) => { const value = update(documents.get(name) ?? empty); documents.set(name, value); return value; },
   };
   const imports = {
-    "./digestStorage": storage,
+    "./blobStorage": storage,
     "next/cache": { unstable_cache: (fn, key, options) => async () => {
       const id = JSON.stringify(key), hit = cache.get(id);
       if (hit?.until > now) return hit.value;
@@ -59,7 +58,7 @@ test("upstream 429 pauses all routes and denied roster pauses all teams", async 
   assert.equal((await a.fetchBallDontLie(roster(2), 3600)).status, 200);
 });
 test("budget storage failure fails closed without calling the provider", async () => {
-  const f = fixture(); f.storage.updateDigestDocument = async () => { throw new Error("storage unavailable"); };
+  const f = fixture(); f.storage.updateBlobDocument = async () => { throw new Error("storage unavailable"); };
   await assert.rejects(f.module().fetchBallDontLie(url(1), 30), /storage unavailable/);
   assert.equal(f.calls(), 0);
 });
@@ -78,40 +77,4 @@ test("invalid teams and intervals never reach the provider", async () => {
     if (path === "schedule") for (const range of ["start=2026-02-30", "start=2026-11-01&end=2026-10-01", "start=2020-01-01&end=2026-10-28", "start=2026-01-01&end=2028-01-01"]) assert.equal((await route.GET({ nextUrl: new URL(`https://fixture/?teamId=2&${range}`) })).status, 400);
   }
   assert.equal(calls, 0);
-});
-test("standings reads never call upstream; partial refresh preserves the last complete snapshot", async () => {
-  const f = fixture(); let page = 0;
-  const route = load("app/api/standings/route.ts", {
-    "next/server": { NextResponse: { json: (body, init) => ({ body, status: init?.status ?? 200 }) } },
-    "@/lib/digestStorage": f.storage,
-    "@/lib/nbaDate": { getNBASeason: () => 2026, formatNBADate: () => "2026-10-28" },
-    "@/lib/gameStatus": { isFinalStatus: () => true, compareStandings: () => 0 },
-    "@/lib/ballDontLie": { fetchBallDontLie: async () => { page++; return Response.json({ data: [], meta: { next_cursor: page === 1 ? "next" : null } }); } },
-  });
-  assert.equal((await route.GET()).status, 503);
-  assert.equal(page, 0);
-  assert.equal((await route.POST({ headers: new Headers() })).status, 401);
-  const request = { headers: new Headers({ authorization: "Bearer publisher" }) };
-  assert.equal((await route.POST(request)).status, 202);
-  assert.equal((await route.GET()).status, 503);
-  await route.POST(request);
-  assert.equal((await route.GET()).status, 200);
-  assert.equal(page, 2);
-  await route.GET(); assert.equal(page, 2);
-  page = 0;
-  await route.POST(request);
-  assert.equal((await route.GET()).status, 200, "incomplete refresh preserves a usable snapshot");
-  assert.equal(page, 1);
-});
-
-test("standings job waits through quota exhaustion and resumes until publication", async () => {
-  const waits = []; let calls = 0;
-  await syncStandings({ publishToken: "publisher", wait: async ms => { waits.push(ms); }, fetcher: async (_url, init) => {
-    assert.equal(init.headers.Authorization, "Bearer publisher");
-    calls++;
-    return calls === 1 ? Response.json({ error: "quota" }, { status: 429, headers: { "Retry-After": "60" } }) : Response.json({ complete: calls === 3 }, { status: calls === 3 ? 200 : 202 });
-  } });
-  assert.deepEqual(waits, [60000, 15000]);
-  assert.equal(calls, 3);
-  await assert.rejects(syncStandings({ publishToken: "publisher", fetcher: async () => new Response(null, { status: 401 }) }), /401/);
 });

@@ -3,8 +3,7 @@ import { registerPreviewBypass } from "../preview-bypass.mjs";
 import { isTolerated503 } from "../smoke-console.mjs";
 
 // SMOKE_ALLOW_MISSING_API_KEY=1 tolerates a 503 console line only for the exact
-// paths /api/games, /api/standings, and /api/digest. /api/digest/feedback is not
-// included. Empty or unset, any 503 fails the smoke. The workflow reads the
+// path /api/games. Empty or unset, any 503 fails the smoke. The workflow reads the
 // repository variable of the same name; it does not hardcode 1.
 // VERCEL_BYPASS is required when BASE_URL is not localhost.
 
@@ -47,20 +46,6 @@ test("home loads the team games without console or hydration errors", async ({ p
   await expect(page.getByRole("heading", { name: "Boston Celtics", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Celtics games" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Games", exact: true })).toBeVisible();
-  assertQuiet(record);
-});
-
-test("standings loads its heading and a conference, empty state, or the data error", async ({ page }) => {
-  const record = watchPage(page);
-  const standings = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/standings");
-  await page.goto("/standings");
-  await standings;
-  await expect(page.getByRole("heading", { name: "Standings", exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Eastern Conference", exact: true })
-      .or(page.getByRole("alert").filter({ hasText: "Unable to load standings" }))
-      .or(page.getByText("No standings data available", { exact: true })),
-  ).toBeVisible();
   assertQuiet(record);
 });
 

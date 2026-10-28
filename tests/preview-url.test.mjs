@@ -5,7 +5,7 @@ import { previewBaseURL } from "./preview-url.mjs";
 test("preview BASE_URL accepts only this project's https host with an empty port", () => {
   assert.deepEqual([
     "https://my-nba-feed-git-main-petertechdevs-projects.vercel.app",
-    "https://my-nba-feed-git-cursor-pet-30-petertechdevs-projects.vercel.app/standings",
+    "https://my-nba-feed-git-cursor-pet-30-petertechdevs-projects.vercel.app/schedule",
     "https://my-nba-feed-abc123def-petertechdevs-projects.vercel.app/",
     "https://MY-NBA-FEED-git-Main-petertechdevs-projects.vercel.app",
     // Node's URL parser treats :443 as the default https port and clears url.port.

@@ -12,6 +12,8 @@ related_targets:
 
 # Homepage
 
+Digest has been removed at the user's request. The arena now leads directly to Games, then highlights and optional news. No Digest request or link remains on this surface. Its former module and styles were deleted; news briefings remain part of the news feature.
+
 ## October 28 refinement: your courtside corner
 
 The user requested delight and animation with a warm, tactile, personal basketball feeling. Preserve the arena composition while warming its wood and local surfaces. A compact ticket-like welcome beneath the controls names the selected team and links to Games, transferring keyboard focus to that section. Its 700ms settle belongs to the arena entrance; the basketball seam graphic rotates on hover or keyboard focus, and pressing the ticket gives a small physical response. No loops, new dependencies, audio or extra engagement flow. Reduced motion renders the ticket statically and retains color feedback. Identity bottom padding is now 40px, making room for the welcome without a separate hero section. Current local colors and the 40% team tint are recorded in DESIGN.md, superseding the earlier neutral surfaces/tint below.
