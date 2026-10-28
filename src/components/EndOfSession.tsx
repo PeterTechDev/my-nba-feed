@@ -38,10 +38,11 @@ export default function EndOfSession() {
   const gamesFailed = coveredGames.some((game) => game.error);
   if (!hydrated || gamesLoading || news.loading || gamesFailed || newsFailed) return null;
 
-  const hasGames = coveredTeams.some((team, index) => {
+  const live = coveredGames.some((game) => Boolean(game.data?.currentGame));
+  const hasGames = live || coveredTeams.some((team, index) => {
     const data = coveredGames[index].data;
     if (!data) return false;
-    if (team.id === selectedTeam.id) return Boolean(data.lastGame || data.currentGame || data.nextGame);
+    if (team.id === selectedTeam.id) return Boolean(data.lastGame || data.nextGame);
     return Boolean(data.lastGame && gameDaysAgo(data.lastGame.date) === 1);
   });
   const hasTeamNews = coveredTeams.some((team) => (feeds[team.name]?.items.length ?? 0) > 0);
@@ -49,7 +50,7 @@ export default function EndOfSession() {
   const teamName = coveredTeams[0].name;
   const message = !hasGames && !hasTeamNews
     ? severalTeams ? "Nothing new for your teams. You can head out." : `Nothing new for the ${teamName}. You can head out.`
-    : severalTeams ? "You’re up to date with your teams." : `You’re up to date with the ${teamName}. You can head out.`;
+    : severalTeams ? "You’re up to date with your teams." : live ? `You’re up to date with the ${teamName}.` : `You’re up to date with the ${teamName}. You can head out.`;
 
   return (
     <section aria-label="End of session" className="mt-2 border-t border-white/10 py-8 text-center">
