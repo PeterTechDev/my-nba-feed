@@ -6,7 +6,6 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import ts from "typescript";
-import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const require = createRequire(import.meta.url);
@@ -52,10 +51,6 @@ const layoutImports = {
   "@/components/Footer": { default: () => null },
   "@/components/SpoilerModeProvider": { SpoilerModeProvider: ({ children }) => children },
 };
-
-function HomeFeed() {
-  return createElement("section", { id: "home-feed" });
-}
 
 function loadGraph(env, hooks = {}) {
   const site = load("lib/site.ts", {}, env, hooks);
@@ -131,9 +126,9 @@ const graph = loadGraph(defaultEnv);
 const publicPaths = sitemapPaths(graph.sitemap.default());
 
 function routeModule(routePath) {
+  if (routePath === "/") return graph.layout;
   const file = metadataFile(routePath);
   const imports = { "@/lib/site": graph.site };
-  if (file === "app/page.tsx") imports["@/components/HomeFeed"] = { default: HomeFeed };
   return load(file, imports, defaultEnv);
 }
 
@@ -152,6 +147,11 @@ function resolvedParent() {
     },
     twitter: { images: [{ url: new URL(inheritedTwitterImage) }] },
   };
+}
+
+async function metadataForRoute(routePath) {
+  const route = loadedRoutes.get(routePath);
+  return route.metadata ?? route.generateMetadata({}, Promise.resolve(resolvedParent()));
 }
 
 function imageHref(image) {
@@ -188,7 +188,7 @@ function disallowValues(rules) {
 for (const routePath of publicPaths) {
   test(`canonical and openGraph.url for ${routePath}`, async () => {
     const base = metadataBaseFrom(graph.layout);
-    const metadata = await loadedRoutes.get(routePath).generateMetadata({}, Promise.resolve(resolvedParent()));
+    const metadata = await metadataForRoute(routePath);
     assertNoTrailingSlash(metadata.alternates.canonical, `${routePath} canonical`);
     assertNoTrailingSlash(metadata.openGraph.url, `${routePath} openGraph.url`);
     assert.equal(metadata.alternates.canonical, routePath);
@@ -199,7 +199,13 @@ for (const routePath of publicPaths) {
   test(`inherited og:image for ${routePath}`, async () => {
     assert.equal(hasPage(routePath), true, `${routePath} is in the sitemap but has no page`);
     assert.equal(segmentHasOwnShareImage(routePath), false, `${routePath} defines its own share image`);
-    const metadata = await loadedRoutes.get(routePath).generateMetadata({}, Promise.resolve(resolvedParent()));
+    const metadata = await metadataForRoute(routePath);
+    if (routePath === "/") {
+      assert.ok(existsSync(srcFile("app/opengraph-image.tsx")));
+      assert.ok(existsSync(srcFile("app/twitter-image.tsx")));
+      assert.equal(metadata.openGraph.images, undefined, "root metadata leaves images to the file convention");
+      return;
+    }
     assert.ok(Array.isArray(metadata.openGraph.images) && metadata.openGraph.images.length > 0);
     const image = metadata.openGraph.images[0];
     const href = imageHref(image);
@@ -219,19 +225,17 @@ for (const routePath of publicPaths) {
   });
 }
 
-test("home page exports metadata for / and renders HomeFeed", async () => {
-  const page = loadedRoutes.get("/");
-  assert.equal(typeof page.generateMetadata, "function");
-  const metadata = await page.generateMetadata({}, Promise.resolve(resolvedParent()));
+test("the server layout supplies home metadata without moving the client homepage", async () => {
+  const metadata = await metadataForRoute("/");
   metadataBaseFrom(graph.layout);
   assert.equal(metadata.alternates.canonical, "/");
   assert.equal(metadata.openGraph.url, "/");
-  assert.equal(renderToStaticMarkup(createElement(page.default)), '<section id="home-feed"></section>');
+  assert.match(readFileSync(srcFile("app/page.tsx"), "utf8"), /^"use client";/);
 });
 
 test("sitemap home loc matches the home canonical without a trailing slash", async () => {
   const base = metadataBaseFrom(graph.layout);
-  const metadata = await loadedRoutes.get("/").generateMetadata({}, Promise.resolve(resolvedParent()));
+  const metadata = await metadataForRoute("/");
   const canonical = absoluteUrl(base, metadata.alternates.canonical);
   const urls = Array.from(graph.sitemap.default(), (entry) => String(entry.url));
   assert.equal(urls[0].endsWith("/"), false);
