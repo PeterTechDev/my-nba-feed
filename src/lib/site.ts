@@ -6,42 +6,37 @@ import type { Metadata, ResolvingMetadata } from "next";
  * against the preview host, not this origin.
  */
 
+const fallbackSiteUrl = "https://my-nba-feed.vercel.app";
+
 export function getSiteUrl(): URL {
-  const configured = configuredSiteUrl();
-  if (configured) return configured;
-
-  const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (productionHost) return asHttpsUrl(productionHost);
-
-  return new URL("https://my-nba-feed.vercel.app");
+  return readHttpsOrigin("NEXT_PUBLIC_SITE_URL")
+    ?? readHttpsOrigin("VERCEL_PROJECT_PRODUCTION_URL", { bareHost: true })
+    ?? new URL(fallbackSiteUrl);
 }
 
-function configuredSiteUrl(): URL | undefined {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (!configured) return undefined;
+/** https origin only. Bare hosts are a Vercel hostname, not a NEXT_PUBLIC_SITE_URL. */
+function readHttpsOrigin(name: string, options?: { bareHost?: boolean }): URL | undefined {
+  const raw = process.env[name]?.trim();
+  if (!raw) return undefined;
+  const candidate = options?.bareHost && !/^https?:\/\//i.test(raw) ? `https://${raw}` : raw;
   try {
-    const url = new URL(configured);
+    const url = new URL(candidate);
     if (url.protocol === "https:" && url.hostname && !url.username && !url.password) {
       return new URL(url.origin);
     }
   } catch {
-    // Invalid URL strings throw; fall through after the warning below.
+    // new URL throws for values such as https:///. Fall through to the warning.
   }
-  warnInvalidSiteUrl();
+  warnInvalidSiteUrl(name);
   return undefined;
 }
 
-let didWarnInvalidSiteUrl = false;
+const warnedSiteUrls = new Set<string>();
 
-function warnInvalidSiteUrl() {
-  if (didWarnInvalidSiteUrl) return;
-  didWarnInvalidSiteUrl = true;
-  console.warn("Ignoring NEXT_PUBLIC_SITE_URL because it is not a valid https URL.");
-}
-
-function asHttpsUrl(value: string): URL {
-  const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-  return new URL(new URL(withProtocol).origin);
+function warnInvalidSiteUrl(name: string) {
+  if (warnedSiteUrls.has(name)) return;
+  warnedSiteUrls.add(name);
+  console.warn(`Ignoring ${name} because it is not a valid https URL.`);
 }
 
 export const siteName = "NBA Feed";
