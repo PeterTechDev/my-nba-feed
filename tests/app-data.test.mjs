@@ -318,7 +318,7 @@ test("homepage keeps news optional after games and shows the focus-team lead onl
   }
   mocked["@/components/TeamHeader"] = { default: () => null };
   mocked["@/components/GameDataProvider"] = { default: ({ children }) => children };
-  const Home = load("app/page.tsx", {}, mocked).exports.default;
+  const Home = load("components/HomeFeed.tsx", {}, mocked).exports.default;
   let html = renderToStaticMarkup(createElement(Home));
   assert.match(html, /Your teams, latest news/);
   assert.doesNotMatch(html, /<details[^>]*\bopen(?:[=\s>])/);

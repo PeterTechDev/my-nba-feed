@@ -1,16 +1,32 @@
+import type { Metadata } from "next";
+
 /**
- * Origin used for absolute metadata URLs (Open Graph, sitemap, robots).
- * Preview deployment hosts are intentionally ignored: Vercel preview SSO
- * blocks crawlers, so shared cards must point at the public production origin.
+ * Origin for absolute metadata URLs (canonical, Open Graph url, sitemap, robots).
+ * On a Vercel preview, Next resolves file-based og:image and twitter:image
+ * against the preview host, not this origin.
  */
+
 export function getSiteUrl(): URL {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (configured) return asHttpsUrl(configured);
+  const configured = configuredSiteUrl();
+  if (configured) return configured;
 
   const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
   if (productionHost) return asHttpsUrl(productionHost);
 
   return new URL("https://my-nba-feed.vercel.app");
+}
+
+function configuredSiteUrl(): URL | undefined {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!configured) return undefined;
+  try {
+    const url = new URL(configured);
+    if (url.protocol === "https:" && url.hostname) return url;
+  } catch {
+    // Invalid URL strings throw; fall through after the warning below.
+  }
+  console.warn("Ignoring NEXT_PUBLIC_SITE_URL because it is not a valid https URL.");
+  return undefined;
 }
 
 function asHttpsUrl(value: string): URL {
@@ -19,6 +35,32 @@ function asHttpsUrl(value: string): URL {
 
 export const siteName = "NBA Feed";
 
-/** Copy grounded in the home feed and the About page. */
+/** Teams, news, games and the daily digest. Scores stay hidden until reveal. */
 export const siteDescription =
-  "Your teams, the stories around them, and the games you are saving for later. News, games, highlights, standings, schedules, rosters and a daily digest, with scores and result headlines hidden until you reveal them.";
+  "Your teams' news, games and daily digest, with scores hidden until you reveal them.";
+
+type PublicPath = "/" | "/about" | "/digest" | "/highlights" | "/players" | "/schedule" | "/standings";
+
+/**
+ * Per-route canonical and Open Graph. Setting openGraph replaces the parent
+ * object, so type, siteName and locale are repeated here. og:image stays on
+ * the file-based opengraph-image route; og:title follows the page title.
+ */
+export function routeMetadata(path: PublicPath, page?: { title?: string; description?: string }): Metadata {
+  const description = page?.description ?? siteDescription;
+  return {
+    ...(page?.title ? { title: page.title } : {}),
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      type: "website",
+      siteName,
+      locale: "en_US",
+      url: path,
+      description,
+      // File-based images live on the root segment. A child openGraph object
+      // replaces that segment, so each route points at the same image.
+      images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "NBA Feed" }],
+    },
+  };
+}

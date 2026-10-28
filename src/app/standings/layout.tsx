@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
+import { routeMetadata } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Standings" };
+export const metadata = routeMetadata("/standings", { title: "Standings" });
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
