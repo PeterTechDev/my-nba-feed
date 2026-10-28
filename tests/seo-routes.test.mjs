@@ -28,7 +28,7 @@ function metadataBaseFrom(layout) {
   return new URL(typeof base === "string" ? base : base.href);
 }
 
-function load(file, imports = {}, env = {}) {
+function load(file, imports = {}, env = {}, hooks = {}) {
   const source = readFileSync(join(srcRoot, file), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX,
@@ -37,7 +37,8 @@ function load(file, imports = {}, env = {}) {
   vm.runInNewContext(code, {
     exports,
     require: (id) => imports[id] ?? (id.endsWith(".css") ? {} : require(id)),
-    Date, URL, console,
+    Date, URL,
+    console: hooks.console ?? console,
     process: { env: { ...env } },
   }, { filename: `${file}?${JSON.stringify(env)}` });
   return exports;
@@ -56,11 +57,11 @@ function HomeFeed() {
   return createElement("section", { id: "home-feed" });
 }
 
-function loadGraph(env) {
-  const site = load("lib/site.ts", {}, env);
-  const layout = load("app/layout.tsx", { ...layoutImports, "@/lib/site": site }, env);
-  const sitemap = load("app/sitemap.ts", { "@/lib/site": site }, env);
-  const robots = load("app/robots.ts", { "@/lib/site": site }, env);
+function loadGraph(env, hooks = {}) {
+  const site = load("lib/site.ts", {}, env, hooks);
+  const layout = load("app/layout.tsx", { ...layoutImports, "@/lib/site": site }, env, hooks);
+  const sitemap = load("app/sitemap.ts", { "@/lib/site": site }, env, hooks);
+  const robots = load("app/robots.ts", { "@/lib/site": site }, env, hooks);
   return { site, layout, sitemap, robots };
 }
 
@@ -322,10 +323,67 @@ testSiteEnv("VERCEL_URL alone does not replace metadataBase", {
   assertOrigin({ VERCEL_URL: "my-nba-feed-abc123.vercel.app" }, "https://my-nba-feed.vercel.app");
 });
 
-testSiteEnv("NEXT_PUBLIC_SITE_URL with a trailing slash has no double slash and no trailing slash on the home canonical", {
-  NEXT_PUBLIC_SITE_URL: "https://x.example/",
+const fallbackOrigin = "https://my-nba-feed.vercel.app";
+const ignoredSiteUrlWarning = "Ignoring NEXT_PUBLIC_SITE_URL because it is not a valid https URL.";
+
+function assertConfiguredSite(value, origin, { rejected = false } = {}) {
+  const warnings = [];
+  const loaded = loadGraph({ NEXT_PUBLIC_SITE_URL: value }, {
+    console: { ...console, warn(...args) { warnings.push(args.map((part) => String(part)).join(" ")); } },
+  });
+  const base = metadataBaseFrom(loaded.layout);
+  assert.equal(base.origin, origin);
+  assert.equal(base.pathname, "/", `metadataBase kept a non-origin path: ${base.pathname}`);
+  assert.equal(base.search, "");
+  assert.equal(base.hash, "");
+  assert.equal(base.username, "");
+  assert.equal(base.password, "");
+  assert.equal(base.href, `${origin}/`);
+  assert.equal(base.href.includes("@"), false);
+  assertNoDoubleSlash(base.href);
+  const urls = Array.from(loaded.sitemap.default(), (entry) => `${entry.url}`);
+  const paths = sitemapPaths(loaded.sitemap.default());
+  assert.equal(urls[0], origin);
+  assert.equal(urls[0].endsWith("/"), false);
+  assert.equal(urls[0], absoluteUrl(base, "/"));
+  assert.deepEqual(urls, paths.map((routePath) => routePath === "/" ? origin : `${origin}${routePath}`));
+  for (const url of urls) assertNoDoubleSlash(url);
+  const robots = loaded.robots.default();
+  assert.ok(disallowValues(robots.rules).includes("/api/"));
+  assert.equal(`${robots.sitemap}`, `${origin}/sitemap.xml`);
+  assertNoDoubleSlash(robots.sitemap);
+  if (rejected) {
+    assert.deepEqual(warnings, [ignoredSiteUrlWarning]);
+    assert.equal(warnings.some((warning) => warning.includes("pw") || warning.includes("user:pw") || warning.includes("@")), false);
+  } else {
+    assert.deepEqual(warnings, []);
+  }
+}
+
+// A single trailing slash is collapsed by the URL parser, so it does not
+// separate the pre-112874a parser from later code. Double slashes, a path,
+// a query, and a hash do: getSiteUrl keeps only url.origin.
+const configuredOriginCases = [
+  ["https://x.example/", "https://x.example"],
+  ["https://x.example//", "https://x.example"],
+  ["https://x.example///", "https://x.example"],
+  ["https://x.example/base", "https://x.example"],
+  ["https://x.example/base/", "https://x.example"],
+  ["https://x.example/base//", "https://x.example"],
+  ["https://x.example/?q=1", "https://x.example"],
+  ["https://x.example/?q=1/", "https://x.example"],
+  ["https://x.example/#top/", "https://x.example"],
+  ["  https://x.example/base/  ", "https://x.example"],
+];
+
+for (const [value, origin] of configuredOriginCases) {
+  testSiteEnv(`NEXT_PUBLIC_SITE_URL ${JSON.stringify(value)} is only ${origin}`, { NEXT_PUBLIC_SITE_URL: value }, () => {
+    assertConfiguredSite(value, origin);
+  });
+}
+
+testSiteEnv("NEXT_PUBLIC_SITE_URL with credentials falls back to the production origin", {
+  NEXT_PUBLIC_SITE_URL: "https://user:pw@x.example/base/",
 }, () => {
-  // The stored base must collapse https://x.example/ to origin https://x.example.
-  // Home canonical has no trailing slash, and no path may contain a double slash.
-  assertOrigin({ NEXT_PUBLIC_SITE_URL: "https://x.example/" }, "https://x.example");
+  assertConfiguredSite("https://user:pw@x.example/base/", fallbackOrigin, { rejected: true });
 });
