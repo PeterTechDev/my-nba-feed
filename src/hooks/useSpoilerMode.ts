@@ -62,6 +62,12 @@ export function useSpoilerMode() {
     });
   }, []);
 
+  const showScoresAndHeadlines = useCallback(() => {
+    const next = { hideScores: false, hideHeadlines: false };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    setSettings(next);
+  }, []);
+
   const effectiveSettings = mounted ? settings : { hideScores: true, hideHeadlines: true };
 
   return {
@@ -71,6 +77,7 @@ export function useSpoilerMode() {
     toggleSpoiler,
     setHideScores,
     setHideHeadlines,
+    showScoresAndHeadlines,
     mounted,
   };
 }
