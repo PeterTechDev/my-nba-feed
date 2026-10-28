@@ -165,6 +165,7 @@ const news = load("lib/news.ts", { Date: FixedDate }, { "./api": api, "./teams":
 const celtics = teams.getCeltics();
 const lakers = teams.teams.find((team) => team.name === "Lakers");
 const UP_TO_DATE = "You’re up to date with the Celtics. You can head out.";
+const UP_TO_DATE_LIVE = "You’re up to date with the Celtics.";
 const UP_TO_DATE_TEAMS = "You’re up to date with your teams.";
 const NOTHING_NEW = "Nothing new for the Celtics. You can head out.";
 
@@ -264,6 +265,8 @@ function markerText(container) {
 }
 
 const celticsNext = { id: 2, date: "2026-10-27", status: "Scheduled", isHome: true, homeTeam: celtics, awayTeam: { id: 3, name: "Nets", abbreviation: "BKN" }, homeScore: 0, awayScore: 0 };
+const celticsLive = { id: 12, date: "2026-10-27", status: "2nd Qtr", isHome: true, homeTeam: { id: celtics.id, name: "Celtics", abbreviation: "BOS" }, awayTeam: { id: 3, name: "Nets", abbreviation: "BKN" }, homeScore: 40, awayScore: 38 };
+const lakersLive = { id: 11, date: "2026-10-27", status: "1st Qtr", isHome: true, homeTeam: { id: lakers.id, name: "Lakers", abbreviation: "LAL" }, awayTeam: { id: celtics.id, name: "Celtics", abbreviation: "BOS" }, homeScore: 24, awayScore: 20 };
 const lakersLastNight = { id: 9, date: "2026-10-26", status: "Final", isHome: true, homeTeam: { id: lakers.id, name: "Lakers", abbreviation: "LAL" }, awayTeam: { id: 2, name: "Celtics", abbreviation: "BOS" }, homeScore: 110, awayScore: 101 };
 
 test("end marker stays hidden while games or news are still loading", () => {
@@ -348,6 +351,36 @@ test("a favorite outside the focus keeps the marker hidden when its games reques
   try {
     assert.equal(endMarker(view.container).length, 0);
     assert.doesNotMatch(view.container.textContent, /up to date|Nothing new|head out|Lakers/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("a live favorite counts when the focus has no game and no team news", () => {
+  const view = renderEnd({
+    favorites: [lakers.id],
+    games: {
+      [celtics.id]: { data: gamesResponse() },
+      [lakers.id]: { data: gamesResponse({ currentGame: lakersLive }) },
+    },
+    feeds: { Celtics: { items: [], error: false }, Lakers: { items: [], error: false }, NBA: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), UP_TO_DATE_TEAMS);
+    assert.doesNotMatch(view.container.textContent, /Nothing new|head out/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("a live focus team is up to date without being told to head out", () => {
+  const view = renderEnd({
+    games: { [celtics.id]: { data: gamesResponse({ currentGame: celticsLive }) } },
+    feeds: { Celtics: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), UP_TO_DATE_LIVE);
+    assert.doesNotMatch(view.container.textContent, /head out/);
   } finally {
     view.unmount();
   }
