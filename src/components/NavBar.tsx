@@ -125,7 +125,13 @@ export default function NavBar() {
   const protectionButtonRef = useRef<HTMLButtonElement>(null);
   const mobileProtection = spoilerFree ? "Spoilers hidden" : hideScores ? "Scores hidden" : hideHeadlines ? "Headlines hidden" : "Spoilers shown";
   const protection = `${mobileProtection} by default`;
-  const protectionAction = hideScores || hideHeadlines ? "Show scores and headlines by default" : "Hide scores and headlines by default";
+  const protectionAction = hideScores && hideHeadlines
+    ? "Show scores and headlines by default"
+    : hideScores
+      ? "Show scores by default"
+      : hideHeadlines
+        ? "Show headlines by default"
+        : "Hide scores and headlines by default";
 
   useEffect(() => {
     if (revealNotice && (hideScores || hideHeadlines)) setRevealNotice(false);
