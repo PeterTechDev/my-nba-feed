@@ -21,4 +21,4 @@ export const siteName = "NBA Feed";
 
 /** Copy grounded in the home feed and the About page. */
 export const siteDescription =
-  "Your teams, the stories around them, and the games you are saving for later. News, games, highlights, standings, schedules, rosters, fan conversations and a daily digest, with scores and result headlines hidden until you reveal them.";
+  "Your teams, the stories around them, and the games you are saving for later. News, games, highlights, standings, schedules, rosters and a daily digest, with scores and result headlines hidden until you reveal them.";

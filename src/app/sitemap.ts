@@ -1,16 +1,17 @@
 import type { MetadataRoute } from "next";
 import { getSiteUrl } from "@/lib/site";
 
-/** Public pages that exist under src/app. API routes are not included. */
+/**
+ * Public pages under src/app. /api is excluded.
+ * /compare and /social are omitted on purpose: PET-28 (#3) removes those routes.
+ */
 const publicPaths = [
   "/",
   "/about",
-  "/compare",
   "/digest",
   "/highlights",
   "/players",
   "/schedule",
-  "/social",
   "/standings",
 ];
 

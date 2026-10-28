@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Team Comparison" };
+export const metadata: Metadata = { title: "Team Comparison | NBA Feed" };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
