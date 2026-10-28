@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { test } from "node:test";
+import { describe, test } from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 
@@ -50,7 +50,11 @@ function classify(headline) {
   const run = chain.then(async () => {
     const id = ++seq;
     feedXml = `<rss><item><title>${escapeXml(headline)}</title><source>ESPN</source><link>https://news.google.com/rss/articles/${id}</link><pubDate>${pubDate}</pubDate></item></rss>`;
-    const result = await route.GET({ nextUrl: new URL("http://localhost/api/news?team=NBA") });
+    // none is the only token that returns the raw headline. The table checks that text, not the redacted default.
+    const result = await route.GET({
+      nextUrl: new URL("http://localhost/api/news?team=NBA"),
+      headers: new Headers({ "x-nba-spoilers": "none" }),
+    });
     assert.equal(result.status, 200, headline);
     assert.equal(result.body.length, 1, headline);
     return result.body[0];
@@ -223,18 +227,86 @@ const obviousNegatives = [
   { headline: "Game 3 tonight", expected: false, reason: "Game 3 tonight não pode casar" },
 ];
 
-const cases = [...acceptedPrice, ...devTable, ...devScripts, ...criterionSpellings, ...roundTwo, ...obviousNegatives];
+// Placar sem outro gatilho. 1336e3f cobre hífen, en dash, em dash, AP e dois-pontos.
+const scoreFormats = [
+  { headline: "118-107", expected: true, reason: "placar sozinho com hífen" },
+  { headline: "118\u2013107", expected: true, reason: "placar sozinho com en dash" },
+  { headline: "118\u2014107", expected: true, reason: "placar sozinho com em dash" },
+  { headline: "Celtics 118, Knicks 107", expected: true, reason: "placar no formato AP" },
+  { headline: "118:107", expected: true, reason: "placar com dois-pontos" },
+  { headline: "50:189", expected: true, reason: "faixa 50–189: 50 à esquerda e 189 à direita" },
+  { headline: "189:50", expected: true, reason: "faixa 50–189: 189 à esquerda e 50 à direita" },
+  { headline: "Celtics 50, Knicks 189", expected: true, reason: "AP na faixa: 50 à esquerda e 189 à direita" },
+  { headline: "Celtics 189, Knicks 50", expected: true, reason: "AP na faixa: 189 à esquerda e 50 à direita" },
+];
+
+// Fora da faixa 50–189 o placar com : ou AP não é resultado. 3:45 parece horário.
+const scoreBandEdges = [
+  { headline: "49:107", expected: false, reason: "49 à esquerda fica fora da faixa" },
+  { headline: "107:49", expected: false, reason: "49 à direita fica fora da faixa" },
+  { headline: "190:107", expected: false, reason: "190 à esquerda fica fora da faixa" },
+  { headline: "107:190", expected: false, reason: "190 à direita fica fora da faixa" },
+  { headline: "3:45", expected: false, reason: "3:45 parece horário e fica fora da faixa" },
+  { headline: "Celtics 49, Knicks 107", expected: false, reason: "AP com 49 à esquerda" },
+  { headline: "Celtics 107, Knicks 49", expected: false, reason: "AP com 49 à direita" },
+  { headline: "Celtics 190, Knicks 107", expected: false, reason: "AP com 190 à esquerda" },
+  { headline: "Celtics 107, Knicks 190", expected: false, reason: "AP com 190 à direita" },
+];
+
+// Só a alternativa leads/trails series. Sem número, para não cair no placar de série.
+const seriesTriggers = [
+  { headline: "Celtics lead the series", expected: true, reason: "só lead the series" },
+  { headline: "Knicks trail series", expected: true, reason: "só trail series" },
+];
+
+// Uma forma por verbo novo. A manchete não traz outro gatilho.
+const newVerbForms = [
+  { headline: "Celtics carry past Nets", expected: true, reason: "só carry … past" },
+  { headline: "Celtics carried past Nets", expected: true, reason: "só carried … past" },
+  { headline: "Brown powered past the Nets", expected: true, reason: "só powered … past" },
+  { headline: "Celtics improves to 3-1", expected: true, reason: "só improves to N-N" },
+  { headline: "Celtics improved to 4-2", expected: true, reason: "só improved to N-N" },
+  { headline: "Boston moves to 5-2", expected: true, reason: "só moves to N-N" },
+  { headline: "Boston moved to 6-3", expected: true, reason: "só moved to N-N" },
+  { headline: "Knicks falls to the Pacers", expected: true, reason: "só falls to" },
+];
+
+// Palavras que contêm um gatilho. O \b tem de mantê-las fora.
+const boundaryNegatives = [
+  { headline: "that 3-1", expected: false, reason: "that contém at" },
+  { headline: "flat 2-1", expected: false, reason: "flat contém at" },
+  { headline: "care 4-1", expected: false, reason: "care contém are" },
+  { headline: "Celtics stop the skid", expected: false, reason: "stop contém top" },
+  { headline: "Celtics take the route", expected: false, reason: "route contém rout" },
+  { headline: "swing through practice", expected: false, reason: "swing contém win" },
+  { headline: "pledge of effort", expected: false, reason: "pledge contém edge" },
+  { headline: "finally tonight", expected: false, reason: "finally contém final" },
+  { headline: "semifinal preview", expected: false, reason: "semifinal contém final" },
+  { headline: "stunt in warmups", expected: false, reason: "stunt contém stun" },
+  { headline: "sinking feeling", expected: false, reason: "sinking contém sink" },
+  { headline: "downtown parade", expected: false, reason: "downtown contém down" },
+  { headline: "upbeat preview", expected: false, reason: "upbeat contém beat" },
+  { headline: "beating the trap", expected: false, reason: "beating contém beat" },
+  { headline: "topic of the day", expected: false, reason: "topic contém top" },
+  { headline: "winter camp", expected: false, reason: "winter contém win" },
+  { headline: "heartbeat of the team", expected: false, reason: "heartbeat contém beat" },
+  { headline: "floss routine", expected: false, reason: "floss contém loss" },
+];
+
+const cases = [...acceptedPrice, ...devTable, ...devScripts, ...criterionSpellings, ...roundTwo, ...scoreFormats, ...scoreBandEdges, ...seriesTriggers, ...newVerbForms, ...obviousNegatives, ...boundaryNegatives];
 const seen = new Set();
 for (const row of cases) {
   assert.equal(seen.has(row.headline), false, `duplicate headline: ${row.headline}`);
   seen.add(row.headline);
 }
 
-for (const row of cases) {
-  test(row.headline, async () => {
-    const item = await classify(row.headline);
-    assert.equal(item.title, row.headline, row.reason);
-    assert.equal(item.isSpoiler, row.expected, row.reason);
-    assert.equal(item.safeTitle, row.expected ? "Spoiler-protected headline from ESPN" : row.headline, row.reason);
-  });
-}
+describe("regex", () => {
+  for (const row of cases) {
+    test(row.headline, async () => {
+      const item = await classify(row.headline);
+      assert.equal(item.title, row.headline, row.reason);
+      assert.equal(item.isSpoiler, row.expected, row.reason);
+      assert.equal(item.safeTitle, row.expected ? "Spoiler-protected headline from ESPN" : row.headline, row.reason);
+    });
+  }
+});
