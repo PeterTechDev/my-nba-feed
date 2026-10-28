@@ -5,7 +5,6 @@ import MarkdownContent from "@/components/MarkdownContent";
 import DataError from "@/components/DataError";
 import { digestContentIsProtected, useSpoilerContext } from "@/components/SpoilerModeProvider";
 import { useRemoteData } from "@/hooks/useRemoteData";
-import { revealDigest } from "@/lib/api";
 import { formatGameDate } from "@/lib/nbaDate";
 import type { DigestEntry, FeedbackAgg } from "@/lib/digest";
 import { getDigestPresentation } from "@/lib/digestPresentation";
@@ -18,6 +17,20 @@ const STYLE_META = {
 };
 function formatDate(date: string) {
   return formatGameDate(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+}
+
+function revealDigest(date: string) {
+  const host = globalThis as typeof globalThis & { __nbaSpoilerBus?: { prefs: { hideScores: boolean; hideHeadlines: boolean } } };
+  const prefs = host.__nbaSpoilerBus?.prefs ?? { hideScores: true, hideHeadlines: true };
+  const header = !prefs.hideScores && !prefs.hideHeadlines
+    ? "none"
+    : [prefs.hideScores ? "scores" : "", prefs.hideHeadlines ? "headlines" : ""].filter(Boolean).join(",");
+  const params = new URLSearchParams({ date, reveal: date });
+  return fetch(`/api/digest?${params}`, { headers: { "x-nba-spoilers": header } }).then(async (response) => {
+    if (!response.ok) return null;
+    const data = await response.json() as { digest?: (DigestEntry & { redacted?: boolean }) | null };
+    return data.digest && !data.digest.redacted ? data.digest : null;
+  });
 }
 type Reaction = "fire" | "thumbsdown";
 interface DigestCardProps {
