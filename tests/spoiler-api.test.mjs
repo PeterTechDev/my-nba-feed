@@ -917,6 +917,226 @@ test("Record hidden offers Reveal record without showing scores or headlines", (
   assert.doesNotMatch(html, /41-20|101|97/);
 });
 
+function createRecordDocument() {
+  const ELEMENT = 1, TEXT = 3, COMMENT = 8;
+  const doc = { nodeType: 9, nodeName: "#document", childNodes: [], listeners: {} };
+  doc.ownerDocument = doc;
+  doc.addEventListener = (type, fn) => { (doc.listeners[type] ||= []).push(fn); };
+  doc.removeEventListener = (type, fn) => { doc.listeners[type] = (doc.listeners[type] || []).filter((item) => item !== fn); };
+  function refresh(n) {
+    n.firstChild = n.childNodes[0] || null;
+    n.lastChild = n.childNodes.at(-1) || null;
+    n.childNodes.forEach((child, index) => {
+      child.nextSibling = n.childNodes[index + 1] || null;
+      child.previousSibling = n.childNodes[index - 1] || null;
+    });
+  }
+  function node(type, name) {
+    const n = { nodeType: type, nodeName: name, parentNode: null, childNodes: [], ownerDocument: doc, style: {}, namespaceURI: "http://www.w3.org/1999/xhtml", listeners: {}, attributes: {}, data: "" };
+    n.appendChild = (child) => { if (child.parentNode) child.parentNode.removeChild(child); child.parentNode = n; n.childNodes.push(child); refresh(n); return child; };
+    n.insertBefore = (child, ref) => { if (child.parentNode) child.parentNode.removeChild(child); child.parentNode = n; const index = ref ? n.childNodes.indexOf(ref) : -1; n.childNodes.splice(index < 0 ? n.childNodes.length : index, 0, child); refresh(n); return child; };
+    n.removeChild = (child) => {
+      const index = n.childNodes.indexOf(child);
+      if (index >= 0) n.childNodes.splice(index, 1);
+      const focused = doc.activeElement;
+      let inside = focused === child;
+      const seen = new Set();
+      for (let node = focused; node && !inside && !seen.has(node); node = node.parentNode) {
+        seen.add(node);
+        inside = node === child;
+      }
+      if (child.parentNode === n) child.parentNode = null;
+      refresh(n);
+      if (inside) doc.activeElement = doc.body;
+      return child;
+    };
+    n.setAttribute = (key, value) => { n.attributes[key] = String(value); };
+    n.getAttribute = (key) => (Object.prototype.hasOwnProperty.call(n.attributes, key) ? n.attributes[key] : null);
+    n.removeAttribute = (key) => { delete n.attributes[key]; };
+    n.hasAttribute = (key) => Object.prototype.hasOwnProperty.call(n.attributes, key);
+    n.addEventListener = (type, fn) => { (n.listeners[type] ||= []).push(fn); };
+    n.removeEventListener = (type, fn) => { n.listeners[type] = (n.listeners[type] || []).filter((item) => item !== fn); };
+    n.focus = () => { doc.activeElement = n; };
+    n.click = () => {
+      n.focus();
+      const event = { type: "click", target: n, bubbles: true, cancelable: true, defaultPrevented: false, eventPhase: 3, timeStamp: 0, preventDefault() { event.defaultPrevented = true; }, stopPropagation() { event._stop = true; }, isPropagationStopped() { return Boolean(event._stop); } };
+      let current = n;
+      while (current) {
+        event.currentTarget = current;
+        for (const fn of [...(current.listeners?.click || [])]) fn(event);
+        if (event._stop) break;
+        current = current.parentNode;
+      }
+    };
+    Object.defineProperty(n, "textContent", {
+      get() { return n.nodeType === TEXT ? n.data : n.childNodes.map((child) => child.nodeType === TEXT ? child.data : (child.textContent || "")).join(""); },
+      set(value) { n.childNodes = []; const text = node(TEXT, "#text"); text.data = String(value ?? ""); n.appendChild(text); },
+    });
+    Object.defineProperty(n, "nodeValue", {
+      get() { return n.nodeType === TEXT || n.nodeType === COMMENT ? n.data : null; },
+      set(value) { if (n.nodeType === TEXT || n.nodeType === COMMENT) n.data = String(value ?? ""); },
+    });
+    Object.defineProperty(n, "tagName", { get() { return n.nodeType === ELEMENT ? String(name).toUpperCase() : undefined; } });
+    return n;
+  }
+  doc.createElement = (name) => node(ELEMENT, String(name));
+  doc.createElementNS = (_ns, name) => doc.createElement(name);
+  doc.createTextNode = (data) => { const text = node(TEXT, "#text"); text.data = String(data); return text; };
+  doc.createComment = (data) => { const text = node(COMMENT, "#comment"); text.data = String(data); return text; };
+  doc.documentElement = doc.createElement("html");
+  doc.body = doc.createElement("body");
+  doc.head = doc.createElement("head");
+  doc.documentElement.appendChild(doc.head);
+  doc.documentElement.appendChild(doc.body);
+  doc.activeElement = doc.body;
+  return doc;
+}
+
+function accessibleName(element) {
+  return (element.getAttribute("aria-label") || element.textContent || "").replace(/\s+/g, " ").trim();
+}
+function elementRole(element) {
+  return element.getAttribute("role") || (element.nodeName === "button" ? "button" : null);
+}
+function queryByRole(root, role, name) {
+  const found = [];
+  const walk = (node) => {
+    if (!node || node.nodeType !== 1) return;
+    if (elementRole(node) === role && (name === undefined || accessibleName(node) === name)) found.push(node);
+    for (const child of node.childNodes) walk(child);
+  };
+  walk(root);
+  return found;
+}
+function getByRole(root, role, { name } = {}) {
+  const found = queryByRole(root, role, name);
+  if (found.length !== 1) {
+    const label = name ? `${role} "${name}"` : role;
+    throw new Error(`getByRole ${label} found ${found.length}`);
+  }
+  return found[0];
+}
+function hiddenAncestor(element) {
+  let current = element;
+  const seen = new Set();
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    if (current.getAttribute?.("aria-hidden") === "true") return current;
+    current = current.parentNode;
+  }
+  return null;
+}
+
+function mountRecordBadge() {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  const document = createRecordDocument();
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  globalThis.document = document;
+  globalThis.HTMLIFrameElement = function HTMLIFrameElement() {};
+  globalThis.window = globalThis;
+  const React = require("react");
+  const { createRoot } = require("react-dom/client");
+  const { act } = require("react");
+  const realm = createRealm({});
+  let setRecord = () => {};
+  realm.context.__nbaRequestScoreReveal = (scope) => Promise.resolve().then(() => {
+    if (String(scope).endsWith(":record")) setRecord({ wins: 41, losses: 20, redacted: false });
+  });
+  const gameData = realm.load("hooks/useGameData.ts", {
+    react: React,
+    "./useRemoteData": { useRemoteData: () => ({ data: null, loading: false, error: false, retry() {} }) },
+    "./useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics" } }) },
+    "@/lib/api": { mergeGameReveal: (base) => base, noteGames() {}, revealedGameOverlay() {}, subscribeGameReveals: () => () => {} },
+  });
+  const Badge = realm.load("components/RecordBadge.tsx", {
+    react: React,
+    "@/hooks/useGameData": gameData,
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics" } }) },
+    "./ScoreReveal": realm.load("components/ScoreReveal.tsx", {
+      react: React,
+      "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }), digestContentIsProtected: () => true },
+    }),
+  }).default;
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  function Screen() {
+    const [record, set] = React.useState({ wins: 41, losses: 20, redacted: true });
+    setRecord = set;
+    return React.createElement(gameData.GameDataContext.Provider, {
+      value: { record, loading: false, error: null, lastGame: { id: 9, homeScore: 101, awayScore: 97, scoresRedacted: true }, currentGame: null, nextGame: null, retry() {} },
+    }, React.createElement(Badge));
+  }
+  return { document, host, act, root, Screen, restore() {
+    root.unmount();
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+    delete globalThis.HTMLIFrameElement;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;
+  } };
+}
+
+let recordUi = Promise.resolve();
+function recordTest(name, fn) {
+  test(name, async () => {
+    const run = recordUi.then(fn, fn);
+    recordUi = run.then(() => {}, () => {});
+    await run;
+  });
+}
+
+recordTest("one Reveal record click reveals the record and moves focus to Hide record", async () => {
+  const screen = mountRecordBadge();
+  try {
+    await screen.act(async () => { screen.root.render(require("react").createElement(screen.Screen)); });
+    const reveal = getByRole(screen.host, "button", { name: "Reveal record" });
+    await screen.act(async () => { reveal.click(); await Promise.resolve(); await Promise.resolve(); });
+    assert.notEqual(screen.document.activeElement, screen.document.body, "focus fell on BODY");
+    assert.equal(queryByRole(screen.host, "button", "Reveal record").length, 0, "a second Reveal record is still showing");
+    const hide = getByRole(screen.host, "button", { name: "Hide record" });
+    assert.equal(screen.document.activeElement, hide, "focus is not on Hide record");
+    assert.match(getByRole(screen.host, "status").textContent, /revealed/i);
+    assert.match(screen.host.textContent, /41-20/);
+  } finally { screen.restore(); }
+});
+
+recordTest("Hide record restores Record hidden and returns focus to Reveal record", async () => {
+  const screen = mountRecordBadge();
+  try {
+    const React = require("react");
+    await screen.act(async () => { screen.root.render(React.createElement(screen.Screen)); });
+    await screen.act(async () => { getByRole(screen.host, "button", { name: "Reveal record" }).click(); await Promise.resolve(); await Promise.resolve(); });
+    const hide = getByRole(screen.host, "button", { name: "Hide record" });
+    await screen.act(async () => { hide.click(); });
+    assert.match(screen.host.textContent, /Record hidden/);
+    const reveal = getByRole(screen.host, "button", { name: "Reveal record" });
+    assert.equal(screen.document.activeElement, reveal, "focus is not on Reveal record");
+    assert.notEqual(screen.document.activeElement, screen.document.body, "focus fell on BODY");
+  } finally { screen.restore(); }
+});
+
+recordTest("the revealed record is not inside aria-hidden", async () => {
+  const screen = mountRecordBadge();
+  try {
+    await screen.act(async () => { screen.root.render(require("react").createElement(screen.Screen)); });
+    await screen.act(async () => { getByRole(screen.host, "button", { name: "Reveal record" }).click(); await Promise.resolve(); await Promise.resolve(); });
+    const record = [...walkElements(screen.host)].find((element) => element.textContent.replace(/\s+/g, "") === "41-20");
+    assert.ok(record, "revealed record 41-20 is missing");
+    assert.ok(hiddenAncestor(record) == null, "revealed record is inside aria-hidden");
+  } finally { screen.restore(); }
+});
+
+function walkElements(root, found = []) {
+  if (!root || root.nodeType !== 1) return found;
+  found.push(root);
+  for (const child of root.childNodes) walkElements(child, found);
+  return found;
+}
+
 test("a redacted headline ignores a present link and a revealed one uses the real link", () => {
   const slots = [];
   let cursor = 0;
