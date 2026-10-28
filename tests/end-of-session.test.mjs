@@ -263,7 +263,9 @@ function renderEnd({ favorites = [], games = {}, feeds = {}, newsError = false, 
   useTeam.persist = teamPersist;
   const useFavoriteTeams = () => ({ favoriteTeamIds: favorites });
   useFavoriteTeams.persist = favoritePersist;
+  const calls = [];
   const remote = (url) => {
+    calls.push(url);
     if (url.includes("/api/games")) {
       const id = Number(new URL(url, "http://localhost").searchParams.get("teamId"));
       return { retry() {}, loading: false, error: false, data: gamesResponse(), ...games[id] };
@@ -287,7 +289,7 @@ function renderEnd({ favorites = [], games = {}, feeds = {}, newsError = false, 
     },
   }).default;
   const view = render(createElement(End));
-  return { ...view, teamPersist, favoritePersist };
+  return { ...view, calls, teamPersist, favoritePersist };
 }
 function markerText(container) {
   const marker = endMarker(container);
@@ -432,6 +434,38 @@ test("a live focus team is up to date without being told to head out", () => {
   try {
     assert.equal(markerText(view.container), UP_TO_DATE_LIVE);
     assert.doesNotMatch(view.container.textContent, /head out/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("team news with no games is still up to date", () => {
+  const view = renderEnd({
+    games: { [celtics.id]: { data: gamesResponse() } },
+    feeds: { Celtics: { items: [story("Celtics opener")], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), "You’re up to date with the Celtics. You can head out.");
+  } finally {
+    view.unmount();
+  }
+});
+
+test("a personalized feed requests the NBA news team", () => {
+  const view = renderEnd({
+    favorites: [lakers.id],
+    games: {
+      [celtics.id]: { data: gamesResponse() },
+      [lakers.id]: { data: gamesResponse() },
+    },
+    feeds: { Lakers: { items: [], error: false }, Celtics: { items: [], error: false }, NBA: { items: [], error: false } },
+  });
+  try {
+    const newsUrl = view.calls.map((url) => new URL(url, "http://localhost")).find((url) => url.pathname === "/api/news");
+    assert.ok(newsUrl);
+    const teams = newsUrl.searchParams.get("teams").split(",");
+    assert.ok(teams.includes("NBA"));
+    assert.deepEqual(teams, ["Lakers", "Celtics", "NBA"]);
   } finally {
     view.unmount();
   }
@@ -615,12 +649,46 @@ test("a 22:00 EDT tipoff still belongs to that Eastern day on the hero", () => {
   const clock = "2026-10-27T16:00:00Z";
   const start = "2026-10-28T02:00:00Z";
   const nbaDates = datesAt(clock);
-  const view = renderHero({ currentGame: null, nextGame: scheduledGame(celtics, "2026-10-28", start) }, nbaDates);
+  const view = renderHero({ currentGame: null, nextGame: scheduledGame(celtics, "2026-10-27", start) }, nbaDates);
   try {
     assert.match(view.container.textContent, /vs Nets/);
   } finally {
     view.unmount();
   }
+});
+
+test("the hero date line uses the Eastern day of a late tipoff", () => {
+  const clock = "2026-10-28T02:00:00Z";
+  const nbaDates = datesAt(clock);
+  const view = renderHero({
+    currentGame: null,
+    nextGame: scheduledGame(celtics, "2026-10-27", clock),
+  }, nbaDates);
+  try {
+    assert.match(view.container.textContent, /Today/);
+    assert.match(view.container.textContent, /Oct 27 · Home/);
+    assert.doesNotMatch(view.container.textContent, /Oct 28/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("a blank or TBD date does not crash the hero", () => {
+  const failures = [];
+  for (const date of ["", "TBD"]) {
+    try {
+      const view = renderHero({
+        currentGame: null,
+        nextGame: { id: 90, date, status: "Scheduled", isHome: true, homeTeam: celtics, awayTeam: { id: 3, name: "Nets", abbreviation: "BKN" }, homeScore: 0, awayScore: 0 },
+      }, dates);
+      const text = view.container.textContent;
+      view.unmount();
+      if (text.includes("vs Nets")) failures.push(`${JSON.stringify(date)} rendered a matchup: ${text}`);
+    } catch (error) {
+      failures.push(`${JSON.stringify(date)} threw ${error.name}: ${error.message}`);
+    }
+  }
+  assert.deepEqual(failures, []);
 });
 
 test("a 19:00 EST tipoff still belongs to that Eastern day on the hero", () => {
@@ -774,6 +842,36 @@ test("a response for the previous url list is ignored after the urls change", as
   } finally {
     act(() => { root.unmount(); });
   }
+});
+
+test("a late response after unmount does not call setState", async () => {
+  // H4 removes `if (active)` before setState. Cleanup sets active = false and
+  // deletes the listener on the next line, and nothing calls sync between them.
+  const React = require("react");
+  let updates = 0;
+  const tracingReact = {
+    ...React,
+    useState(initial) {
+      const [state, setState] = React.useState(initial);
+      return [state, (next) => { updates += 1; setState(next); }];
+    },
+  };
+  let resolveFetch;
+  const hooks = load("hooks/useRemoteData.ts", {
+    fetch: () => new Promise((resolve) => { resolveFetch = resolve; }),
+    AbortController, clearTimeout, setInterval, clearInterval, queueMicrotask, document, window: globalThis,
+  }, { react: tracingReact });
+  function View() {
+    hooks.useRemoteDataAll(["/api/games?teamId=14"]);
+    return null;
+  }
+  const view = render(createElement(View));
+  view.unmount();
+  await settle();
+  const afterCleanup = updates;
+  resolveFetch({ ok: true, json: async () => ({ id: "late" }) });
+  await settle();
+  assert.equal(updates, afterCleanup);
 });
 
 test("unmount aborts the in-flight request of the last subscriber", async () => {
