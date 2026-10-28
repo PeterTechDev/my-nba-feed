@@ -110,7 +110,7 @@ export default function NavBar() {
   }, [pathname]);
 
   function onProtectionClick() {
-    if (spoilerFree) {
+    if (hideScores || hideHeadlines) {
       setConfirmReveal(true);
       return;
     }
@@ -153,7 +153,7 @@ export default function NavBar() {
           <div className="hidden xl:flex xl:items-center">{navigationLinks}</div>
           <div className="flex items-center gap-1 xl:ml-auto xl:border-l xl:border-white/10 xl:pl-3">
           <button ref={protectionButtonRef} type="button" onClick={onProtectionClick}
-            aria-haspopup={spoilerFree ? "dialog" : undefined}
+            aria-haspopup={hideScores || hideHeadlines ? "dialog" : undefined}
             aria-controls={confirmReveal ? "reveal-spoilers" : undefined}
             aria-label={`${protection}. ${spoilerFree ? "Show scores and headlines by default" : "Hide scores and headlines by default"}`}
             title={`${protection}. Individual items can be revealed.`}
