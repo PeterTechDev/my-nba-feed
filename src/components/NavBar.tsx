@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
+import { BarChart3, Calendar, Play, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
 import Modal from "./Modal";
 import FavoriteTeamsModal from "./FavoriteTeamsModal";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
@@ -13,8 +13,6 @@ const links = [
   { href: "/standings", label: "Standings", icon: BarChart3 },
   { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/highlights", label: "Highlights", icon: Play },
-  { href: "/compare", label: "Compare", icon: ArrowLeftRight },
-  { href: "/social", label: "Social", icon: MessageCircle },
   { href: "/digest", label: "Digest", icon: BookOpen },
   { href: "/about", label: "About", icon: Info },
 ];
@@ -93,7 +91,7 @@ export default function NavBar() {
             <label className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Hide scores and records</p>
-                <p className="text-xs text-white/70 mt-1">Protects game scores, records, standings and comparison statistics until reveal.</p>
+                <p className="text-xs text-white/70 mt-1">Protects game scores, records and standings until reveal.</p>
               </div>
               <input
                 type="checkbox"
@@ -105,7 +103,7 @@ export default function NavBar() {
             <label className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Hide result headlines</p>
-                <p className="text-xs text-white/70 mt-1">Protects news headlines and all social titles and images until reveal.</p>
+                <p className="text-xs text-white/70 mt-1">Protects news headlines until reveal.</p>
               </div>
               <input
                 type="checkbox"
