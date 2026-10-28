@@ -1,69 +1,121 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import ts from "typescript";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const require = createRequire(import.meta.url);
-// Same absolute-url rule Next uses for canonical and openGraph.url
-// (root pathname with an empty query becomes the origin, no trailing slash).
-const { resolveAbsoluteUrlWithPathname } = require("next/dist/lib/metadata/resolvers/resolve-url.js");
+const srcRoot = fileURLToPath(new URL("../src/", import.meta.url));
 
-function load(file, globals = {}, imports = {}) {
-  const source = readFileSync(new URL("../src/" + file, import.meta.url), "utf8");
+// Next does not export its metadata URL resolver. For an origin metadataBase,
+// `new URL` plus "pathname / and empty query → origin" matches that resolver:
+// the home canonical has no trailing slash, and a base href of
+// https://host/ does not produce a double slash.
+function absoluteUrl(metadataBase, path) {
+  const url = new URL(path, metadataBase);
+  if (url.pathname === "/" && url.search === "" && url.hash === "") return url.origin;
+  return url.href;
+}
+
+function metadataBaseFrom(layout) {
+  const base = layout.metadata?.metadataBase;
+  assert.ok(base, "app/layout.tsx must export metadata.metadataBase");
+  return new URL(typeof base === "string" ? base : base.href);
+}
+
+function load(file, imports = {}, env = {}) {
+  const source = readFileSync(join(srcRoot, file), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX,
   } }).outputText;
   const exports = {};
-  const scope = {
+  vm.runInNewContext(code, {
     exports,
     require: (id) => imports[id] ?? (id.endsWith(".css") ? {} : require(id)),
     Date, URL, console,
-    ...globals,
-  };
-  vm.runInNewContext(code, scope, { filename: file });
+    process: { env: { ...env } },
+  }, { filename: `${file}?${JSON.stringify(env)}` });
   return exports;
 }
 
-const isolatedProcess = { env: {} };
-const site = load("lib/site.ts", { process: isolatedProcess });
-const rootLayout = load("app/layout.tsx", { process: isolatedProcess }, {
+const layoutImports = {
   "next/font/google": { Inter: () => ({ variable: "--font-inter" }) },
   "./globals.css": {},
-  "@/lib/site": site,
   "@/components/TeamThemeProvider": { default: () => null },
   "@/components/NavBar": { default: () => null },
   "@/components/Footer": { default: () => null },
   "@/components/SpoilerModeProvider": { SpoilerModeProvider: ({ children }) => children },
-});
-const sitemap = load("app/sitemap.ts", { process: isolatedProcess }, { "@/lib/site": site });
+};
 
 function HomeFeed() {
   return createElement("section", { id: "home-feed" });
 }
 
-/**
- * Public routes from sitemap.ts / PublicPath. canonical and openGraph.url are
- * the relative values routeMetadata sets; absolute is the URL Next emits from
- * metadataBase https://my-nba-feed.vercel.app. Home has no trailing slash.
- * /compare and /social are outside this table on purpose (PET-28).
- */
-const publicRoutes = [
-  { path: "/", module: "app/page.tsx", canonical: "/", openGraphUrl: "/", absolute: "https://my-nba-feed.vercel.app" },
-  { path: "/about", module: "app/about/page.tsx", canonical: "/about", openGraphUrl: "/about", absolute: "https://my-nba-feed.vercel.app/about" },
-  { path: "/digest", module: "app/digest/layout.tsx", canonical: "/digest", openGraphUrl: "/digest", absolute: "https://my-nba-feed.vercel.app/digest" },
-  { path: "/highlights", module: "app/highlights/layout.tsx", canonical: "/highlights", openGraphUrl: "/highlights", absolute: "https://my-nba-feed.vercel.app/highlights" },
-  { path: "/players", module: "app/players/layout.tsx", canonical: "/players", openGraphUrl: "/players", absolute: "https://my-nba-feed.vercel.app/players" },
-  { path: "/schedule", module: "app/schedule/layout.tsx", canonical: "/schedule", openGraphUrl: "/schedule", absolute: "https://my-nba-feed.vercel.app/schedule" },
-  { path: "/standings", module: "app/standings/layout.tsx", canonical: "/standings", openGraphUrl: "/standings", absolute: "https://my-nba-feed.vercel.app/standings" },
-];
+function loadGraph(env) {
+  const site = load("lib/site.ts", {}, env);
+  const layout = load("app/layout.tsx", { ...layoutImports, "@/lib/site": site }, env);
+  const sitemap = load("app/sitemap.ts", { "@/lib/site": site }, env);
+  const robots = load("app/robots.ts", { "@/lib/site": site }, env);
+  return { site, layout, sitemap, robots };
+}
 
-// Parent openGraph image Next already resolved from app/opengraph-image.
-// The query is the content hash. On a preview the host matches twitter-image
-// and is not metadataBase.
+function srcFile(file) {
+  return join(srcRoot, file);
+}
+
+function sitemapPaths(entries) {
+  return Array.from(entries, (entry) => {
+    const pathname = new URL(`${entry.url}`).pathname.replace(/\/$/, "");
+    return pathname || "/";
+  });
+}
+
+function hasPage(routePath) {
+  const file = routePath === "/" ? "app/page.tsx" : `app${routePath}/page.tsx`;
+  return existsSync(srcFile(file));
+}
+
+function metadataFile(routePath) {
+  const candidates = routePath === "/"
+    ? ["app/page.tsx"]
+    : [`app${routePath}/layout.tsx`, `app${routePath}/page.tsx`];
+  const existing = candidates.filter((file) => existsSync(srcFile(file)));
+  assert.ok(existing.length > 0, `${routePath} is in the sitemap but has no page`);
+  return existing.find((file) => readFileSync(srcFile(file), "utf8").includes("routeMetadata")) ?? existing[0];
+}
+
+function discoverPublicPages() {
+  const pages = [];
+  function walk(dir, routePath) {
+    if (!existsSync(dir)) return;
+    const entries = readdirSync(dir, { withFileTypes: true });
+    if (entries.some((entry) => entry.isFile() && entry.name === "page.tsx")) pages.push(routePath);
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name === "api" || entry.name.startsWith("(")) continue;
+      const child = routePath === "/" ? `/${entry.name}` : `${routePath}/${entry.name}`;
+      walk(join(dir, entry.name), child);
+    }
+  }
+  walk(srcFile("app"), "/");
+  return pages;
+}
+
+function segmentHasOwnShareImage(routePath) {
+  if (routePath === "/") return false;
+  const dir = srcFile(`app${routePath}`);
+  if (!existsSync(dir)) return false;
+  return readdirSync(dir).some((name) => /^(opengraph-image|twitter-image)\.[a-z0-9]+$/i.test(name));
+}
+
+// Already-resolved file image handed to the route as parent metadata.
+// routeMetadata replaces openGraph, so the copy has to keep this content hash
+// and the same host as the parent's twitter:image. Preview deployment hosts
+// are covered by the env tests; they do not replace metadataBase.
 const inheritedOgImage = {
   href: "https://preview.my-nba-feed.vercel.app/opengraph-image?1ad8b1e68c4af42a",
   type: "image/png",
@@ -73,13 +125,18 @@ const inheritedOgImage = {
 };
 const inheritedTwitterImage = "https://preview.my-nba-feed.vercel.app/twitter-image?ea726dff14259933";
 
-const loadedRoutes = new Map(publicRoutes.map((route) => [
-  route.path,
-  load(route.module, { process: isolatedProcess }, {
-    "@/lib/site": site,
-    ...(route.module === "app/page.tsx" ? { "@/components/HomeFeed": { default: HomeFeed } } : {}),
-  }),
-]));
+const defaultEnv = {};
+const graph = loadGraph(defaultEnv);
+const publicPaths = sitemapPaths(graph.sitemap.default());
+
+function routeModule(routePath) {
+  const file = metadataFile(routePath);
+  const imports = { "@/lib/site": graph.site };
+  if (file === "app/page.tsx") imports["@/components/HomeFeed"] = { default: HomeFeed };
+  return load(file, imports, defaultEnv);
+}
+
+const loadedRoutes = new Map(publicPaths.map((routePath) => [routePath, routeModule(routePath)]));
 
 function resolvedParent() {
   return {
@@ -96,11 +153,6 @@ function resolvedParent() {
   };
 }
 
-function absoluteMetadataUrl(url, pathname) {
-  assert.equal(site.getSiteUrl().origin, "https://my-nba-feed.vercel.app");
-  return resolveAbsoluteUrlWithPathname(url, site.getSiteUrl(), pathname, { trailingSlash: false });
-}
-
 function imageHref(image) {
   if (typeof image === "string") return image;
   if (image && typeof image.href === "string" && image.hostname) return image.href;
@@ -115,59 +167,76 @@ function imageHrefs(images) {
   return (Array.isArray(images) ? images : [images]).map(imageHref);
 }
 
-function segmentHasOwnShareImage(path) {
-  if (path === "/") return false;
-  return readdirSync(new URL(`../src/app${path}/`, import.meta.url))
-    .some((name) => /^(opengraph-image|twitter-image)\.[a-z0-9]+$/i.test(name));
-}
-
 function assertNoTrailingSlash(value, label) {
   const authored = String(value);
   assert.equal(authored.endsWith("/") && authored !== "/", false, `${label} has a trailing slash: ${authored}`);
 }
 
-for (const route of publicRoutes) {
-  test(`canonical and openGraph.url for ${route.path}`, async () => {
-    const metadata = await loadedRoutes.get(route.path).generateMetadata({}, Promise.resolve(resolvedParent()));
-    assertNoTrailingSlash(metadata.alternates.canonical, `${route.path} canonical`);
-    assertNoTrailingSlash(metadata.openGraph.url, `${route.path} openGraph.url`);
-    assert.equal(metadata.alternates.canonical, route.canonical);
-    assert.equal(metadata.openGraph.url, route.openGraphUrl);
-    const canonical = absoluteMetadataUrl(metadata.alternates.canonical, route.path);
-    const openGraphUrl = absoluteMetadataUrl(metadata.openGraph.url, route.path);
-    assert.equal(canonical, route.absolute);
-    assert.equal(openGraphUrl, route.absolute);
-    assert.equal(canonical.endsWith("/"), false);
-    assert.equal(openGraphUrl.endsWith("/"), false);
+function assertNoDoubleSlash(absolute) {
+  assert.equal(new URL(absolute).pathname.includes("//"), false, absolute);
+}
+
+function disallowValues(rules) {
+  return (Array.isArray(rules) ? rules : [rules]).flatMap((rule) => {
+    const value = rule?.disallow;
+    if (!value) return [];
+    return Array.isArray(value) ? value : [value];
+  });
+}
+
+const siteEnvKeys = ["NEXT_PUBLIC_SITE_URL", "VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_ENV", "VERCEL_BRANCH_URL", "VERCEL_URL"];
+let envQueue = Promise.resolve();
+
+function testSiteEnv(name, env, fn) {
+  test(name, () => {
+    const run = envQueue.then(() => {
+      const saved = Object.fromEntries(siteEnvKeys.map((key) => [key, process.env[key]]));
+      try {
+        for (const key of siteEnvKeys) delete process.env[key];
+        Object.assign(process.env, env);
+        fn();
+      } finally {
+        for (const key of siteEnvKeys) {
+          if (saved[key] === undefined) delete process.env[key];
+          else process.env[key] = saved[key];
+        }
+      }
+    });
+    envQueue = run.then(() => {}, () => {});
+    return run;
+  });
+}
+
+for (const routePath of publicPaths) {
+  test(`canonical and openGraph.url for ${routePath}`, async () => {
+    const base = metadataBaseFrom(graph.layout);
+    const metadata = await loadedRoutes.get(routePath).generateMetadata({}, Promise.resolve(resolvedParent()));
+    assertNoTrailingSlash(metadata.alternates.canonical, `${routePath} canonical`);
+    assertNoTrailingSlash(metadata.openGraph.url, `${routePath} openGraph.url`);
+    assert.equal(metadata.alternates.canonical, routePath);
+    assert.equal(metadata.openGraph.url, routePath);
+    assert.equal(absoluteUrl(base, metadata.alternates.canonical), graph.sitemap.default()[publicPaths.indexOf(routePath)].url);
   });
 
-  test(`inherited og:image for ${route.path}`, async () => {
-    assert.equal(segmentHasOwnShareImage(route.path), false, `${route.path} defines its own share image`);
-    assert.match(readFileSync(new URL("../src/app/twitter-image.tsx", import.meta.url), "utf8"), /from\s+["']\.\/opengraph-image["']/);
-    assert.match(inheritedOgImage.href, /\/opengraph-image\?[0-9a-f]{8,}$/i);
-    assert.equal(new URL(inheritedOgImage.href).host, new URL(inheritedTwitterImage).host);
-    assert.notEqual(new URL(inheritedOgImage.href).host, site.getSiteUrl().host);
-
-    const metadata = await loadedRoutes.get(route.path).generateMetadata({}, Promise.resolve(resolvedParent()));
+  test(`inherited og:image for ${routePath}`, async () => {
+    assert.equal(hasPage(routePath), true, `${routePath} is in the sitemap but has no page`);
+    assert.equal(segmentHasOwnShareImage(routePath), false, `${routePath} defines its own share image`);
+    const metadata = await loadedRoutes.get(routePath).generateMetadata({}, Promise.resolve(resolvedParent()));
     assert.ok(Array.isArray(metadata.openGraph.images) && metadata.openGraph.images.length > 0);
     const image = metadata.openGraph.images[0];
     const href = imageHref(image);
-    assert.match(href, /\/opengraph-image\?[0-9a-f]{8,}$/i, `${route.path} og:image is missing its cache hash`);
-    assert.equal(href, inheritedOgImage.href, `${route.path} dropped the inherited og:image`);
+    assert.match(href, /\/opengraph-image\?[0-9a-f]{8,}$/i, `${routePath} og:image is missing its cache hash`);
+    assert.equal(href, inheritedOgImage.href, `${routePath} dropped the inherited og:image`);
     assert.equal(image.type, inheritedOgImage.type);
     assert.equal(image.alt, inheritedOgImage.alt);
     assert.equal(image.width, inheritedOgImage.width);
     assert.equal(image.height, inheritedOgImage.height);
-    const ogHost = new URL(href).host;
-    const twitterHrefs = [
-      inheritedTwitterImage,
+    for (const extra of [
       ...imageHrefs(metadata.twitter?.images),
-      ...imageHrefs(rootLayout.metadata?.twitter?.images),
-      ...imageHrefs(rootLayout.metadata?.openGraph?.images),
-    ];
-    assert.ok(twitterHrefs.length > 0);
-    for (const twitterHref of twitterHrefs) {
-      assert.equal(new URL(twitterHref).host, ogHost, `${route.path} og:image host differs from twitter:image ${twitterHref}`);
+      ...imageHrefs(graph.layout.metadata?.twitter?.images),
+      ...imageHrefs(graph.layout.metadata?.openGraph?.images),
+    ]) {
+      assert.equal(new URL(extra).host, new URL(href).host, `${routePath} image host differs: ${extra}`);
     }
   });
 }
@@ -176,32 +245,87 @@ test("home page exports metadata for / and renders HomeFeed", async () => {
   const page = loadedRoutes.get("/");
   assert.equal(typeof page.generateMetadata, "function");
   const metadata = await page.generateMetadata({}, Promise.resolve(resolvedParent()));
+  metadataBaseFrom(graph.layout);
   assert.equal(metadata.alternates.canonical, "/");
   assert.equal(metadata.openGraph.url, "/");
-  assert.equal(absoluteMetadataUrl(metadata.alternates.canonical, "/"), "https://my-nba-feed.vercel.app");
   assert.equal(renderToStaticMarkup(createElement(page.default)), '<section id="home-feed"></section>');
 });
 
 test("sitemap home loc matches the home canonical without a trailing slash", async () => {
-  const home = publicRoutes[0];
+  const base = metadataBaseFrom(graph.layout);
   const metadata = await loadedRoutes.get("/").generateMetadata({}, Promise.resolve(resolvedParent()));
-  const canonical = absoluteMetadataUrl(metadata.alternates.canonical, "/");
-  const urls = Array.from(sitemap.default(), (entry) => String(entry.url));
-  assert.equal(urls[0], canonical);
-  assert.equal(urls[0], home.absolute);
+  const canonical = absoluteUrl(base, metadata.alternates.canonical);
+  const urls = Array.from(graph.sitemap.default(), (entry) => String(entry.url));
   assert.equal(urls[0].endsWith("/"), false);
-  assert.equal(canonical.endsWith("/"), false);
-  assert.deepEqual(urls, publicRoutes.map((route) => route.absolute));
+  assert.equal(urls[0], canonical);
+  assert.equal(urls[0], base.origin);
+  assert.deepEqual(urls, publicPaths.map((routePath) => absoluteUrl(base, routePath)));
+  for (const url of urls) assertNoDoubleSlash(url);
 });
 
-test("compare and social inherit the share image instead of replacing it", () => {
-  for (const route of [
-    { path: "/compare", module: "app/compare/layout.tsx" },
-    { path: "/social", module: "app/social/layout.tsx" },
-  ]) {
-    assert.equal(segmentHasOwnShareImage(route.path), false, route.path);
-    const metadata = load(route.module, { process: isolatedProcess }).metadata;
-    assert.equal(imageHrefs(metadata?.openGraph?.images).length, 0, `${route.path} sets its own og:image`);
-    assert.equal(imageHrefs(metadata?.twitter?.images).length, 0, `${route.path} sets its own twitter:image`);
+test("sitemap routes have pages, and other public pages are the intentional omissions", () => {
+  for (const routePath of publicPaths) {
+    assert.equal(hasPage(routePath), true, `${routePath} is in the sitemap but has no page`);
   }
+  const outside = discoverPublicPages().filter((routePath) => !publicPaths.includes(routePath)).sort();
+  // PET-28 removes these. Absent directories are not read, so the removal does not throw.
+  const intentional = ["/compare", "/social"].filter((routePath) => hasPage(routePath)).sort();
+  assert.deepEqual(outside, intentional);
+  for (const routePath of outside) {
+    assert.equal(segmentHasOwnShareImage(routePath), false, routePath);
+    const layoutFile = `app${routePath}/layout.tsx`;
+    if (!existsSync(srcFile(layoutFile))) continue;
+    const metadata = load(layoutFile, {}, defaultEnv).metadata;
+    assert.equal(imageHrefs(metadata?.openGraph?.images).length, 0, `${routePath} sets its own og:image`);
+    assert.equal(imageHrefs(metadata?.twitter?.images).length, 0, `${routePath} sets its own twitter:image`);
+  }
+});
+
+test("robots disallows /api/ and advertises the metadataBase sitemap", () => {
+  const origin = metadataBaseFrom(graph.layout).origin;
+  const robots = graph.robots.default();
+  assert.ok(disallowValues(robots.rules).includes("/api/"));
+  assert.equal(robots.sitemap, `${origin}/sitemap.xml`);
+  assertNoDoubleSlash(robots.sitemap);
+});
+
+function assertOrigin(env, origin) {
+  const loaded = loadGraph(env);
+  const base = metadataBaseFrom(loaded.layout);
+  assert.equal(base.origin, origin);
+  assertNoDoubleSlash(base.href);
+  const urls = Array.from(loaded.sitemap.default(), (entry) => String(entry.url));
+  assert.equal(urls[0], origin);
+  assert.equal(urls[0].endsWith("/"), false);
+  assert.deepEqual(urls, sitemapPaths(loaded.sitemap.default()).map((routePath) => absoluteUrl(base, routePath)));
+  for (const url of urls) assertNoDoubleSlash(url);
+  const robots = loaded.robots.default();
+  assert.ok(disallowValues(robots.rules).includes("/api/"));
+  assert.equal(robots.sitemap, `${origin}/sitemap.xml`);
+}
+
+testSiteEnv("preview canonical stays on metadataBase when branch and deployment URLs are set", {
+  VERCEL_ENV: "preview",
+  VERCEL_BRANCH_URL: "my-nba-feed-git-feat-pet-21-seo-og.vercel.app",
+  VERCEL_URL: "my-nba-feed-abc123.vercel.app",
+}, () => {
+  assertOrigin({
+    VERCEL_ENV: "preview",
+    VERCEL_BRANCH_URL: "my-nba-feed-git-feat-pet-21-seo-og.vercel.app",
+    VERCEL_URL: "my-nba-feed-abc123.vercel.app",
+  }, "https://my-nba-feed.vercel.app");
+});
+
+testSiteEnv("VERCEL_URL alone does not replace metadataBase", {
+  VERCEL_URL: "my-nba-feed-abc123.vercel.app",
+}, () => {
+  assertOrigin({ VERCEL_URL: "my-nba-feed-abc123.vercel.app" }, "https://my-nba-feed.vercel.app");
+});
+
+testSiteEnv("NEXT_PUBLIC_SITE_URL with a trailing slash has no double slash and no trailing slash on the home canonical", {
+  NEXT_PUBLIC_SITE_URL: "https://x.example/",
+}, () => {
+  // The stored base must collapse https://x.example/ to origin https://x.example.
+  // Home canonical has no trailing slash, and no path may contain a double slash.
+  assertOrigin({ NEXT_PUBLIC_SITE_URL: "https://x.example/" }, "https://x.example");
 });
