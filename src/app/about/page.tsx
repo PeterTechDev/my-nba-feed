@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { routeMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "About | NBA Feed",
+export const generateMetadata = routeMetadata("/about", {
+  title: "About",
   description: "Basketball on your terms. Learn about NBA Feed, spoiler protection, our sources and the person behind the project.",
-};
+});
 
 export default function AboutPage() {
   return (
