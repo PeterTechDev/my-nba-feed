@@ -33,13 +33,25 @@ function NewsStory({ item }: { item: NewsItem }) {
   const [copy, setCopy] = useReducer((_current: NewsItem, next: NewsItem) => next, item);
   const itemKey = storyKey(item);
   const latest = useRef(item);
+  const covered = useRef(Boolean(item.redacted));
+  const sealed = useRef(item);
   latest.current = item;
+  if (item.redacted) {
+    covered.current = true;
+    sealed.current = item;
+  }
   useEffect(() => { if (!revealed) setCopy(latest.current); }, [itemKey, revealed]);
-  const hidden = hideHeadlines && copy.isSpoiler && !revealed;
+  const showControls = hideHeadlines && (copy.isSpoiler || covered.current);
+  const hidden = showControls && !revealed;
   const href = !hidden && !copy.redacted ? copy.link : null;
   const toggle = () => {
     if (!revealed && copy.redacted) {
       void revealNewsItem(copy).then((full) => { if (!full) return; setCopy(full); setRevealed(true); });
+      return;
+    }
+    if (revealed) {
+      setCopy(sealed.current);
+      setRevealed(false);
       return;
     }
     setRevealed((value) => !value);
@@ -57,7 +69,7 @@ function NewsStory({ item }: { item: NewsItem }) {
       <p className="flex min-h-11 items-center gap-2 break-words text-base font-medium leading-relaxed text-white/70 sm:text-sm">{title}</p>
     )}
     <p className="mt-1 text-sm text-white/70">{copy.source && `${copy.source} · `}{formatNewsAge(copy.pubDate)}</p>
-    {hideHeadlines && copy.isSpoiler && <div className="mt-2 flex flex-wrap items-center gap-2">
+    {showControls && <div className="mt-2 flex flex-wrap items-center gap-2">
       {revealed && <span role="status" className="text-sm text-amber-200">Headline revealed</span>}
       <button type="button" aria-pressed={revealed} aria-label={`${hidden ? "Reveal" : "Hide"} headline from ${copy.source || "source"}`}
         onClick={toggle} className="min-h-11 rounded-lg border border-white/20 px-3 text-sm text-white/80 hover:bg-white/10">

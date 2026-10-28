@@ -165,7 +165,7 @@ function refreshRevealedGame(teamId: string, reveal: string) {
     const bag = gamesBag();
     const base = bag.latest.get(teamId);
     if (!base) return;
-    bag.revealed.set(teamId, mergeGameReveal(mergeGameReveal(base, bag.revealed.get(teamId)), incoming));
+    bag.revealed.set(teamId, applyIncomingReveal(bag.revealed.get(teamId), incoming));
     bag.listeners.forEach((listener) => listener());
   }).finally(() => { refreshingScores.delete(key); });
 }
@@ -196,6 +196,13 @@ export function subscribeGameReveals(listener: () => void) {
 
 function openedGame(extra: GamesResponse, id: number) {
   return [extra.lastGame, extra.currentGame, extra.nextGame].find((candidate) => candidate && candidate.id === id && !candidate.scoresRedacted);
+}
+
+function applyIncomingReveal(current: GamesResponse | undefined, incoming: GamesResponse): GamesResponse {
+  if (!current) return incoming;
+  const pick = (next: GameInfo | null, prev: GameInfo | null) => (next && !next.scoresRedacted ? next : prev ?? next);
+  const record = incoming.record && !incoming.record.redacted ? incoming.record : current.record;
+  return { ...incoming, lastGame: pick(incoming.lastGame, current.lastGame), currentGame: pick(incoming.currentGame, current.currentGame), nextGame: pick(incoming.nextGame, current.nextGame), record };
 }
 
 export function mergeGameReveal(base: GamesResponse, extra?: GamesResponse | null): GamesResponse {
@@ -268,7 +275,7 @@ export function requestScoreReveal(scope: string): Promise<void> | null {
     if (!response.ok) throw new Error("Score reveal failed");
     const incoming = await response.json() as GamesResponse;
     if (!incoming || incoming.error) throw new Error("Score reveal failed");
-    bag.revealed.set(parsed.teamId, mergeGameReveal(mergeGameReveal(base, bag.revealed.get(parsed.teamId)), incoming));
+    bag.revealed.set(parsed.teamId, applyIncomingReveal(bag.revealed.get(parsed.teamId), incoming));
     bag.listeners.forEach((listener) => listener());
   });
 }
