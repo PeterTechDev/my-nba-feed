@@ -164,9 +164,11 @@ function refreshRevealedGame(teamId: string, reveal: string) {
     if (!incoming || incoming.error) return;
     const bag = gamesBag();
     const base = bag.latest.get(teamId);
-    if (!base) return;
+    if (!base || !bag.revealed.has(teamId)) return;
     bag.revealed.set(teamId, applyIncomingReveal(bag.revealed.get(teamId), incoming));
     bag.listeners.forEach((listener) => listener());
+  }).catch(() => {
+    // Keep the last revealed value; the next game poll retries this refresh.
   }).finally(() => { refreshingScores.delete(key); });
 }
 
@@ -176,6 +178,7 @@ export function noteGames(teamId: string, data: GamesResponse | null) {
   bag.latest.set(teamId, data);
   const overlay = bag.revealed.get(teamId);
   if (!overlay) return;
+  if (data.record.redacted && !overlay.record.redacted) refreshRevealedGame(teamId, "record");
   for (const game of [data.currentGame, data.lastGame, data.nextGame]) {
     if (!game?.scoresRedacted) continue;
     const opened = openedGame(overlay, game.id);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, test } from "node:test";
 import vm from "node:vm";
@@ -441,7 +441,7 @@ function clientSpoilerCalls() {
   const calls = [];
   for (const path of walkClient(fileURLToPath(new URL("../src/", import.meta.url)))) {
     const source = readFileSync(path, "utf8");
-    const file = path.slice(path.indexOf("/src/") + 1);
+    const file = relative(fileURLToPath(root), path).replaceAll("\\", "/");
     const pattern = /\/api\/(?:news|digest|games)\b/g;
     for (const match of source.matchAll(pattern)) {
       const after = source.slice(match.index + match[0].length, match.index + match[0].length + 12);
@@ -729,7 +729,7 @@ test("a revealed live score refetches when the game status changes", async () =>
       ok: true,
       json: async () => ({
         lastGame: { id: 9, status: "Final", scoresRedacted: false, homeScore: 118, awayScore: 107 },
-        currentGame: null, nextGame: null, record: { wins: 1, losses: 0 }, error: null,
+        currentGame: null, nextGame: null, record: { wins: 0, losses: 0, redacted: true }, error: null,
       }),
     });
   };
@@ -774,6 +774,37 @@ test("a revealed live score replaces 98-95 with the next 101-97", async () => {
   for (let step = 0; step < 6; step += 1) await Promise.resolve();
   assert.equal(shown().lastGame.homeScore, 101);
   assert.equal(shown().lastGame.awayScore, 97);
+});
+
+test("a revealed record follows new game polls and retries after an offline poll", async () => {
+  let record = { wins: 2, losses: 1 };
+  let offline = false;
+  const requests = [];
+  const base = { lastGame: null, currentGame: null, nextGame: null, record: { wins: 0, losses: 0, redacted: true }, error: null };
+  const api = load("lib/api.ts", { fetch: async (url) => {
+    requests.push(String(url));
+    if (offline) throw new Error("offline");
+    return { ok: true, json: async () => ({ ...base, record }) };
+  } }).exports;
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  const shown = () => api.mergeGameReveal(base, api.revealedGameOverlay("2")).record;
+  api.noteGames("2", base);
+  await api.requestScoreReveal("2:record");
+  assert.equal(shown().wins, 2);
+  record = { wins: 3, losses: 1 };
+  api.noteGames("2", { ...base, lastGame: { id: 20, status: "Final", scoresRedacted: true } });
+  await settle();
+  assert.equal(shown().wins, 3);
+  assert.match(requests.at(-1), /reveal=record/);
+  offline = true;
+  api.noteGames("2", base);
+  await settle();
+  assert.equal(shown().wins, 3);
+  offline = false;
+  record = { wins: 4, losses: 1 };
+  api.noteGames("2", base);
+  await settle();
+  assert.equal(shown().wins, 4);
 });
 
 test("revealing a non-spoiler in a spoiler group keeps hide, the live region, and focus", async () => {
