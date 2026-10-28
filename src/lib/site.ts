@@ -17,7 +17,7 @@ export function getSiteUrl(): URL {
 }
 
 function configuredSiteUrl(): URL | undefined {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const configured = withoutTrailingSlashes(process.env.NEXT_PUBLIC_SITE_URL ?? "");
   if (!configured) return undefined;
   try {
     const url = new URL(configured);
@@ -37,8 +37,13 @@ function warnInvalidSiteUrl() {
   console.warn("Ignoring NEXT_PUBLIC_SITE_URL because it is not a valid https URL.");
 }
 
+function withoutTrailingSlashes(value: string): string {
+  return value.trim().replace(/\/+$/, "");
+}
+
 function asHttpsUrl(value: string): URL {
-  return new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+  const stripped = withoutTrailingSlashes(value);
+  return new URL(/^https?:\/\//i.test(stripped) ? stripped : `https://${stripped}`);
 }
 
 export const siteName = "NBA Feed";
