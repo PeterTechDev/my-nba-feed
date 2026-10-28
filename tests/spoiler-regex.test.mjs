@@ -9,8 +9,8 @@ import ts from "typescript";
 // Each row is the headline, the expected boolean, and the reason.
 // Classification goes through fetchNews (isSpoiler = SPOILERS.test(title)), same loader as tests/app-data.test.mjs.
 //
-// Divergência com a tabela do Dev: "Celtics up 2-1" foi declarado visível.
-// O critério exige spoiler. O teste fica vermelho enquanto o regex não casar. Não afrouxar.
+// "Celtics up 2-1" segue expected true. No 6b77636 o padrão up N-N passa a casar.
+// A expectativa não foi afrouxada.
 // O primeiro script do Dev também marcou "2-1 in the series" como visível; a tabela publicada corrigiu para spoiler.
 // "Celtics in a blowout" saiu como BAD (expect visível) e o Dev corrigiu: blowout permanece spoiler.
 
@@ -64,6 +64,12 @@ const acceptedPrice = [
   { headline: "Top 10 plays", expected: true, reason: "preço aceito: top em ranking" },
   { headline: "Tatum down with an ankle injury", expected: true, reason: "preço aceito: down de lesão" },
   { headline: "Advanced stats", expected: true, reason: "preço aceito: advanced casa com advance" },
+  { headline: "Celtics at 3-1 odds", expected: true, reason: "preço aceito: at N-N também esconde odd de aposta" },
+  { headline: "The odds are 3-1", expected: true, reason: "preço aceito: are N-N pega odd sem ser retrospecto" },
+  { headline: "improve to 3-1 in preseason", expected: true, reason: "preço aceito: improve to N-N não distingue pré-temporada" },
+  { headline: "How to practice a buzzer-beating move", expected: true, reason: "preço aceito: buzzer-beating em treino" },
+  { headline: "Tatum carries the ball over half court", expected: true, reason: "preço aceito: carries … over sem ser resultado" },
+  { headline: "Celtics hold off on trade", expected: true, reason: "preço aceito: hold off também é adiar uma decisão" },
 ];
 
 // Tabela publicada pelo Dev (coluna Depois do PR #10). Onde ela diverge do critério PET-32, o critério prevalece.
@@ -123,7 +129,7 @@ const devTable = [
   { headline: "Tatum lifts teammates in practice", expected: false, reason: "lift sem past continua visível" },
   { headline: "Jayson Tatum gives a bold warning to the rest of the NBA", expected: false, reason: "sem game winner continua visível" },
   { headline: "Celtics game plan for the Knicks", expected: false, reason: "game plan não é game winner" },
-  { headline: "Celtics up 2-1", expected: true, reason: "critério PET-32 exige spoiler; Dev declarou visível" },
+  { headline: "Celtics up 2-1", expected: true, reason: "up N-N é spoiler; expectativa mantida" },
   { headline: "Best plays from the Celtics", expected: false, reason: "não-spoiler" },
   { headline: "Preview: Celtics vs Knicks", expected: false, reason: "preview não é resultado" },
   { headline: "Thunder force a Game 7", expected: true, reason: "force a Game N" },
@@ -189,6 +195,26 @@ const criterionSpellings = [
   { headline: "Celtics BUZZERBEATER", expected: true, reason: "buzzerbeater em maiúsculas" },
 ];
 
+// Casos novos do regex em 6b77636. Todos devem dar true.
+const roundTwo = [
+  { headline: "Jayson Tatum's buzzer-beating jumper lifts Celtics over Nets in OT", expected: true, reason: "buzzer-beating com hífen e lifts … over" },
+  { headline: "Jayson Tatum's buzzer beating jumper lifts Celtics over Nets in OT", expected: true, reason: "buzzer beating com espaço e lifts … over" },
+  { headline: "Jayson Tatum's buzzerbeating jumper lifts Celtics over Nets in OT", expected: true, reason: "buzzerbeating junto e lifts … over" },
+  { headline: "lifts Celtics over Nets", expected: true, reason: "lifts … over" },
+  { headline: "carries Celtics over Nets", expected: true, reason: "carries … over" },
+  { headline: "powers Celtics past Nets", expected: true, reason: "powers … past" },
+  { headline: "Why the Celtics are 3-1", expected: true, reason: "are N-N com hífen" },
+  { headline: "Why the Celtics are 3\u20131", expected: true, reason: "are N-N com en dash" },
+  { headline: "Why the Celtics are 3\u20141", expected: true, reason: "are N-N com em dash" },
+  { headline: "Celtics at 3-1", expected: true, reason: "at N-N" },
+  { headline: "Celtics improve to 3-1", expected: true, reason: "improve to N-N" },
+  { headline: "Celtics move to 3-1", expected: true, reason: "move to N-N" },
+  { headline: "Boston Celtics outlast Brooklyn Nets in OT via Jayson Tatum buzzer-beater", expected: true, reason: "outlast e buzzer-beater" },
+  { headline: "C's hold off", expected: true, reason: "hold off" },
+  { headline: "held off", expected: true, reason: "held off" },
+  { headline: "Boston rallies past Brooklyn", expected: true, reason: "rallies past" },
+];
+
 // Negativos óbvios que não podem casar. Se casarem, o teste fica vermelho.
 const obviousNegatives = [
   { headline: "preview", expected: false, reason: "preview não pode casar" },
@@ -197,7 +223,7 @@ const obviousNegatives = [
   { headline: "Game 3 tonight", expected: false, reason: "Game 3 tonight não pode casar" },
 ];
 
-const cases = [...acceptedPrice, ...devTable, ...devScripts, ...criterionSpellings, ...obviousNegatives];
+const cases = [...acceptedPrice, ...devTable, ...devScripts, ...criterionSpellings, ...roundTwo, ...obviousNegatives];
 const seen = new Set();
 for (const row of cases) {
   assert.equal(seen.has(row.headline), false, `duplicate headline: ${row.headline}`);
