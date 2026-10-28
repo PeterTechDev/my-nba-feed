@@ -95,12 +95,12 @@ export default async function runPagesRegression(page) {
     check(await p.getByText("Final/OT", { exact: true }).filter({ visible: true }).count() === 1, "Schedule recognizes overtime finals");
     check(await p.getByText(/8:30 PM/).count() >= 1, "Schedule shows local tipoff with timezone");
     await go("/highlights"); await p.getByText("Mon, Oct 26", { exact: true }).waitFor();
-    await p.getByRole("button", { name: "Reveal video preview vs Nets", exact: true }).click();
+    check(await p.locator('main img[src="https://i.ytimg.com/vi/DTNqMLNVBC8/hqdefault.jpg"]').count() === 1, "Highlights thumbnails remain visible with spoilers hidden");
     check(await p.locator("main iframe").count() === 0, "The YouTube player is not loaded before play");
     await p.getByRole("button", { name: "Play highlights vs Nets", exact: true }).click();
     check((await p.locator("main iframe").getAttribute("src")).startsWith("https://www.youtube-nocookie.com/embed/DTNqMLNVBC8"), "Highlights play inside the site after a click");
-    await p.getByRole("button", { name: "Hide video preview", exact: true }).click();
-    check(await p.locator("main iframe").count() === 0, "Hiding a preview stops and removes its player");
+    await p.getByRole("button", { name: "Close player", exact: true }).click();
+    check(await p.locator("main iframe").count() === 0, "Closing the player stops and removes its iframe");
     check((await p.getByRole("link", { name: "Search more highlights" }).boundingBox()).height >= 44, "Highlights footer has a 44px target");
     await go("/compare"); await p.getByText("120", { exact: true }).waitFor();
     check(await p.locator("main .rounded-r").first().evaluate((el) => getComputedStyle(el).backgroundColor !== "rgb(0, 0, 0)"), "Nets chart uses a visible color");

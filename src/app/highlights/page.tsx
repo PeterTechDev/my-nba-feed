@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
 import TeamSelector from "@/components/TeamSelector";
-import { ExternalLink, EyeOff, Play, Youtube } from "lucide-react";
+import { ExternalLink, Play, Youtube } from "lucide-react";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
 import { formatGameDate } from "@/lib/nbaDate";
@@ -32,21 +32,16 @@ interface ScheduleGame {
 }
 
 function HighlightCard({ game, video, loading, failed }: { game: HighlightGame; video?: HighlightVideo; loading: boolean; failed: boolean }) {
-  const { hideScores, hideHeadlines } = useSpoilerContext();
+  const { hideScores } = useSpoilerContext();
   const { selectedTeam } = useTeam();
-  const [revealed, setRevealed] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const protectedPreview = (hideScores || hideHeadlines) && !revealed;
   const matchup = `${game.isHome ? "vs" : "at"} ${game.opponent}`;
 
   return <article className="overflow-hidden rounded-xl border border-white/10 bg-[#161616]">
     <div className="relative aspect-video bg-[#202020]">
       {loading ? <div role="status" aria-label={`Loading highlights ${matchup}`} className="h-full animate-pulse bg-white/5" /> : video ? (
-        protectedPreview ? <button type="button" onClick={() => setRevealed(true)} aria-label={`Reveal video preview ${matchup}`}
-          className="flex h-full w-full flex-col items-center justify-center gap-3 p-5 text-white/80 hover:bg-white/5">
-          <EyeOff aria-hidden="true" className="h-7 w-7" /><span className="font-medium">Reveal video preview</span><span className="text-xs text-white/70">The thumbnail may reveal the result</span>
-        </button> : playing ? <iframe
+        playing ? <iframe
           src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&playsinline=1&rel=0`}
           title={`Full game highlights ${matchup}`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin" className="absolute inset-0 h-full w-full border-0" />
@@ -71,11 +66,10 @@ function HighlightCard({ game, video, loading, failed }: { game: HighlightGame; 
       </div>
       <p className="mt-1 text-sm text-white/70">{formatGameDate(game.date, { weekday: "short", month: "short", day: "numeric" })}</p>
       {video ? <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        {protectedPreview ? <span className="text-sm text-white/70">NBA · YouTube</span> : <a href={video.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 text-sm text-white/70 hover:text-white">
+        <a href={video.url} target="_blank" rel="noopener noreferrer" aria-describedby="video-warning" className="inline-flex min-h-11 items-center gap-2 text-sm text-white/70 hover:text-white">
           NBA · YouTube<ExternalLink aria-hidden="true" className="h-4 w-4" /><span className="sr-only">(opens in a new tab)</span>
-        </a>}
+        </a>
         {playing && <button type="button" onClick={() => setPlaying(false)} className="min-h-11 rounded-lg border border-white/20 px-3 text-sm text-white/80 hover:bg-white/10">Close player</button>}
-        {(hideScores || hideHeadlines) && revealed && <button type="button" onClick={() => { setPlaying(false); setRevealed(false); }} className="min-h-11 rounded-lg border border-white/20 px-3 text-sm text-white/80 hover:bg-white/10">Hide video preview</button>}
       </div> : !loading && <a href={game.youtubeUrl} target="_blank" rel="noopener noreferrer" aria-describedby="video-warning"
         className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm text-white/80 hover:text-white"><Youtube aria-hidden="true" className="h-4 w-4" />Search on YouTube<ExternalLink aria-hidden="true" className="h-4 w-4" /><span className="sr-only">(opens in a new tab)</span></a>}
     </div>
@@ -123,7 +117,7 @@ export default function HighlightsPage() {
         </div>
         <TeamSelector />
       </div>
-      <p id="video-warning" className="text-sm text-white/70 mb-6">Play here or open on YouTube. Video previews and the player may reveal results.</p>
+      <p id="video-warning" className="text-sm text-white/70 mb-6">Play here or open on YouTube. The video player and YouTube may reveal results.</p>
       {(videos.error || Boolean(videos.data?.failedDates.length)) && <div className="mb-6"><DataError subject="highlight videos" retry={videos.retry} /></div>}
 
       {error ? (
