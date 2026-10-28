@@ -12,6 +12,8 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "test": "node --experimental-strip-types --test \"tests/**/*.test.mjs\"",
     "typecheck": "tsc --noEmit",
+    "test:ssr": "node --experimental-strip-types --test tests/morning-briefing-ssr.e2e.mjs",
+    "test:e2e": "playwright test tests/morning-briefing-hydration.spec.mjs",
     "digest:publish": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/publish-digest.mjs",
     "digest:generate": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/generate-digest.mjs",
     "highlights:sync": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/sync-youtube-highlights.mjs"
@@ -25,6 +27,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
