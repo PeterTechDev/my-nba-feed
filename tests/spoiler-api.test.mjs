@@ -274,6 +274,7 @@ test("games stay redacted until x-nba-spoilers is none", async () => {
     react,
     "@/hooks/useGameData": { useGameData: () => ({ record: closed.body.record, loading: false, error: null }) },
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics" } }) },
+    "./GoogleCalendarLink": { default: () => null },
     "./ScoreReveal": { default: ({ children }) => children },
   }).exports.default;
   const hiddenRecord = renderToStaticMarkup(createElement(Badge));
@@ -283,6 +284,7 @@ test("games stay redacted until x-nba-spoilers is none", async () => {
     react,
     "@/hooks/useGameData": { useGameData: () => ({ record: { wins: 1, losses: 0 }, loading: false, error: null }) },
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics" } }) },
+    "./GoogleCalendarLink": { default: () => null },
     "./ScoreReveal": { default: ({ children }) => children },
   }).exports.default;
   assert.doesNotMatch(renderToStaticMarkup(createElement(OpenBadge)), /Record hidden/);
@@ -574,6 +576,7 @@ test("every client fetch of news, digest and games sends the spoiler header for 
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics", city: "Boston", abbreviation: "BOS" } }) },
     "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: false }) },
     "@/lib/api": api,
+    "./GoogleCalendarLink": { default: () => null },
     "./ScoreReveal": { default: () => null },
     "@/lib/teams": load("lib/teams.ts").exports,
     "@/lib/digest": load("lib/digest.ts").exports,
@@ -707,6 +710,7 @@ test("the home digest sends the spoiler header and loads again when the state ch
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics", city: "Boston", abbreviation: "BOS" } }) },
     "./SpoilerModeProvider": { useSpoilerContext: () => settings },
     "@/lib/api": api,
+    "./GoogleCalendarLink": { default: () => null },
     "./ScoreReveal": { default: () => null },
     "@/lib/teams": realm.load("lib/teams.ts"),
     "@/lib/digest": realm.load("lib/digest.ts"),
@@ -940,6 +944,7 @@ test("Record hidden offers Reveal record without showing scores or headlines", (
     react,
     "@/hooks/useGameData": { useGameData: () => ({ record: { wins: 41, losses: 20, redacted: true }, loading: false, error: null, lastGame: { homeScore: 101, awayScore: 97, scoresRedacted: true } }) },
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics" } }) },
+    "./GoogleCalendarLink": { default: () => null },
     "./ScoreReveal": load("components/ScoreReveal.tsx", {}, {
       react,
       "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }), digestContentIsProtected: () => true },
@@ -1088,6 +1093,7 @@ function mountRecordBadge() {
     react: React,
     "@/hooks/useGameData": gameData,
     "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics" } }) },
+    "./GoogleCalendarLink": { default: () => null },
     "./ScoreReveal": realm.load("components/ScoreReveal.tsx", {
       react: React,
       "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }), digestContentIsProtected: () => true },

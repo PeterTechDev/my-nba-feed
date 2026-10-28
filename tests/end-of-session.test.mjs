@@ -305,6 +305,7 @@ function renderHero(gameState, nbaDates) {
     "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }) },
   };
   mocked["./DataError"] = load("components/DataError.tsx");
+  mocked["./GoogleCalendarLink"] = { default: () => null };
   mocked["./ScoreReveal"] = load("components/ScoreReveal.tsx", {}, mocked);
   return render(createElement(load("components/GameDayHero.tsx", {}, mocked).default));
 }
@@ -798,6 +799,7 @@ test("homepage places the end marker after the last story, names the selected te
     "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: false, hideHeadlines: false }) },
   };
   mocked["./DataError"] = load("components/DataError.tsx");
+  mocked["./GoogleCalendarLink"] = { default: () => null };
   mocked["./ScoreReveal"] = load("components/ScoreReveal.tsx", {}, mocked);
   mocked["./NewsList"] = load("components/NewsList.tsx", {}, mocked);
   for (const name of ["GameDayHero", "GameSection", "MorningBriefingCard", "PersonalizedFeed", "NewsFeed", "TopPlaysCard", "EndOfSession"]) {

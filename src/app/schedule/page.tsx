@@ -2,6 +2,7 @@
 import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
 import TeamSelector from "@/components/TeamSelector";
+import GoogleCalendarLink from "@/components/GoogleCalendarLink";
 import { useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
@@ -151,6 +152,7 @@ export default function SchedulePage() {
                         <div className="text-white/70">{game.status}</div>
                       )}
                       {!isFinal && <div className="text-white/70 break-words">{gameStatus(game)}</div>}
+                      <GoogleCalendarLink game={game} compact />
                     </div>
                   )}
                 </div>
@@ -201,6 +203,7 @@ export default function SchedulePage() {
                       <p className="text-xs text-white/70">
                         {new Date(year, month, day).toLocaleDateString("en-US", { weekday: "short" })}
                       </p>
+                      <GoogleCalendarLink game={game} compact />
                     </div>
                   </div>
                   {isFinal ? (

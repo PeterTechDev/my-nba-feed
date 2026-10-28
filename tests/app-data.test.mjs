@@ -31,6 +31,9 @@ const imports = {
   "@/lib/news": newsTools,
   "@/lib/youtubeHighlights": youtubeHighlights,
   "@/hooks/useRemoteData": { useRemoteData: () => ({ data: null }) },
+  "./GoogleCalendarLink": load("components/GoogleCalendarLink.tsx", {}, {
+    "@/lib/googleCalendar": load("lib/googleCalendar.ts", { URLSearchParams }).exports,
+  }).exports,
 };
 
 function fixedClock(at) {

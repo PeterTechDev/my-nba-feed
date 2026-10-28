@@ -366,11 +366,13 @@ const sectionImports = {
 const readyCard = load("components/GameSection.tsx", {
   ...sectionImports,
   react: reactHooks(),
+  "./GoogleCalendarLink": { default: () => null },
   "./ScoreReveal": load("components/ScoreReveal.tsx", { "./SpoilerModeProvider": spoilerMock }),
 }).HomeDigestCard;
 const revealedCard = load("components/GameSection.tsx", {
   ...sectionImports,
   react: reactHooks(),
+  "./GoogleCalendarLink": { default: () => null },
   "./ScoreReveal": load("components/ScoreReveal.tsx", {
     react: reactHooks({ forceReveal: true }),
     "./SpoilerModeProvider": spoilerMock,
@@ -378,6 +380,7 @@ const revealedCard = load("components/GameSection.tsx", {
 }).HomeDigestCard;
 const loadingCard = load("components/GameSection.tsx", {
   ...sectionImports,
+  "./GoogleCalendarLink": { default: () => null },
   "./ScoreReveal": load("components/ScoreReveal.tsx", { "./SpoilerModeProvider": spoilerMock }),
 }).HomeDigestCard;
 

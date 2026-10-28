@@ -12,6 +12,7 @@ import { Youtube, ArrowUpRight } from "lucide-react";
 import { getTeamById, teamByAbbreviation, type Team } from "@/lib/teams";
 import { isDigestDate, parseCoveredGames, readDigestLeagueDate, type CoveredGame, type DigestEntry } from "@/lib/digest";
 import styles from "./Home.module.css";
+import GoogleCalendarLink from "./GoogleCalendarLink";
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
@@ -152,6 +153,7 @@ export function NextGameCard() {
       </div>
       </div>
       <div className={styles.gameFooter}>
+        <GoogleCalendarLink game={nextGame} />
         <Link href="/schedule" className="inline-flex min-h-11 w-full items-center justify-between gap-2 text-sm font-medium text-white/80 hover:text-white">Full schedule<ArrowUpRight aria-hidden="true" className="h-4 w-4" /></Link>
       </div>
     </Card>

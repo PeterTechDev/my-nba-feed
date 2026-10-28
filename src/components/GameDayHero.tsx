@@ -10,6 +10,7 @@ import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 import { getOpponent, getOpponentScore, getTeamScore } from "@/lib/api";
 import styles from "./Home.module.css";
+import GoogleCalendarLink from "./GoogleCalendarLink";
 
 function easternDay(value: string): string {
   const options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
@@ -79,6 +80,7 @@ export default function GameDayHero() {
       </div>}
       </div>
       <div className={styles.gameFooter}>
+      {!isLive && <GoogleCalendarLink game={heroGame} />}
       <div className="flex items-center justify-between gap-3">
         <Link href="/schedule" className="inline-flex min-h-11 flex-1 items-center text-sm font-medium text-white/80 hover:text-white">Full schedule</Link>
         <a href={`https://www.google.com/search?q=${encodeURIComponent(searchContext)}`} target="_blank" rel="noopener noreferrer"
