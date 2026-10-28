@@ -83,7 +83,8 @@ export function teamByAbbreviation(abbreviation: string): Team | undefined {
 }
 
 const LEADING_ARTICLES = new Set(["the", "a", "an"]);
-const SCORE_IN_TEXT = /\b\d{2,3}\s*[-–—]\s*\d{2,3}\b/;
+// Placar (121-115) ou campanha (3-1). Não cola em outro dígito, barra ou data 10-26-2026.
+const SPOILER_FIGURE = /(?<![\d/])(?:\d{2,3}[-–—]\d{2,3}|\d{1,2}[-–—]\d{1,2})(?![\d/]|[-–—]\d)/;
 
 function textTokens(value: string): string[] {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
@@ -106,21 +107,34 @@ function teamPhrases(team: Team): string[][] {
     .sort((a, b) => b.length - a.length);
 }
 
+// Nome do clube, sem a cidade sozinha. "New York" não escolhe os Knicks se os Nets também estão na frase.
+function clubNamePhrases(team: Team): string[][] {
+  const phrases = [`${team.city} ${team.name}`, team.name];
+  if (team.name === "76ers") phrases.push("Sixers");
+  if (team.name === "Trail Blazers") phrases.push("Blazers", "Rip City");
+  if (team.city === "Los Angeles") phrases.push(`LA ${team.name}`);
+  return phrases.map((phrase) => textTokens(phrase)).filter((parts) => parts.length > 0);
+}
+
 function startsWithPhrase(words: string[], phrase: string[]): boolean {
   let index = 0;
   while (LEADING_ARTICLES.has(words[index] ?? "")) index += 1;
   return phrase.every((part, offset) => words[index + offset] === part);
 }
 
-// A manchete é sobre o time quando começa por ele (nome, apelido ou cidade única)
-// ou quando um placar numérico está na mesma oração que esse nome.
-// Menção depois de ponto e vírgula, sem placar, não conta.
+// A manchete é sobre o time quando começa por ele (nome, apelido ou cidade única),
+// quando um placar ou uma campanha aparece em qualquer ponto e o time também,
+// ou quando dois nomes de clube estão ligados por "and" (os dois contam).
+// Menção depois de ponto e vírgula, sem número, não conta.
 export function headlineIsAboutTeam(title: string, team: Team): boolean {
   const words = textTokens(title);
   const phrases = teamPhrases(team);
   if (phrases.some((phrase) => startsWithPhrase(words, phrase))) return true;
-  return title.split(/[;|]/).some((clause) => SCORE_IN_TEXT.test(clause)
-    && phrases.some((phrase) => containsTokens(textTokens(clause), phrase)));
+  if (SPOILER_FIGURE.test(title) && phrases.some((phrase) => containsTokens(words, phrase))) return true;
+  if (!/\band\b|&/i.test(title)) return false;
+  const names = clubNamePhrases(team);
+  if (!names.some((phrase) => containsTokens(words, phrase))) return false;
+  return teams.some((other) => other.id !== team.id && clubNamePhrases(other).some((phrase) => containsTokens(words, phrase)));
 }
 
 // Version 0 persisted these eight IDs under the wrong team identities.

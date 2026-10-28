@@ -299,8 +299,10 @@ export function HomeDigestCard({ favoriteTeams }: { favoriteTeams: Team[] }) {
     return <section aria-label="Digest" lang="pt-BR" className={styles.digest}>
       <h2 className={styles.sectionHeading}>Digest</h2>
       <p role="alert" className="text-sm text-white/80">{failure === "timeout" ? "O digest não respondeu em 8 segundos." : "Não foi possível carregar o digest."}</p>
-      <button type="button" onClick={() => setAttempt((value) => value + 1)} className="mt-4 min-h-11 rounded-lg bg-white/10 px-4 text-sm font-medium hover:bg-white/20">Tentar de novo</button>
-      {editionLink()}
+      <div className="mt-4 flex flex-col items-start gap-4">
+        <button type="button" onClick={() => setAttempt((value) => value + 1)} className="min-h-11 rounded-lg bg-white/10 px-4 text-sm font-medium hover:bg-white/20">Tentar de novo</button>
+        {editionLink("inline-flex min-h-11 items-center text-sm text-white/70 underline decoration-white/20 underline-offset-4 hover:text-white")}
+      </div>
     </section>;
   }
 
