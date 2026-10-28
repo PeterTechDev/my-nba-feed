@@ -26,6 +26,7 @@ export function newsIdentity(item: NewsItem): string[] {
   for (const key of [...url.searchParams.keys()]) {
     if (key.startsWith("utm_") || key === "oc") url.searchParams.delete(key);
   }
+  if (item.identity) return [url.href, item.identity];
   return [url.href, words(getNewsTitle(item, false)) + ":" + new Date(item.pubDate).toISOString().slice(0, 10)];
 }
 
@@ -109,8 +110,9 @@ export function groupNews(items: NewsItem[]): NewsItem[] {
 export function selectHomepageNews(feeds: NewsFeeds, order: string[], briefingTeam?: string): NewsFeeds {
   const seen = new Set<string>();
   return Object.fromEntries(order.map((name) => {
-    const available = newestNews(feeds[name]?.items ?? []).filter((item) => !newsIdentity(item).some((key) => seen.has(key)));
-    const items = groupNews(available).slice(0, name === "NBA" ? 6 : name === briefingTeam ? 1 : 3);
+    const bucket = feeds[name];
+    const available = newestNews(bucket?.items ?? []).filter((item) => !newsIdentity(item).some((key) => seen.has(key)));
+    const items = (bucket?.grouped ? available : groupNews(available)).slice(0, name === "NBA" ? 6 : name === briefingTeam ? 1 : 3);
     for (const item of items.flatMap((item) => [item, ...(item.related ?? [])])) newsIdentity(item).forEach((key) => seen.add(key));
     return [name, { items, error: feeds[name]?.error ?? false }];
   }));
@@ -120,4 +122,25 @@ export function newsVisitBoundary(items: NewsItem[], lastVisitAt: string | null)
   const visited = Date.parse(lastVisitAt ?? "");
   if (!Number.isFinite(visited)) return null;
   return items.filter((item) => Date.parse(item.pubDate) > visited).length;
+}
+
+function spoilerIdentity(item: NewsItem) {
+  const published = Date.parse(item.pubDate);
+  const day = Number.isFinite(published) ? new Date(published).toISOString().slice(0, 10) : item.pubDate;
+  const text = `${item.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()}:${day}`;
+  let hash = 5381;
+  for (let i = 0; i < text.length; i += 1) hash = Math.imul(hash, 33) ^ text.charCodeAt(i);
+  return (hash >>> 0).toString(16);
+}
+
+function sealNewsItem(item: NewsItem, team: string, reveal: string | null): NewsItem {
+  const identity = spoilerIdentity(item);
+  const related = item.related?.map((entry) => sealNewsItem(entry, team, reveal));
+  const sealed = { ...item, related, identity, feed: team };
+  if (!item.isSpoiler || reveal === item.link) return sealed;
+  return { ...sealed, title: item.safeTitle, redacted: true };
+}
+
+export function presentNews(items: NewsItem[], team: string, reveal: string | null, grouped: boolean): NewsItem[] {
+  return (grouped ? groupNews(items) : items).map((item) => sealNewsItem(item, team, reveal));
 }

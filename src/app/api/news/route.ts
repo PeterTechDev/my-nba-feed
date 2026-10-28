@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { teams } from "@/lib/teams";
 import type { NewsItem } from "@/lib/api";
 import { decodeXml } from "@/lib/communityFeed";
-import { isTeamNews, newestNews } from "@/lib/news";
+import { isTeamNews, newestNews, presentNews } from "@/lib/news";
 
 const SPOILERS = /\b\d{2,3}\s*[-–]\s*\d{2,3}\b|\b(final|recap|box score|postgame|beat|beats|defeat|defeats|edge|edges|blow out|blows out|blown out|rout|routs|survive|survives|stun|stuns|win|wins|won|winning|winless|unbeaten|undefeated|loss|losses|lose|loses|losing|lost)\b/i;
 const PROMOTIONS = /\b(promo code|sportsbook|prop bets?|best bets?|odds[\s,]+(?:and|picks))\b/i;
@@ -35,19 +35,39 @@ async function fetchNews(team: string): Promise<NewsItem[]> {
   return newestNews(items).slice(0, 10);
 }
 
+function spoilerHidden(req: NextRequest, kind: "scores" | "headlines") {
+  const query = req.nextUrl.searchParams.get(kind === "scores" ? "hideScores" : "hideHeadlines");
+  if (query === "1" || query === "true") return true;
+  if (query === "0" || query === "false") return false;
+  const header = req.headers?.get?.("x-nba-spoilers") ?? "";
+  if (!header || header === "off") return false;
+  return header.split(",").some((part) => part.trim() === kind);
+}
+
+function deliver(items: NewsItem[], team: string, hideHeadlines: boolean, reveal: string | null, grouped: boolean) {
+  return hideHeadlines ? presentNews(items, team, reveal, grouped) : items;
+}
+
 export async function GET(req: NextRequest) {
   const batch = req.nextUrl.searchParams.get("teams");
   const names = [...new Set((batch ?? req.nextUrl.searchParams.get("team") ?? "").split(","))];
   if (!names.length || names.some((name) => name !== "NBA" && !teams.some((team) => team.name === name))) {
     return NextResponse.json({ error: "Valid teams required" }, { status: 400 });
   }
+  const hideHeadlines = spoilerHidden(req, "headlines");
+  const reveal = req.nextUrl.searchParams.get("reveal");
   const results = await Promise.allSettled(names.map(fetchNews));
+  const init = hideHeadlines ? { headers: new Headers({ Vary: "x-nba-spoilers", "Cache-Control": "private, no-store" }) } : undefined;
   if (!batch) {
     const result = results[0];
-    return result.status === "fulfilled" ? NextResponse.json(result.value) : NextResponse.json({ error: "News unavailable" }, { status: 502 });
+    return result.status === "fulfilled"
+      ? NextResponse.json(deliver(result.value, names[0], hideHeadlines, reveal, false), init)
+      : NextResponse.json({ error: "News unavailable" }, { status: 502 });
   }
   const feeds = Object.fromEntries(names.map((name, i) => [name, {
-    items: results[i].status === "fulfilled" ? results[i].value : [], error: results[i].status === "rejected",
+    items: results[i].status === "fulfilled" ? deliver(results[i].value, name, hideHeadlines, reveal, true) : [],
+    error: results[i].status === "rejected",
+    ...(hideHeadlines && results[i].status === "fulfilled" ? { grouped: true } : {}),
   }]));
-  return NextResponse.json({ feeds }, { status: results.every((result) => result.status === "rejected") ? 502 : 200 });
+  return NextResponse.json({ feeds }, { status: results.every((result) => result.status === "rejected") ? 502 : 200, ...init });
 }

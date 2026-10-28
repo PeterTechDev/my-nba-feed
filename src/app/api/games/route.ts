@@ -16,6 +16,15 @@ interface BDLGame {
   visitor_team_score: number;
 }
 
+function spoilerHidden(req: NextRequest, kind: "scores" | "headlines") {
+  const query = req.nextUrl.searchParams.get(kind === "scores" ? "hideScores" : "hideHeadlines");
+  if (query === "1" || query === "true") return true;
+  if (query === "0" || query === "false") return false;
+  const header = req.headers?.get?.("x-nba-spoilers") ?? "";
+  if (!header || header === "off") return false;
+  return header.split(",").some((part) => part.trim() === kind);
+}
+
 export async function GET(req: NextRequest) {
   const teamId = req.nextUrl.searchParams.get("teamId");
   if (!teamId) {
@@ -101,7 +110,18 @@ export async function GET(req: NextRequest) {
       else losses++;
     }
 
-    return NextResponse.json({ lastGame, currentGame, nextGame, record: { wins, losses }, error: null });
+    const reveal = req.nextUrl.searchParams.get("reveal");
+    const hideScores = spoilerHidden(req, "scores");
+    const conceal = (game: ReturnType<typeof toInfo> | null) => {
+      if (!game || !hideScores || reveal === String(game.id)) return game;
+      if (!isFinalStatus(game.status) && !isLiveStatus(game.status)) return game;
+      return { ...game, homeScore: null, awayScore: null, won: undefined, scoresRedacted: true };
+    };
+    return NextResponse.json({
+      lastGame: conceal(lastGame), currentGame: conceal(currentGame), nextGame: conceal(nextGame),
+      record: hideScores && reveal !== "record" ? { wins: 0, losses: 0, redacted: true } : { wins, losses },
+      error: null,
+    }, hideScores ? { headers: new Headers({ Vary: "x-nba-spoilers", "Cache-Control": "private, no-store" }) } : undefined);
   } catch {
     return NextResponse.json(
       { error: "Failed to fetch game data", lastGame: null, currentGame: null, nextGame: null, record: { wins: 0, losses: 0 } },

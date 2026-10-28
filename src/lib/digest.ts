@@ -7,6 +7,7 @@ export interface DigestEntry {
   stats_highlighted: string[];
   metadata: { model: string; generation_time_ms: number };
   created_at: string;
+  redacted?: boolean;
 }
 
 export interface FeedbackAgg {
@@ -43,4 +44,11 @@ export function parseDigest(value: unknown): DigestEntry {
     stats_highlighted: (body.stats_highlighted as string[] | undefined) ?? [],
     metadata: metadata ?? { model: "unknown", generation_time_ms: 0 }, created_at: new Date().toISOString(),
   };
+}
+
+export function redactDigest(entry: DigestEntry, reveal: string | null): DigestEntry {
+  if (reveal && reveal === entry.date) return entry;
+  const candidate = entry.content.match(/League date:\s*(\d{4}-\d{2}-\d{2})/i)?.[1];
+  const content = candidate && isDigestDate(candidate) ? `## Sources\n\nLeague date: ${candidate}.` : "";
+  return { ...entry, title: "NBA daily breakdown", content, games_covered: [], stats_highlighted: [], redacted: true };
 }
