@@ -138,7 +138,8 @@ globalThis.removeEventListener = () => {};
 const { createRoot } = await import("react-dom/client");
 const { act } = await import("react");
 
-const NOW = Date.parse("2026-10-27T14:00:00Z");
+// 08:00Z is still 27 Oct in Eastern Time, UTC, Los Angeles and Kiritimati.
+const NOW = Date.parse("2026-10-27T08:00:00Z");
 class FixedDate extends Date {
   constructor(...args) { super(...(args.length ? args : [NOW])); }
   static now() { return NOW; }
@@ -168,15 +169,42 @@ const UP_TO_DATE = "You’re up to date with the Celtics. You can head out.";
 const UP_TO_DATE_LIVE = "You’re up to date with the Celtics.";
 const UP_TO_DATE_TEAMS = "You’re up to date with your teams.";
 const NOTHING_NEW = "Nothing new for the Celtics. You can head out.";
+const NOTHING_NEW_TEAMS = "Nothing new for your teams. You can head out.";
 
 function story(title) {
   return {
     title: `${title} - ESPN`, safeTitle: "Protected recap", source: "ESPN", isSpoiler: false, category: "analysis",
-    pubDate: "2026-10-27T12:00:00Z", link: `https://example.com/${encodeURIComponent(title)}`,
+    pubDate: "2026-10-27T06:00:00Z", link: `https://example.com/${encodeURIComponent(title)}`,
   };
 }
 function gamesResponse(overrides = {}) {
   return { lastGame: null, currentGame: null, nextGame: null, record: { wins: 2, losses: 1 }, error: null, ...overrides };
+}
+function finishedGame(team, date) {
+  return {
+    id: team.id * 100 + Number(date.slice(-2)), date, status: "Final", isHome: true,
+    homeTeam: { id: team.id, name: team.name, abbreviation: team.abbreviation },
+    awayTeam: { id: 3, name: "Nets", abbreviation: "BKN" }, homeScore: 110, awayScore: 101,
+  };
+}
+function easternDaysAgo(value, now) {
+  const eastern = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const [year, month, day] = eastern.split("-").map(Number);
+  const [gameYear, gameMonth, gameDay] = value.split("-").map(Number);
+  return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(gameYear, gameMonth - 1, gameDay)) / 86400000);
+}
+function loadRemoteHooks(fetchImpl) {
+  return load("hooks/useRemoteData.ts", {
+    fetch: fetchImpl, AbortController, clearTimeout, setInterval, clearInterval, queueMicrotask,
+    document, window: globalThis,
+  });
+}
+async function settle() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 function createPersist(hydrated) {
   let ready = hydrated;
@@ -268,6 +296,7 @@ const celticsNext = { id: 2, date: "2026-10-27", status: "Scheduled", isHome: tr
 const celticsLive = { id: 12, date: "2026-10-27", status: "2nd Qtr", isHome: true, homeTeam: { id: celtics.id, name: "Celtics", abbreviation: "BOS" }, awayTeam: { id: 3, name: "Nets", abbreviation: "BKN" }, homeScore: 40, awayScore: 38 };
 const lakersLive = { id: 11, date: "2026-10-27", status: "1st Qtr", isHome: true, homeTeam: { id: lakers.id, name: "Lakers", abbreviation: "LAL" }, awayTeam: { id: celtics.id, name: "Celtics", abbreviation: "BOS" }, homeScore: 24, awayScore: 20 };
 const lakersLastNight = { id: 9, date: "2026-10-26", status: "Final", isHome: true, homeTeam: { id: lakers.id, name: "Lakers", abbreviation: "LAL" }, awayTeam: { id: 2, name: "Celtics", abbreviation: "BOS" }, homeScore: 110, awayScore: 101 };
+const lakersNext = { id: 21, date: "2026-10-28", status: "Scheduled", isHome: true, homeTeam: { id: lakers.id, name: "Lakers", abbreviation: "LAL" }, awayTeam: { id: 3, name: "Nets", abbreviation: "BKN" }, homeScore: 0, awayScore: 0 };
 
 test("end marker stays hidden while games or news are still loading", () => {
   const loadingGames = renderEnd({ games: { [celtics.id]: { loading: true, data: gamesResponse({ nextGame: celticsNext }) } }, feeds: { Celtics: { items: [story("Celtics opener")], error: false } } });
@@ -386,6 +415,113 @@ test("a live focus team is up to date without being told to head out", () => {
   }
 });
 
+test("a favorite's final from yesterday in Eastern Time means the teams are up to date", () => {
+  const yesterday = "2026-10-26";
+  assert.equal(easternDaysAgo(yesterday, new Date(NOW)), 1);
+  const view = renderEnd({
+    favorites: [lakers.id],
+    games: {
+      [celtics.id]: { data: gamesResponse() },
+      [lakers.id]: { data: gamesResponse({ lastGame: finishedGame(lakers, yesterday) }) },
+    },
+    feeds: { Celtics: { items: [], error: false }, Lakers: { items: [], error: false }, NBA: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), UP_TO_DATE_TEAMS);
+    assert.doesNotMatch(view.container.textContent, /Nothing new|head out/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("a favorite's final from today counts as a game", () => {
+  const today = "2026-10-27";
+  assert.equal(easternDaysAgo(today, new Date(NOW)), 0);
+  const view = renderEnd({
+    favorites: [lakers.id],
+    games: {
+      [celtics.id]: { data: gamesResponse() },
+      [lakers.id]: { data: gamesResponse({ lastGame: finishedGame(lakers, today) }) },
+    },
+    feeds: { Celtics: { items: [], error: false }, Lakers: { items: [], error: false }, NBA: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), UP_TO_DATE_TEAMS);
+    assert.doesNotMatch(view.container.textContent, /Nothing new|head out/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("a favorite with only a next game counts the same way the focus does", () => {
+  const view = renderEnd({
+    favorites: [lakers.id],
+    games: {
+      [celtics.id]: { data: gamesResponse() },
+      [lakers.id]: { data: gamesResponse({ nextGame: lakersNext }) },
+    },
+    feeds: { Celtics: { items: [], error: false }, Lakers: { items: [], error: false }, NBA: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), UP_TO_DATE_TEAMS);
+    assert.doesNotMatch(view.container.textContent, /Nothing new|head out/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("the focus counts a finished game when it has no next game", () => {
+  const view = renderEnd({
+    games: { [celtics.id]: { data: gamesResponse({ lastGame: finishedGame(celtics, "2026-10-25") }) } },
+    feeds: { Celtics: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), UP_TO_DATE);
+    assert.match(markerText(view.container), /head out/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("the focus with no games and no team news has nothing new", () => {
+  const view = renderEnd({
+    games: { [celtics.id]: { data: gamesResponse() } },
+    feeds: { Celtics: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), NOTHING_NEW);
+    assert.doesNotMatch(view.container.textContent, /up to date/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("a favorite's final from two days ago does not count", () => {
+  const older = "2026-10-25";
+  assert.equal(easternDaysAgo(older, new Date(NOW)), 2);
+  const view = renderEnd({
+    favorites: [lakers.id],
+    games: {
+      [celtics.id]: { data: gamesResponse() },
+      [lakers.id]: { data: gamesResponse({ lastGame: finishedGame(lakers, older) }) },
+    },
+    feeds: { Celtics: { items: [], error: false }, Lakers: { items: [], error: false }, NBA: { items: [], error: false } },
+  });
+  try {
+    assert.equal(markerText(view.container), NOTHING_NEW_TEAMS);
+    assert.doesNotMatch(view.container.textContent, /up to date/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("gameDaysAgo follows the Eastern Time calendar rather than the machine zone", () => {
+  for (const iso of ["2026-10-27T02:00:00Z", "2026-10-27T05:00:00Z", "2026-10-27T12:00:00Z"]) {
+    const now = new Date(iso);
+    assert.equal(dates.gameDaysAgo("2026-10-26", now), easternDaysAgo("2026-10-26", now), iso);
+  }
+});
+
 test("end marker waits until both saved preference stores have hydrated", () => {
   const view = renderEnd({ hydrated: false, games: { [celtics.id]: { data: gamesResponse({ nextGame: celticsNext }) } }, feeds: { Celtics: { items: [story("Celtics opener")], error: false } } });
   try {
@@ -456,4 +592,81 @@ test("homepage places the end marker after the last story, names the selected te
   } finally {
     view.unmount();
   }
+});
+
+test("useRemoteDataAll and useRemoteData share one fetch for the same url", async () => {
+  const calls = [];
+  let finish;
+  const gate = new Promise((resolve) => { finish = resolve; });
+  const hooks = loadRemoteHooks((url) => {
+    calls.push(String(url));
+    return gate.then(() => ({ ok: true, json: async () => ({ id: "shared" }) }));
+  });
+  const url = "/api/games?teamId=14";
+  function View() {
+    const single = hooks.useRemoteData(url);
+    const rows = hooks.useRemoteDataAll([url, url]);
+    const text = [single, ...rows].map((row) => row.loading ? "loading" : row.data?.id).join("|");
+    return createElement("p", { role: "status" }, text);
+  }
+  const view = render(createElement(View));
+  try {
+    assert.deepEqual(calls, [url]);
+    finish();
+    await settle();
+    assert.equal(view.container.textContent, "shared|shared|shared");
+  } finally {
+    view.unmount();
+  }
+});
+
+test("a response for the previous url list is ignored after the urls change", async () => {
+  const pending = new Map();
+  const hooks = loadRemoteHooks((url) => new Promise((resolve) => { pending.set(String(url), resolve); }));
+  function View({ urls }) {
+    const rows = hooks.useRemoteDataAll(urls);
+    const text = rows.map((row) => row.loading ? "loading" : row.error ? "error" : row.data?.id).join("|");
+    return createElement("p", { role: "status" }, text);
+  }
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const lakers = "/api/games?teamId=14";
+  const celticsUrl = "/api/games?teamId=2";
+  try {
+    await act(async () => { root.render(createElement(View, { urls: [lakers] })); });
+    await act(async () => { root.render(createElement(View, { urls: [celticsUrl] })); });
+    pending.get(celticsUrl)({ ok: true, json: async () => ({ id: "Celtics" }) });
+    await settle();
+    assert.equal(container.textContent, "Celtics");
+    pending.get(lakers)({ ok: true, json: async () => ({ id: "Lakers" }) });
+    await settle();
+    assert.equal(container.textContent, "Celtics");
+    assert.doesNotMatch(container.textContent, /Lakers/);
+  } finally {
+    act(() => { root.unmount(); });
+  }
+});
+
+test("unmount aborts the in-flight request of the last subscriber", async () => {
+  const signals = [];
+  const hooks = loadRemoteHooks((_url, init) => {
+    signals.push(init.signal);
+    return new Promise((_resolve, reject) => {
+      init.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+    });
+  });
+  function View() {
+    hooks.useRemoteData("/api/games?teamId=2");
+    hooks.useRemoteDataAll(["/api/games?teamId=14"]);
+    return createElement("p", { role: "status" }, "waiting");
+  }
+  const view = render(createElement(View));
+  try {
+    assert.equal(signals.length, 2);
+    assert.equal(signals.every((signal) => signal.aborted), false);
+  } finally {
+    view.unmount();
+  }
+  await settle();
+  assert.equal(signals.every((signal) => signal.aborted), true);
 });
