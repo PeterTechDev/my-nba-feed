@@ -32,32 +32,72 @@ const imports = {
   "@/lib/youtubeHighlights": youtubeHighlights,
 };
 
-test("highlights read saved YouTube videos without calling YouTube, and authenticate publications", async () => {
-  const now = new Date("2026-10-27T14:00:00Z");
+function fixedClock(at) {
+  const now = new Date(at);
   class FixedDate extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now.getTime(); } }
-  const clip = { id: "DTNqMLNVBC8", date: "2026-10-26", awayTeamId: 5, homeTeamId: 2,
-    title: "BULLS at CELTICS | FULL GAME HIGHLIGHTS | October 26, 2026", thumbnail: "https://i.ytimg.com/vi/DTNqMLNVBC8/hqdefault.jpg", duration: 600, retrievedAt: now.toISOString() };
-  let state = { syncedAt: now.toISOString(), videos: [clip] }, unavailable = false, reads = 0;
+  return { now, FixedDate };
+}
+
+function shiftCalendarDate(isoDate, days) {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+function nbaHighlightWindow(at) {
+  const instant = new Date(at);
+  const today = dates.formatNBADate(instant);
+  const start = dates.formatNBADate(new Date(instant.getTime() - 30 * 86400000));
+  return { today, start, after: shiftCalendarDate(today, 1), before: shiftCalendarDate(start, -1) };
+}
+
+function loadDatedLeagueRoutes(at, fetch) {
+  const { FixedDate } = fixedClock(at);
+  const nbaDates = load("lib/nbaDate.ts", { Date: FixedDate }).exports;
+  const globals = { Date: FixedDate, process: { env: { BALLDONTLIE_KEY: "fixture" } }, fetch };
+  const routeImports = { ...imports, "@/lib/nbaDate": nbaDates };
+  return {
+    nbaDates,
+    schedule: load("app/api/schedule/route.ts", globals, routeImports).exports,
+    standings: load("app/api/standings/route.ts", globals, routeImports).exports,
+  };
+}
+
+function loadHighlightsRoute(at, storage) {
+  const { now, FixedDate } = fixedClock(at);
   const route = load("app/api/highlights/route.ts", { Date: FixedDate, process: { env: { DIGEST_PUBLISH_TOKEN: "publisher" } },
     fetch: () => { throw new Error("A page read must never call YouTube"); } }, { ...imports,
     "@/lib/nbaDate": load("lib/nbaDate.ts", { Date: FixedDate }).exports,
     "@/lib/youtubeHighlights": load("lib/youtubeHighlights.ts", { Date: FixedDate }).exports,
-    "@/lib/digestStorage": {
-      readDigestDocument: async () => { reads++; if (unavailable) throw new Error("offline"); return state; },
-      updateDigestDocument: async (_name, _empty, update) => { state = update(state); return state; },
-    },
+    "@/lib/digestStorage": storage,
   }).exports;
+  return { now, route };
+}
+
+test("highlights read saved YouTube videos without calling YouTube, and authenticate publications", async () => {
+  const at = "2026-10-27T14:00:00Z";
+  let state, unavailable = false, reads = 0;
+  const { now, route } = loadHighlightsRoute(at, {
+    readDigestDocument: async () => { reads++; if (unavailable) throw new Error("offline"); return state; },
+    updateDigestDocument: async (_name, _empty, update) => { state = update(state); return state; },
+  });
+  const clip = { id: "DTNqMLNVBC8", date: "2026-10-26", awayTeamId: 5, homeTeamId: 2,
+    title: "BULLS at CELTICS | FULL GAME HIGHLIGHTS | October 26, 2026", thumbnail: "https://i.ytimg.com/vi/DTNqMLNVBC8/hqdefault.jpg", duration: 600, retrievedAt: now.toISOString() };
+  state = { syncedAt: now.toISOString(), videos: [clip] };
   const get = (query = "teamId=2&dates=2026-10-26", token = "") => route.GET({ nextUrl: new URL("http://localhost/api/highlights?" + query), headers: new Headers({ authorization: `Bearer ${token}` }) });
   let result = await get();
   assert.equal(result.body.videos["2026-10-26"].url, "https://www.youtube.com/watch?v=DTNqMLNVBC8");
   assert.equal(result.body.videos["2026-10-26"].thumbnail, clip.thumbnail);
   assert.equal((await get("teamId=5&dates=2026-10-26")).body.videos["2026-10-26"].id, clip.id, "One saved game serves both teams");
   assert.equal(Object.keys((await get("teamId=14&dates=2026-10-26")).body.videos).length, 0);
-  for (const invalid of ["", "teamId=999&dates=2026-10-26", "teamId=2&dates=2026-02-30", "teamId=2&dates=2026-10-28", "teamId=2&dates=2026-09-01", "teamId=2&dates=" + Array.from({ length: 16 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`).join(",")]) {
+  const bounds = nbaHighlightWindow(at);
+  assert.deepEqual(bounds, { today: "2026-10-27", start: "2026-09-27", after: "2026-10-28", before: "2026-09-26" });
+  for (const invalid of ["", "teamId=999&dates=2026-10-26", "teamId=2&dates=2026-02-30", `teamId=2&dates=${bounds.after}`, `teamId=2&dates=${bounds.before}`, "teamId=2&dates=" + Array.from({ length: 16 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`).join(",")]) {
     const before = reads;
-    assert.equal((await get(invalid)).status, 400);
+    assert.equal((await get(invalid)).status, 400, invalid);
     assert.equal(reads, before, "Invalid requests never reach storage");
   }
+  assert.equal((await get(`teamId=2&dates=${bounds.today}`)).status, 200, "The New York date of the frozen clock is accepted");
+  assert.equal((await get(`teamId=2&dates=${bounds.start}`)).status, 200, "The New York date of that clock minus 30 days is accepted");
   assert.equal((await get("sync=1")).status, 401);
   assert.equal((await get("sync=1", "publisher")).body.videos[0].id, clip.id);
   const post = (payload, token) => route.POST({ headers: new Headers({ authorization: `Bearer ${token}` }), text: async () => JSON.stringify(payload) });
@@ -69,6 +109,26 @@ test("highlights read saved YouTube videos without calling YouTube, and authenti
   result = await get();
   assert.equal(result.status, 503);
   assert.match(result.body.error, /storage unavailable/);
+});
+
+test("highlight dates follow America/New_York across midnight, including the DST offset", async () => {
+  const storage = { readDigestDocument: async () => ({ syncedAt: null, videos: [] }), updateDigestDocument: async () => { throw new Error("not used"); } };
+  const edges = [
+    ["2026-10-28T03:59:59.999Z", "2026-10-27", "2026-09-27"],
+    ["2026-10-28T04:00:00.000Z", "2026-10-28", "2026-09-28"],
+    ["2026-11-02T04:30:00.000Z", "2026-11-01", "2026-10-03"],
+    ["2026-12-15T04:59:59.999Z", "2026-12-14", "2026-11-14"],
+    ["2026-12-15T05:00:00.000Z", "2026-12-15", "2026-11-15"],
+  ];
+  for (const [at, today, start] of edges) {
+    const { route } = loadHighlightsRoute(at, storage);
+    const get = (query) => route.GET({ nextUrl: new URL("http://localhost/api/highlights?" + query), headers: new Headers() });
+    assert.deepEqual(nbaHighlightWindow(at), { today, start, after: shiftCalendarDate(today, 1), before: shiftCalendarDate(start, -1) }, at);
+    assert.equal((await get(`teamId=2&dates=${today}`)).status, 200, at);
+    assert.equal((await get(`teamId=2&dates=${shiftCalendarDate(today, 1)}`)).status, 400, at);
+    assert.equal((await get(`teamId=2&dates=${start}`)).status, 200, at);
+    assert.equal((await get(`teamId=2&dates=${shiftCalendarDate(start, -1)}`)).status, 400, at);
+  }
 });
 
 test("highlight thumbnails stay visible while scores respect spoiler settings", () => {
@@ -588,17 +648,32 @@ test("schedule preserves tipoff/postponement and overtime finals count in standi
   const home_team = { id: 2, name: "Celtics", abbreviation: "BOS" }, visitor_team = { id: 3, name: "Nets", abbreviation: "BKN" };
   let games = [{ id: 1, date: "2026-10-27", datetime: "2026-10-27T23:30:00Z", status: "Scheduled", postponed: true, home_team, visitor_team, home_team_score: 0, visitor_team_score: 0 }];
   const fetch = async () => ({ ok: true, json: async () => ({ data: games }) });
-  const globals = { process: { env: { BALLDONTLIE_KEY: "fixture" } }, fetch };
-  const schedule = load("app/api/schedule/route.ts", globals, imports).exports;
+  const { schedule, standings } = loadDatedLeagueRoutes("2026-10-27T18:00:00Z", fetch);
   const result = await schedule.GET({ nextUrl: new URL("http://localhost/api/schedule?teamId=2") });
   assert.equal(result.body.games[0].startTime, "2026-10-27T23:30:00.000Z");
   assert.equal(result.body.games[0].status, "Postponed");
   games = [{ ...games[0], postponed: false, status: "Final/OT", home_team_score: 118, visitor_team_score: 114 }];
-  const standings = load("app/api/standings/route.ts", globals, imports).exports;
   const table = await standings.GET();
   assert.equal(table.body.standings.find((team) => team.id === 2).wins, 1);
-  assert.equal(table.body.season, dates.getNBASeason());
-  assert.equal(table.body.asOf, dates.formatNBADate());
+  assert.equal(table.body.season, 2026);
+  assert.equal(table.body.asOf, "2026-10-27");
+  const beforeMidnight = loadDatedLeagueRoutes("2026-10-28T03:00:00Z", fetch);
+  const evening = await beforeMidnight.standings.GET();
+  assert.equal(evening.body.asOf, "2026-10-27", "2026-10-28T03:00:00Z is still 2026-10-27 in America/New_York");
+  assert.equal(evening.body.season, 2026);
+});
+
+test("the NBA season changes on October 1 in America/New_York", async () => {
+  const fetch = async () => ({ ok: true, json: async () => ({ data: [] }) });
+  const edges = [
+    ["2026-10-01T03:59:59Z", 2025, "2026-09-30 ET"],
+    ["2026-10-01T04:00:00Z", 2026, "2026-10-01 ET"],
+  ];
+  for (const [at, season, label] of edges) {
+    const { standings } = loadDatedLeagueRoutes(at, fetch);
+    const table = await standings.GET();
+    assert.equal(table.body.season, season, label);
+  }
 });
 
 test("standings omit all result content until scores are revealed", () => {
@@ -632,7 +707,8 @@ test("digest presentation separates coverage, localizes old UTC prose and names 
   const result = getDigestPresentation(entry);
   assert.equal(result.title, "NBA Morning Briefing");
   assert.equal(result.coverageDate, "2026-10-26");
-  assert.match(result.content, new RegExp(dates.formatTipoff("2026-10-27T23:30:00Z")));
+  const tipoff = dates.formatTipoff("2026-10-27T23:30:00Z");
+  assert.match(result.content, new RegExp(tipoff.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.doesNotMatch(result.content, /Sources|Retrieved|23:30 UTC/);
   const Markdown = load("components/MarkdownContent.tsx").exports.default;
   const html = renderToStaticMarkup(Markdown({ content: result.sources + "\n\n[Unsafe](javascript:alert(1))\n\n<script>bad</script>" }));
