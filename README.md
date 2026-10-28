@@ -125,7 +125,7 @@ Set `BALLDONTLIE_KEY` in your environment before starting the app.
 | Signal | Result |
 |---|---|
 | No `x-nba-spoilers` header, or an unknown token | Scores and spoiler headlines redacted |
-| `x-nba-spoilers: none` as the only token (`None` and surrounding spaces count) | Full payload |
+| `x-nba-spoilers: none` as the only token (`None` and surrounding spaces count). Empty tokens are ignored, so `none;` is `none` | Full payload |
 | `none` together with any other token, such as `none,scores` | Stays closed. `none` does not open anything unless it is alone |
 | `scores` and/or `headlines` (comma or semicolon, any case, trimmed), with no `none` | Those parts stay redacted; the other part is included |
 | `hideScores=1` or `hideHeadlines=true` (name and value are case-insensitive; `1` or `true`) | Forces that part to stay redacted |
