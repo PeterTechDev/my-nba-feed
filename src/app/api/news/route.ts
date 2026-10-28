@@ -4,7 +4,7 @@ import type { NewsItem } from "@/lib/api";
 import { decodeXml } from "@/lib/communityFeed";
 import { isTeamNews, newestNews } from "@/lib/news";
 
-const SPOILERS = /\b\d{2,3}\s*[-–]\s*\d{2,3}\b|\b(final|recap|box score|postgame|beat|beats|defeat|defeats|edge|edges|blow out|blows out|blown out|rout|routs|survive|survives|stun|stuns|win|wins|won|winning|winless|unbeaten|undefeated|loss|losses|lose|loses|losing|lost)\b/i;
+const SPOILERS = /\b\d{2,3}\s*[-–]\s*\d{2,3}\b|\b\d\s*[-–—]\s*\d\b(?:\s+\w+){0,3}\s+\b(?:series|lead)\b|\b(?:series|lead)\b(?:\s+\w+){0,3}\s+\b\d\s*[-–—]\s*\d\b|\b(?:series\s+lead|sweeps?|sweeping|swept|forc(?:e[sd]?|ing)\s+(?:(?:a|the)\s+)?game\s+\d+|eliminat(?:e[sd]?|ing|ion)|advanc(?:e[sd]?|ing))\b|\b(final|recap|box score|postgame|beat|beats|beaten|defeat|defeats|defeated|edge|edges|edged|blow out|blows out|blown out|blew out|blowout|blowouts|rout|routs|routed|survive|survives|survived|stun|stuns|stunned|win|wins|won|winning|winless|unbeaten|undefeated|loss|losses|lose|loses|losing|lost|top|tops|fall to|falls to|fell to|down|downs|downed|outlast|outlasts|outlasted|hold off|holds off|held off|crush|crushes|crushed|cruise past|cruises past|cruised past|rally past|rallies past|rallied past|upset|upsets|sink|sinks|sank|sunk|topple|topples|toppled)\b/i;
 const PROMOTIONS = /\b(promo code|sportsbook|prop bets?|best bets?|odds[\s,]+(?:and|picks))\b/i;
 
 function getCategory(title: string): NewsItem["category"] {
