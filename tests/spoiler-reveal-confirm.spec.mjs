@@ -171,6 +171,41 @@ async function clickBackdrop(page, dialog) {
   await page.mouse.click(x, y);
 }
 
+function mixedButton(page, hiddenPart) {
+  const name = hiddenPart === "scores"
+    ? "Scores hidden by default. Hide scores and headlines by default"
+    : "Headlines hidden by default. Hide scores and headlines by default";
+  return page.getByRole("button", { name, exact: true });
+}
+
+function aboutLink(page) {
+  return page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "About", exact: true });
+}
+
+async function bodyOverflow(page) {
+  return page.evaluate(() => document.body.style.overflow);
+}
+
+async function openRevealDialog(page) {
+  const overflowBefore = await bodyOverflow(page);
+  await topButton(page, "hidden").click();
+  const dialog = revealDialog(page);
+  await expect(dialog).toBeVisible();
+  await expect.poll(() => bodyOverflow(page)).toBe("hidden");
+  expect(await storedSettings(page)).toBe(HIDDEN_JSON);
+  return { dialog, overflowBefore };
+}
+
+async function expectClosedWithoutReveal(page, overflowBefore) {
+  await expect(revealDialog(page)).toHaveCount(0);
+  expect(await storedSettings(page)).toBe(HIDDEN_JSON);
+  await expect(page.getByText(HOME_SCORE, { exact: true })).toHaveCount(0);
+  await expect(page.getByText(AWAY_SCORE, { exact: true })).toHaveCount(0);
+  await expect.poll(() => bodyOverflow(page)).toBe(overflowBefore);
+  await expect(topButton(page, "hidden")).toBeFocused();
+  await expect(topButton(page, "hidden")).toHaveAttribute("aria-pressed", "true");
+}
+
 async function focusedInDialog(dialog) {
   return dialog.evaluate((node) => {
     const active = document.activeElement;
@@ -315,4 +350,82 @@ test("Tab and Shift+Tab cycle only inside the reveal dialog", async ({ page }) =
 
   await expectStillHidden(page);
   await expect(dialog).toBeVisible();
+});
+
+for (const [hiddenPart, initial] of [
+  ["scores", { hideScores: true, hideHeadlines: false }],
+  ["headlines", { hideScores: false, hideHeadlines: true }],
+]) {
+  test(`confirming from ${hiddenPart} hidden and the other shown writes both flags false`, async ({ page }) => {
+    await seedSettings(page, initial);
+    await openHome(page);
+    const button = mixedButton(page, hiddenPart);
+    await expect(button).toHaveAttribute("aria-pressed", "mixed");
+    expect(await storedSettings(page)).toBe(JSON.stringify(initial));
+    if (initial.hideScores) await expectScoreAbsent(page);
+    else {
+      await expect(homeScore(page)).toBeVisible();
+      await expect(awayScore(page)).toBeVisible();
+    }
+
+    await button.click();
+    const dialog = revealDialog(page);
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: CONFIRM, exact: true }).click();
+
+    await expect(dialog).toHaveCount(0);
+    await expect(homeScore(page)).toBeVisible();
+    await expect(awayScore(page)).toBeVisible();
+    expect(await storedSettings(page)).toBe(SHOWN_JSON);
+  });
+}
+
+test("going back closes the reveal dialog without revealing", async ({ page }) => {
+  await seedSettings(page, HIDDEN);
+  await openHome(page);
+  await aboutLink(page).click();
+  await expect(page.getByRole("heading", { name: /Basketball/ })).toBeVisible();
+  await page.getByRole("link", { name: "My NBA Feed home", exact: true }).click();
+  await expect(games(page).getByRole("heading", { name: "Last Game", exact: true })).toBeVisible();
+  const { overflowBefore } = await openRevealDialog(page);
+
+  await page.goBack();
+
+  await expect(page).toHaveURL(/\/about$/);
+  await expect(page.getByRole("heading", { name: /Basketball/ })).toBeVisible();
+  await expectClosedWithoutReveal(page, overflowBefore);
+});
+
+test("going forward closes the reveal dialog without revealing", async ({ page }) => {
+  await seedSettings(page, HIDDEN);
+  await openHome(page);
+  await aboutLink(page).click();
+  await expect(page.getByRole("heading", { name: /Basketball/ })).toBeVisible();
+  await page.goBack();
+  await expect(games(page).getByRole("heading", { name: "Last Game", exact: true })).toBeVisible();
+  const { overflowBefore } = await openRevealDialog(page);
+
+  await page.goForward();
+
+  await expect(page).toHaveURL(/\/about$/);
+  await expect(page.getByRole("heading", { name: /Basketball/ })).toBeVisible();
+  await expectClosedWithoutReveal(page, overflowBefore);
+});
+
+test("history.pushState closes the reveal dialog without revealing", async ({ page }) => {
+  await seedSettings(page, HIDDEN);
+  await openHome(page);
+  const { overflowBefore } = await openRevealDialog(page);
+
+  // Next copies the current history state into pushState and applies the URL
+  // there. The popstate event then restores that same tree, so the address
+  // becomes /about while the home view stays mounted. The dialog still has to
+  // dismiss without revealing.
+  await page.evaluate(() => {
+    history.pushState(null, "", "/about");
+    window.dispatchEvent(new PopStateEvent("popstate", { state: history.state }));
+  });
+
+  await expect(page).toHaveURL(/\/about$/);
+  await expectClosedWithoutReveal(page, overflowBefore);
 });
