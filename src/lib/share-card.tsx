@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getSiteUrl } from "@/lib/site";
+import { brandMark } from "@/lib/brand-icon";
 
 export const shareImageSize = { width: 1200, height: 630 };
 
@@ -32,14 +33,8 @@ export function shareCard() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center" }}>
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                backgroundColor: "#fcd34d",
-              }}
-            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={brandMark} alt="" width={48} height={48} />
             <div style={{ marginLeft: 16, fontSize: 28, color: "#fcd34d" }}>NBA FEED</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>

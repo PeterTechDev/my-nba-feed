@@ -39,7 +39,7 @@ function load(file, imports = {}, env = {}, hooks = {}) {
     require: (id) => imports[id] ?? (id.endsWith(".css") ? {} : require(id)),
     Date, URL,
     console: hooks.console ?? console,
-    process: { env: { ...env } },
+    process: { env: { ...env }, cwd: process.cwd },
   }, { filename: `${file}?${JSON.stringify(env)}` });
   return exports;
 }
@@ -421,6 +421,26 @@ test("VERCEL_PROJECT_PRODUCTION_URL http://host falls back without throwing", ()
 
 test("VERCEL_PROJECT_PRODUCTION_URL https:/// falls back without throwing", () => {
   assertProductionHost("https:///", fallbackOrigin, { rejected: true });
+});
+
+for (const value of ["ftp://prod.example", "wss://prod.example", "file:///tmp/site"]) {
+  test(`VERCEL_PROJECT_PRODUCTION_URL rejects the non-HTTPS scheme in ${value}`, () => {
+    assertProductionHost(value, fallbackOrigin, { rejected: true });
+  });
+}
+
+test("app icons preserve the approved My NBA Feed mark at every advertised size", () => {
+  class ImageResponse {
+    constructor(element, options) { this.element = element; this.options = options; }
+  }
+  const { brandIcon } = load("lib/brand-icon.tsx", { "next/og": { ImageResponse } });
+  const mark = readFileSync(new URL("../public/branding/my-nba-feed-mark-dark.png", import.meta.url)).toString("base64");
+  for (const size of [180, 192, 512]) {
+    const response = brandIcon(size);
+    assert.ok(renderToStaticMarkup(response.element).includes(`data:image/png;base64,${mark}`), "icon must use the saved approved mark");
+    assert.equal(response.options.width, size);
+    assert.equal(response.options.height, size);
+  }
 });
 
 function assertSiteChoice(env, origin, warningsExpected) {

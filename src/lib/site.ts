@@ -18,7 +18,7 @@ export function getSiteUrl(): URL {
 function readHttpsOrigin(name: string, options?: { bareHost?: boolean }): URL | undefined {
   const raw = process.env[name]?.trim();
   if (!raw) return undefined;
-  const candidate = options?.bareHost && !/^https?:\/\//i.test(raw) ? `https://${raw}` : raw;
+  const candidate = options?.bareHost && !/^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? `https://${raw}` : raw;
   try {
     const url = new URL(candidate);
     if (url.protocol === "https:" && url.hostname && !url.username && !url.password) {

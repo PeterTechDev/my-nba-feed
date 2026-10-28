@@ -1,40 +1,13 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
-export function brandIcon(size: number) {
-  const mark = Math.round(size * 0.72);
-  const radius = Math.round(size * 0.18);
-  const fontSize = Math.round(size * 0.2);
+export const brandMark = `data:image/png;base64,${readFileSync(join(process.cwd(), "public", "branding", "my-nba-feed-mark-dark.png")).toString("base64")}`;
 
+export function brandIcon(size: number) {
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "#0a0a0a",
-        }}
-      >
-        <div
-          style={{
-            width: mark,
-            height: mark,
-            borderRadius: radius,
-            backgroundColor: "#fcd34d",
-            color: "#0a0a0a",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize,
-            fontFamily: "geist",
-          }}
-        >
-          NBA
-        </div>
-      </div>
-    ),
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={brandMark} alt="My NBA Feed" width={size} height={size} />,
     { width: size, height: size }
   );
 }

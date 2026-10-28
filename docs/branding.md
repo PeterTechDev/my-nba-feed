@@ -24,6 +24,7 @@ All files live in [public/branding/](../public/branding/).
 | [Stacked light logo](../public/branding/my-nba-feed-logo-stacked-light.png) | 1774 × 887 | Light-background documents and presentations. Amber mark with dark lettering. |
 | [Standalone dark mark](../public/branding/my-nba-feed-mark-dark.png) | 1254 × 1254 | Compact square placements and future app-icon preparation. No wordmark. |
 | [Browser favicon](../src/app/favicon.ico) | 64 × 64 | PNG-encoded ICO derived from the standalone mark; served at `/favicon.ico`. |
+| [App icons](../src/lib/brand-icon.tsx) | 180, 192 and 512px | PNGs generated from the saved standalone mark for Apple and manifest icons. |
 
 The original selection remains available as
 [`my-nba-feed-logo-option-c-the-feed.png`](../public/branding/my-nba-feed-logo-option-c-the-feed.png).
@@ -53,8 +54,9 @@ accessible name is **My NBA Feed**, and the logo links to the home page.
 
 `src/app/favicon.ico` is a 64px PNG-encoded ICO made from the standalone mark.
 Next.js adds the favicon link through its file-based metadata convention. The
-previous favicon has been replaced. Page titles and PWA/home-screen icons have
-not been changed.
+previous favicon has been replaced. The Apple icon (180px), manifest icons
+(192px and 512px), and share cards reuse the saved standalone mark rather than
+rebuilding it with text or geometric placeholders.
 
 The source logos are opaque PNGs with baked-in backgrounds and canvas margins.
 Transparent and SVG/vector exports have not been prepared. The three generated
