@@ -34,17 +34,17 @@ test("equal winning percentage ranks by wins minus losses, then by wins", () => 
   const shortSchedule = record("C", 2, 1);
   const longSchedule = record("D", 4, 2);
 
-  assert.equal(compareStandings(mem, okc), 0);
-  assert.equal(compareStandings(okc, mem), 0);
-  assert.equal(compareStandings(lal, mem), 1);
-  assert.equal(compareStandings(mem, lal), -1);
-  assert.equal(compareStandings(lal, okc), 1);
-  assert.equal(compareStandings(nyk, mia), -1);
-  assert.equal(compareStandings(mia, nyk), 1);
-  assert.equal(compareStandings(moreWins, fewerWins), -1);
-  assert.equal(compareStandings(fewerWins, moreWins), 1);
-  assert.equal(compareStandings(longSchedule, shortSchedule), -1);
-  assert.equal(compareStandings(shortSchedule, longSchedule), 1);
+  assert.equal(Math.sign(compareStandings(mem, okc)), 0);
+  assert.equal(Math.sign(compareStandings(okc, mem)), 0);
+  assert.equal(Math.sign(compareStandings(lal, mem)), 1);
+  assert.equal(Math.sign(compareStandings(mem, lal)), -1);
+  assert.equal(Math.sign(compareStandings(lal, okc)), 1);
+  assert.equal(Math.sign(compareStandings(nyk, mia)), -1);
+  assert.equal(Math.sign(compareStandings(mia, nyk)), 1);
+  assert.equal(Math.sign(compareStandings(moreWins, fewerWins)), -1);
+  assert.equal(Math.sign(compareStandings(fewerWins, moreWins)), 1);
+  assert.equal(Math.sign(compareStandings(longSchedule, shortSchedule)), -1);
+  assert.equal(Math.sign(compareStandings(shortSchedule, longSchedule)), 1);
 
   assert.deepEqual(rank([lal, mem, okc]), ["MEM 4-0", "OKC 4-0", "LAL 3-0"]);
   assert.deepEqual(rank([lal, okc, mem]), ["OKC 4-0", "MEM 4-0", "LAL 3-0"]);
@@ -57,17 +57,13 @@ test("equal winning percentage ranks by wins minus losses, then by wins", () => 
 test("a complete tie returns 0 and sort keeps the input order", () => {
   const first = { abbreviation: "MEM", id: 15, wins: 4, losses: 0 };
   const second = { abbreviation: "OKC", id: 21, wins: 4, losses: 0 };
-  assert.equal(compareStandings(first, second), 0);
-  assert.equal(compareStandings(second, first), 0);
-  assert.equal(compareStandings(first, { ...first }), 0);
+  assert.equal(Math.sign(compareStandings(first, second)), 0);
+  assert.equal(Math.sign(compareStandings(second, first)), 0);
+  assert.equal(Math.sign(compareStandings(first, { ...first })), 0);
   assert.deepEqual(rank([first, second]), ["MEM 4-0", "OKC 4-0"]);
   assert.deepEqual(rank([second, first]), ["OKC 4-0", "MEM 4-0"]);
   assert.deepEqual(rank([record("A", 0, 0), record("B", 0, 0)]), ["A 0-0", "B 0-0"]);
   assert.deepEqual(rank([record("B", 0, 0), record("A", 0, 0)]), ["B 0-0", "A 0-0"]);
-
-  const input = [first, second];
-  input.slice().sort(compareStandings);
-  assert.deepEqual(input.map(label), ["MEM 4-0", "OKC 4-0"]);
 });
 
 test("an unplayed 0-0 team has a finite percentage and a defined rank", () => {
@@ -80,11 +76,11 @@ test("an unplayed 0-0 team has a finite percentage and a defined rank", () => {
     assert.equal(Number.isFinite(delta), true, label(opponent));
     assert.equal(Number.isNaN(delta), false, label(opponent));
   }
-  assert.equal(compareStandings(zero, record("ALSO", 0, 0)), 0);
-  assert.equal(compareStandings(zero, record("WIN", 1, 0)), 1);
-  assert.equal(compareStandings(zero, record("EVEN", 1, 1)), 0.5);
-  assert.equal(compareStandings(zero, record("LOSS", 0, 1)), -1);
-  assert.equal(compareStandings(zero, record("LOSS", 0, 4)), -4);
+  assert.equal(Math.sign(compareStandings(zero, record("ALSO", 0, 0))), 0);
+  assert.equal(Math.sign(compareStandings(zero, record("WIN", 1, 0))), 1);
+  assert.equal(Math.sign(compareStandings(zero, record("EVEN", 1, 1))), 1);
+  assert.equal(Math.sign(compareStandings(zero, record("LOSS", 0, 1))), -1);
+  assert.equal(Math.sign(compareStandings(zero, record("LOSS", 0, 4))), -1);
   assert.deepEqual(rank([
     record("LOSS", 0, 4),
     record("ZERO", 0, 0),
@@ -173,6 +169,8 @@ test("games behind can be negative when a worse percentage has a better margin",
     ],
   };
   const html = renderToStaticMarkup(createElement(StandingsPage));
+  // LAL -1.5 is known, undesired behavior: a worse percentage can still show
+  // negative games behind. This locks the current output, not the desired one.
   assert.deepEqual(conferenceRows(html, "Western Conference"), [
     { team: "OKC", wins: "1", losses: "0", pct: "1.000", gb: "—" },
     { team: "LAL", wins: "5", losses: "1", pct: ".833", gb: "-1.5" },

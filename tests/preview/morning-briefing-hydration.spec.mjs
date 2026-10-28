@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { registerPreviewBypass } from "../preview-bypass.mjs";
 
 // Same call MorningBriefingCard makes after mount:
 // new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" })
@@ -17,23 +18,7 @@ if (!process.env.BASE_URL) {
   throw new Error("Set BASE_URL to the origin of the running app.");
 }
 
-test.beforeEach(async ({ page, baseURL }) => {
-  const bypass = process.env.VERCEL_BYPASS;
-  if (!bypass || !baseURL) return;
-  const appOrigin = new URL(baseURL).origin;
-  await page.route("**/*", async (route) => {
-    if (new URL(route.request().url()).origin !== appOrigin) {
-      await route.continue();
-      return;
-    }
-    await route.continue({
-      headers: {
-        ...route.request().headers(),
-        "x-vercel-protection-bypass": bypass,
-      },
-    });
-  });
-});
+registerPreviewBypass();
 
 for (const timezoneId of ["America/Bahia", "UTC"]) {
   test.describe(timezoneId, () => {
