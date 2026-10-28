@@ -131,7 +131,7 @@ export function setSpoilerPrefs(next: SpoilerPrefs) {
 
 export function spoilerHeaders(): Record<string, string> {
   const { hideScores, hideHeadlines } = spoilerBus().prefs;
-  if (!hideScores && !hideHeadlines) return { "x-nba-spoilers": "off" };
+  if (!hideScores && !hideHeadlines) return { "x-nba-spoilers": "none" };
   const parts = [hideScores ? "scores" : "", hideHeadlines ? "headlines" : ""].filter(Boolean);
   return { "x-nba-spoilers": parts.join(",") };
 }
@@ -147,9 +147,41 @@ export function protectedSpoilerUrl(url: string) {
   return path === "/api/news" || path === "/api/digest" || path === "/api/games";
 }
 
+const refreshingScores = new Set<string>();
+
+function looksLive(status: string) {
+  return /qtr|quarter|halftime|\bot\b|overtime|live|progress/i.test(status);
+}
+
+function refreshRevealedGame(teamId: string, reveal: string) {
+  const key = `${teamId}:${reveal}`;
+  if (refreshingScores.has(key)) return;
+  refreshingScores.add(key);
+  const params = new URLSearchParams({ teamId, reveal });
+  void fetch(`/api/games?${params}`, { headers: spoilerHeaders() }).then(async (response) => {
+    if (!response.ok) return;
+    const incoming = await response.json() as GamesResponse;
+    if (!incoming || incoming.error) return;
+    const bag = gamesBag();
+    const base = bag.latest.get(teamId);
+    if (!base) return;
+    bag.revealed.set(teamId, mergeGameReveal(mergeGameReveal(base, bag.revealed.get(teamId)), incoming));
+    bag.listeners.forEach((listener) => listener());
+  }).finally(() => { refreshingScores.delete(key); });
+}
+
 export function noteGames(teamId: string, data: GamesResponse | null) {
   if (!data) return;
-  gamesBag().latest.set(teamId, data);
+  const bag = gamesBag();
+  bag.latest.set(teamId, data);
+  const overlay = bag.revealed.get(teamId);
+  if (!overlay) return;
+  for (const game of [data.currentGame, data.lastGame, data.nextGame]) {
+    if (!game?.scoresRedacted) continue;
+    const opened = openedGame(overlay, game.id);
+    if (!opened) continue;
+    if (opened.status !== game.status || looksLive(game.status)) refreshRevealedGame(teamId, String(game.id));
+  }
 }
 
 export function revealedGameOverlay(teamId: string) {
@@ -162,24 +194,31 @@ export function subscribeGameReveals(listener: () => void) {
   return () => { bag.listeners.delete(listener); };
 }
 
+function openedGame(extra: GamesResponse, id: number) {
+  return [extra.lastGame, extra.currentGame, extra.nextGame].find((candidate) => candidate && candidate.id === id && !candidate.scoresRedacted);
+}
+
 export function mergeGameReveal(base: GamesResponse, extra?: GamesResponse | null): GamesResponse {
   if (!extra) return base;
   const pick = (game: GameInfo | null) => {
-    if (!game) return game;
-    const opened = [extra.lastGame, extra.currentGame, extra.nextGame].find((candidate) => candidate && candidate.id === game.id && !candidate.scoresRedacted);
-    return opened ?? game;
+    if (!game || !game.scoresRedacted) return game;
+    const opened = openedGame(extra, game.id);
+    if (!opened || opened.status !== game.status) return game;
+    return opened;
   };
   const record = base.record?.redacted && extra.record && !extra.record.redacted ? extra.record : base.record;
   return { ...base, lastGame: pick(base.lastGame), currentGame: pick(base.currentGame), nextGame: pick(base.nextGame), record };
 }
 
 function parseGameScope(scope: string) {
+  const digest = /^digest:(\d{4}-\d{2}-\d{2})(?::|$)/.exec(scope);
+  if (digest) return { teamId: "", reveal: digest[1], kind: "digest" as const };
   const live = /^live:(\d+):(\d+)$/.exec(scope);
-  if (live) return { teamId: live[1], reveal: live[2] };
+  if (live) return { teamId: live[1], reveal: live[2], kind: "game" as const };
   const record = /^(\d+):record$/.exec(scope);
-  if (record) return { teamId: record[1], reveal: "record" };
+  if (record) return { teamId: record[1], reveal: "record", kind: "game" as const };
   const game = /^(\d+):(\d+)$/.exec(scope);
-  if (game) return { teamId: game[1], reveal: game[2] };
+  if (game) return { teamId: game[1], reveal: game[2], kind: "game" as const };
   return null;
 }
 
@@ -188,9 +227,39 @@ function needsScoreReveal(data: GamesResponse, reveal: string) {
   return [data.lastGame, data.currentGame, data.nextGame].some((game) => game && String(game.id) === reveal && game.scoresRedacted);
 }
 
+interface DigestRevealBag { revealed: Map<string, { redacted?: boolean }>; listeners: Set<() => void> }
+
+function digestBag(): DigestRevealBag {
+  const host = globalThis as typeof globalThis & { __nbaDigestReveals?: DigestRevealBag };
+  if (!host.__nbaDigestReveals) host.__nbaDigestReveals = { revealed: new Map(), listeners: new Set() };
+  return host.__nbaDigestReveals;
+}
+
+export function revealedDigest(date: string) {
+  return digestBag().revealed.get(date);
+}
+
+export function subscribeDigestReveals(listener: () => void) {
+  const bag = digestBag();
+  bag.listeners.add(listener);
+  return () => { bag.listeners.delete(listener); };
+}
+
 export function requestScoreReveal(scope: string): Promise<void> | null {
   const parsed = parseGameScope(scope);
   if (!parsed) return null;
+  if (parsed.kind === "digest") {
+    const cached = digestBag().revealed.get(parsed.reveal);
+    if (cached && !cached.redacted) return null;
+    const params = new URLSearchParams({ date: parsed.reveal, reveal: parsed.reveal });
+    return fetch(`/api/digest?${params}`, { headers: spoilerHeaders() }).then(async (response) => {
+      if (!response.ok) throw new Error("Digest reveal failed");
+      const body = await response.json() as { digest?: { redacted?: boolean } | null };
+      if (!body.digest || body.digest.redacted) throw new Error("Digest reveal failed");
+      digestBag().revealed.set(parsed.reveal, body.digest);
+      digestBag().listeners.forEach((listener) => listener());
+    });
+  }
   const bag = gamesBag();
   const base = bag.latest.get(parsed.teamId);
   if (!base || !needsScoreReveal(mergeGameReveal(base, bag.revealed.get(parsed.teamId)), parsed.reveal)) return null;
@@ -206,11 +275,12 @@ export function requestScoreReveal(scope: string): Promise<void> | null {
 
 export async function revealNewsItem(item: NewsItem): Promise<NewsItem | null> {
   if (!item.redacted || !item.feed) return null;
-  const params = new URLSearchParams({ team: item.feed, reveal: item.link, hideHeadlines: "1" });
+  const params = new URLSearchParams({ team: item.feed, reveal: item.identity || item.link });
   const response = await fetch(`/api/news?${params}`, { headers: spoilerHeaders() });
   if (!response.ok) return null;
   const data = await response.json() as NewsItem[];
-  return Array.isArray(data) ? data.find((entry) => entry.link === item.link && !entry.redacted) ?? null : null;
+  if (!Array.isArray(data)) return null;
+  return data.find((entry) => !entry.redacted && (entry.identity === item.identity || entry.link === item.link)) ?? null;
 }
 
 export async function revealDigest(date: string): Promise<{ redacted?: boolean } | null> {

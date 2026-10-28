@@ -1,8 +1,29 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { setSpoilerPrefs, type SpoilerPrefs } from "@/lib/api";
 
 const STORAGE_KEY = "nba-feed-spoiler-settings";
+
+interface SpoilerPrefs {
+  hideScores: boolean;
+  hideHeadlines: boolean;
+}
+
+function setSpoilerPrefs(next: SpoilerPrefs) {
+  const host = globalThis as typeof globalThis & {
+    __nbaSpoilerBus?: { prefs: SpoilerPrefs; listeners: Set<() => void> };
+    __nbaGameOverlays?: { revealed: Map<string, unknown>; listeners: Set<() => void> };
+  };
+  if (!host.__nbaSpoilerBus) host.__nbaSpoilerBus = { prefs: { hideScores: true, hideHeadlines: true }, listeners: new Set() };
+  const bus = host.__nbaSpoilerBus;
+  if (bus.prefs.hideScores === next.hideScores && bus.prefs.hideHeadlines === next.hideHeadlines) return;
+  const hideScoresAgain = next.hideScores && !bus.prefs.hideScores;
+  bus.prefs = { hideScores: next.hideScores, hideHeadlines: next.hideHeadlines };
+  if (hideScoresAgain && host.__nbaGameOverlays) {
+    host.__nbaGameOverlays.revealed.clear();
+    host.__nbaGameOverlays.listeners.forEach((listener) => listener());
+  }
+  bus.listeners.forEach((listener) => listener());
+}
 
 function readStored(): SpoilerPrefs {
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -65,6 +86,7 @@ export function useSpoilerMode() {
   const showScoresAndHeadlines = useCallback(() => {
     const next = { hideScores: false, hideHeadlines: false };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    setSpoilerPrefs(next);
     setSettings(next);
   }, []);
 

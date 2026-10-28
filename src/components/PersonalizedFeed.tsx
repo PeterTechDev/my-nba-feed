@@ -35,8 +35,10 @@ function TeamNewsSection({ team, ...newsState }: NewsState & { team: Team }) {
       {lastNight && <div className="border-t border-white/10 pt-3 space-y-2">
         <p className="text-sm text-white/70">Last night · {formatGameDate(lastNight.date, { month: "short", day: "numeric" })}</p>
         <ScoreReveal scope={`${team.id}:${lastNight.id}`} label={`${team.name} result`}>
-          <p className="text-lg font-bold tabular-nums">{team.abbreviation} {getTeamScore(lastNight)} – {getOpponentScore(lastNight)} {getOpponent(lastNight).abbreviation}</p>
-          <p className={`text-sm ${(getTeamScore(lastNight) ?? 0) > (getOpponentScore(lastNight) ?? 0) ? "text-emerald-400" : "text-red-400"}`}>{(getTeamScore(lastNight) ?? 0) > (getOpponentScore(lastNight) ?? 0) ? "Win" : "Loss"}</p>
+          {typeof getTeamScore(lastNight) === "number" && typeof getOpponentScore(lastNight) === "number" ? <>
+            <p className="text-lg font-bold tabular-nums">{team.abbreviation} {getTeamScore(lastNight)} – {getOpponentScore(lastNight)} {getOpponent(lastNight).abbreviation}</p>
+            <p className={`text-sm ${(getTeamScore(lastNight) ?? 0) > (getOpponentScore(lastNight) ?? 0) ? "text-emerald-400" : "text-red-400"}`}>{(getTeamScore(lastNight) ?? 0) > (getOpponentScore(lastNight) ?? 0) ? "Win" : "Loss"}</p>
+          </> : <p className="text-sm text-white/70">Score unavailable</p>}
         </ScoreReveal>
       </div>}
     </div>
