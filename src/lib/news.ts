@@ -21,6 +21,7 @@ export function isTeamNews(title: string, teamName: string): boolean {
 }
 
 export function newsIdentity(item: NewsItem): string[] {
+  if (!item.link) return item.identity ? [item.identity] : [words(getNewsTitle(item, false)) + ":" + new Date(item.pubDate).toISOString().slice(0, 10)];
   const url = new URL(item.link);
   url.hash = "";
   for (const key of [...url.searchParams.keys()]) {
@@ -34,7 +35,9 @@ export function newestNews(items: NewsItem[], now = Date.now()): NewsItem[] {
   const seen = new Set<string>();
   return items.filter((item) => {
     const published = Date.parse(item.pubDate);
-    try { if (new URL(item.link).protocol !== "https:") return false; } catch { return false; }
+    if (item.link) {
+      try { if (new URL(item.link).protocol !== "https:") return false; } catch { return false; }
+    } else if (!item.redacted) return false;
     return item.title.trim() && Number.isFinite(published) && published <= now && published >= now - 7 * 86400000;
   }).sort((a, b) => Date.parse(b.pubDate) - Date.parse(a.pubDate)).filter((item) => {
     const keys = newsIdentity(item);
@@ -135,16 +138,6 @@ function spoilerIdentity(item: NewsItem) {
   return (hash >>> 0).toString(16);
 }
 
-function neutralLink(link: string, identity: string) {
-  try {
-    const url = new URL(link);
-    if (!url.pathname.split("/").some((part) => /[a-z]{3,}-[a-z0-9]/i.test(decodeURIComponent(part)))) return link;
-    return `${url.origin}/story/${identity}`;
-  } catch {
-    return link;
-  }
-}
-
 function coverHeadline(item: NewsItem): NewsItem {
   const identity = item.identity ?? spoilerIdentity(item);
   const safe = item.isSpoiler && item.safeTitle !== item.title
@@ -153,7 +146,7 @@ function coverHeadline(item: NewsItem): NewsItem {
   return {
     ...item, title: safe, safeTitle: safe, isSpoiler: true, redacted: true, identity,
     category: item.category === "recap" ? "general" : item.category,
-    link: neutralLink(item.link, identity),
+    link: null,
   };
 }
 

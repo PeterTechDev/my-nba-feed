@@ -29,7 +29,7 @@ export interface GamesResponse {
 export interface NewsItem {
   title: string;
   safeTitle: string;
-  link: string;
+  link: string | null;
   pubDate: string;
   source: string;
   isSpoiler: boolean;
@@ -275,13 +275,13 @@ export function requestScoreReveal(scope: string): Promise<void> | null {
 
 export async function revealNewsItem(item: NewsItem): Promise<NewsItem | null> {
   if (!item.redacted || !item.feed) return null;
-  const params = new URLSearchParams({ team: item.feed, reveal: item.identity || item.link });
+  const params = new URLSearchParams({ team: item.feed, reveal: item.identity || item.link || "" });
   const response = await fetch(`/api/news?${params}`, { headers: spoilerHeaders() });
   if (!response.ok) return null;
   const data = await response.json() as NewsItem[];
   if (!Array.isArray(data)) return null;
   const matches = (entry: NewsItem): NewsItem | null => {
-    if (!entry.redacted && (entry.identity === item.identity || entry.link === item.link)) return entry;
+    if (!entry.redacted && (entry.identity === item.identity || (item.link !== null && entry.link === item.link))) return entry;
     for (const related of entry.related ?? []) {
       const found = matches(related);
       if (found) return found;

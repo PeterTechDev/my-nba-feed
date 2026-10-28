@@ -24,7 +24,7 @@ export function NewsLinkWarning() {
 
 function storyKey(item: NewsItem): string {
   const related = item.related?.map(storyKey).join("\n") ?? "";
-  return `${item.link}:${item.redacted ? 1 : 0}:${item.title}:${related}`;
+  return `${item.link || item.identity || item.title}:${item.redacted ? 1 : 0}:${item.title}:${related}`;
 }
 
 function NewsStory({ item }: { item: NewsItem }) {
@@ -36,7 +36,7 @@ function NewsStory({ item }: { item: NewsItem }) {
   latest.current = item;
   useEffect(() => { if (!revealed) setCopy(latest.current); }, [itemKey, revealed]);
   const hidden = hideHeadlines && copy.isSpoiler && !revealed;
-  const linked = !hidden && !copy.redacted;
+  const href = !hidden && !copy.redacted ? copy.link : null;
   const toggle = () => {
     if (!revealed && copy.redacted) {
       void revealNewsItem(copy).then((full) => { if (!full) return; setCopy(full); setRevealed(true); });
@@ -46,8 +46,8 @@ function NewsStory({ item }: { item: NewsItem }) {
   };
   const title = <span className="min-w-0 flex-1">{getNewsTitle(copy, hidden)}</span>;
   return <>
-    {linked ? (
-      <a href={copy.link} target="_blank" rel="noopener noreferrer"
+    {href ? (
+      <a href={href} target="_blank" rel="noopener noreferrer"
         className="flex min-h-11 items-center gap-2 break-words text-base font-medium leading-relaxed text-white/90 hover:text-white sm:text-sm">
         {title}
         <ExternalLink aria-hidden="true" className="h-4 w-4 shrink-0 text-white/70" />
@@ -66,7 +66,7 @@ function NewsStory({ item }: { item: NewsItem }) {
     </div>}
     {copy.related && copy.related.length > 0 && <details className="mt-2">
       <summary className="min-h-11 cursor-pointer py-3 text-sm text-white/70 hover:text-white">Related coverage ({copy.related.length})</summary>
-      <ul className="divide-y divide-white/10">{copy.related.map((related) => <li key={`${related.link}:${hideHeadlines}`} className="py-3"><NewsStory item={related} /></li>)}</ul>
+      <ul className="divide-y divide-white/10">{copy.related.map((related) => <li key={`${related.link || related.identity || related.title}:${hideHeadlines}`} className="py-3"><NewsStory item={related} /></li>)}</ul>
     </details>}
   </>;
 }
@@ -81,9 +81,9 @@ export default function NewsList({ news, loading, error, retry, subject, showWar
   return <>
     {boundary !== null && boundary > 0 && <p className="mb-3 text-sm text-white/70">{boundary} new {boundary === 1 ? "story" : "stories"} since your last visit</p>}
     {showWarning && <NewsLinkWarning />}
-    <ul className="divide-y divide-white/10">{news.map((item, index) => <Fragment key={item.link}>
+    <ul className="divide-y divide-white/10">{news.map((item, index) => <Fragment key={item.link || item.identity || item.title}>
       {boundary !== null && boundary > 0 && index === boundary && <li className="py-3 text-sm text-white/70">Earlier stories</li>}
-      <li className="py-3 first:pt-0"><NewsStory key={`${item.link}:${hideHeadlines}`} item={item} /></li>
+      <li className="py-3 first:pt-0"><NewsStory key={`${item.link || item.identity || item.title}:${hideHeadlines}`} item={item} /></li>
     </Fragment>)}</ul>
   </>;
 }
