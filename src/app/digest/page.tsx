@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useReducer, useRef, useState } from "react";
 import { Flame, ThumbsDown, ChevronDown, ChevronUp, BookOpen, Clock, Zap, BarChart2, Coffee, BookMarked } from "lucide-react";
 import MarkdownContent from "@/components/MarkdownContent";
 import DataError from "@/components/DataError";
-import { useSpoilerContext } from "@/components/SpoilerModeProvider";
+import { digestContentIsProtected, useSpoilerContext } from "@/components/SpoilerModeProvider";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import { formatGameDate } from "@/lib/nbaDate";
 import type { DigestEntry, FeedbackAgg } from "@/lib/digest";
@@ -18,6 +18,20 @@ const STYLE_META = {
 function formatDate(date: string) {
   return formatGameDate(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
+
+function revealDigest(date: string) {
+  const host = globalThis as typeof globalThis & { __nbaSpoilerBus?: { prefs: { hideScores: boolean; hideHeadlines: boolean } } };
+  const prefs = host.__nbaSpoilerBus?.prefs ?? { hideScores: true, hideHeadlines: true };
+  const header = !prefs.hideScores && !prefs.hideHeadlines
+    ? "none"
+    : [prefs.hideScores ? "scores" : "", prefs.hideHeadlines ? "headlines" : ""].filter(Boolean).join(",");
+  const params = new URLSearchParams({ date, reveal: date });
+  return fetch(`/api/digest?${params}`, { headers: { "x-nba-spoilers": header } }).then(async (response) => {
+    if (!response.ok) return null;
+    const data = await response.json() as { digest?: (DigestEntry & { redacted?: boolean }) | null };
+    return data.digest && !data.digest.redacted ? data.digest : null;
+  });
+}
 type Reaction = "fire" | "thumbsdown";
 interface DigestCardProps {
   digest: DigestEntry;
@@ -30,13 +44,23 @@ interface DigestCardProps {
 
 function DigestCard({ digest, feedback, reaction, pending, reactionError, onReact }: DigestCardProps) {
   const { hideScores, hideHeadlines } = useSpoilerContext();
-  const protectedContent = hideScores || hideHeadlines;
+  const protectedContent = digestContentIsProtected({ hideScores, hideHeadlines });
   const [revealed, setRevealed] = useState(false);
+  const [copy, setCopy] = useReducer((_current: DigestEntry, next: DigestEntry) => next, digest);
   useEffect(() => setRevealed(false), [digest.date, hideScores, hideHeadlines]);
+  useEffect(() => { if (!revealed) setCopy(digest); }, [digest, revealed]);
   const hidden = protectedContent && !revealed;
-  const meta = STYLE_META[digest.style] ?? STYLE_META.casual;
+  const meta = STYLE_META[copy.style] ?? STYLE_META.casual;
   const StyleIcon = meta.icon;
-  const presentation = getDigestPresentation(digest);
+  const presentation = getDigestPresentation(copy);
+  const open = () => {
+    if (revealed) { setRevealed(false); return; }
+    if (copy.redacted) {
+      void revealDigest(copy.date).then((full) => { if (!full) return; setCopy(full as DigestEntry); setRevealed(true); });
+      return;
+    }
+    setRevealed(true);
+  };
   return (
     <div className="p-5 sm:p-6">
       <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -52,7 +76,7 @@ function DigestCard({ digest, feedback, reaction, pending, reactionError, onReac
       {protectedContent && (
         <div className="mt-4">
           <p role={hidden ? undefined : "status"} className="text-sm text-white/70 mb-2">{hidden ? "This digest includes results and player statistics." : "Digest revealed. Default protection is still on."}</p>
-          <button type="button" aria-pressed={revealed} onClick={() => setRevealed((value) => !value)}
+          <button type="button" aria-pressed={revealed} onClick={open}
             className="min-h-11 rounded-lg border border-white/15 px-3 text-sm text-white/80 hover:bg-white/10">
             {hidden ? "Reveal digest" : "Hide digest spoilers"}
           </button>
@@ -60,9 +84,9 @@ function DigestCard({ digest, feedback, reaction, pending, reactionError, onReac
       )}
       {!hidden && <div className="content-reveal">
         <MarkdownContent content={presentation.content} className="mb-5 break-words" />
-        {digest.stats_highlighted.length > 0 && <div className="mb-4">
+        {copy.stats_highlighted.length > 0 && <div className="mb-4">
           <h3 className="font-semibold mb-2">Key stats</h3>
-          <ul className="space-y-1 text-sm text-white/80">{digest.stats_highlighted.map((stat) => <li key={stat}>{stat}</li>)}</ul>
+          <ul className="space-y-1 text-sm text-white/80">{copy.stats_highlighted.map((stat) => <li key={stat}>{stat}</li>)}</ul>
         </div>}
         {presentation.readerSources && <section className="mt-6" aria-label="Readable sources">
           <h3 className="font-semibold mb-2">Check the sources</h3>
@@ -71,8 +95,8 @@ function DigestCard({ digest, feedback, reaction, pending, reactionError, onReac
         <details className="group border-t border-white/10 pt-2 mt-6">
           <summary className="min-h-11 flex items-center justify-between gap-3 cursor-pointer text-sm text-white/80 hover:text-white">Raw source data and edition details<ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 group-open:rotate-180" /></summary>
           {presentation.sources ? <MarkdownContent content={presentation.sources} className="text-sm break-words" /> : <p className="text-sm text-white/70 my-3">No source links were supplied for this edition.</p>}
-          {digest.games_covered.length > 0 && <><h3 className="font-semibold mt-4 mb-2">Games covered</h3><ul className="space-y-1 text-sm text-white/70">{digest.games_covered.map((game) => <li key={game}>{game}</li>)}</ul></>}
-          {digest.metadata?.model && <p className="text-sm text-white/70 mt-4">Generated by {digest.metadata.model}{digest.metadata.generation_time_ms ? ` · ${(digest.metadata.generation_time_ms / 1000).toFixed(1)}s` : ""}</p>}
+          {copy.games_covered.length > 0 && <><h3 className="font-semibold mt-4 mb-2">Games covered</h3><ul className="space-y-1 text-sm text-white/70">{copy.games_covered.map((game) => <li key={game}>{game}</li>)}</ul></>}
+          {copy.metadata?.model && <p className="text-sm text-white/70 mt-4">Generated by {copy.metadata.model}{copy.metadata.generation_time_ms ? ` · ${(copy.metadata.generation_time_ms / 1000).toFixed(1)}s` : ""}</p>}
         </details>
         <div className="flex flex-wrap items-center gap-3 mt-4 pt-3 border-t border-white/10" aria-label={`Reactions for ${formatDate(digest.date)}`}>
           <span className="text-sm text-white/70">Was this useful?</span>
@@ -98,7 +122,7 @@ function ArchiveItem(props: DigestCardProps) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const { hideScores, hideHeadlines } = useSpoilerContext();
-  const hidden = hideScores || hideHeadlines;
+  const hidden = digestContentIsProtected({ hideScores, hideHeadlines });
   const { digest } = props;
   const meta = STYLE_META[digest.style] ?? STYLE_META.casual;
   return <div className="rounded-xl border border-[#2a2a2a] bg-[#161616] overflow-hidden">

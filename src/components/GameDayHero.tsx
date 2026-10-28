@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { getTeamById } from "@/lib/teams";
-import { formatGameDate, formatTipoff, gameDaysAgo } from "@/lib/nbaDate";
+import { NBA_TIME_ZONE, formatGameDate, formatTipoff, gameDaysAgo } from "@/lib/nbaDate";
 import { ArrowUpRight } from "lucide-react";
 import DataError from "./DataError";
 import ScoreReveal from "./ScoreReveal";
@@ -10,6 +10,12 @@ import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 import { getOpponent, getOpponentScore, getTeamScore } from "@/lib/api";
 import styles from "./Home.module.css";
+
+function easternDay(value: string): string {
+  const options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) options.timeZone = NBA_TIME_ZONE;
+  return formatGameDate(value, options);
+}
 
 function getCountdown(dateStr?: string | null): string {
   if (!dateStr) return "Tipoff time TBD";
@@ -57,12 +63,14 @@ export default function GameDayHero() {
         {opponentTeam && <img src={opponentTeam.logo} alt="" width={40} height={40} className="h-10 w-10 shrink-0 object-contain" />}
         <p className="text-2xl font-bold [text-wrap:balance]">{matchupLabel}</p>
       </div>
-      <p className="mt-2 text-sm text-white/70">{formatGameDate(heroGame.startTime || heroGame.date, { month: "short", day: "numeric" })} · {heroGame.isHome ? "Home" : "Away"}</p>
+      <p className="mt-2 text-sm text-white/70">{easternDay(heroGame.startTime || heroGame.date)} · {heroGame.isHome ? "Home" : "Away"}</p>
       </div>
       {isLive ? (
         <div>
           <ScoreReveal scope={`live:${selectedTeam.id}:${heroGame.id}`} label={`${selectedTeam.name} live score`}>
-            <p className="text-xl font-bold tabular-nums">{selectedTeam.abbreviation} {teamScore} – {opponent.abbreviation} {opponentScore}</p>
+            {typeof teamScore === "number" && typeof opponentScore === "number"
+              ? <p className="text-xl font-bold tabular-nums">{selectedTeam.abbreviation} {teamScore} – {opponent.abbreviation} {opponentScore}</p>
+              : <p className="text-sm text-white/70">Score unavailable</p>}
           </ScoreReveal>
         </div>
       ) : <div>

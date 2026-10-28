@@ -1,11 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { protectedSpoilerUrl, spoilerHeaders, subscribeSpoilerPrefs } from "@/lib/api";
 
 interface Snapshot { data: unknown; loading: boolean; error: boolean }
 interface Entry {
   snapshot: Snapshot;
   listeners: Set<() => void>;
   updatedAt: number;
+  mode?: string;
   pending?: Promise<unknown>;
   controller?: AbortController;
   timer?: ReturnType<typeof setInterval>;
@@ -24,19 +26,23 @@ function getEntry(url: string): Entry {
 
 export function fetchRemoteData<T>(url: string, force = false): Promise<T> {
   const entry = getEntry(url);
-  if (entry.pending) return entry.pending as Promise<T>;
-  if (!force && !entry.snapshot.error && entry.snapshot.data !== null && Date.now() - entry.updatedAt < 30000) {
+  const mode = protectedSpoilerUrl(url) ? spoilerHeaders()["x-nba-spoilers"] : "";
+  if (entry.pending && entry.mode === mode) return entry.pending as Promise<T>;
+  if (!force && entry.mode === mode && !entry.snapshot.error && entry.snapshot.data !== null && Date.now() - entry.updatedAt < 30000) {
     return Promise.resolve(entry.snapshot.data as T);
   }
+  if (entry.pending) entry.controller?.abort();
   const publish = (snapshot: Snapshot) => {
     entry.snapshot = snapshot;
     entry.listeners.forEach((listener) => listener());
   };
   const controller = new AbortController();
   entry.controller = controller;
+  entry.mode = mode;
   const timeout = setTimeout(() => controller.abort(), 15000);
   publish({ ...entry.snapshot, loading: entry.snapshot.data === null, error: false });
-  entry.pending = fetch(url, { signal: controller.signal })
+  const headers = mode ? spoilerHeaders() : undefined;
+  const promise = fetch(url, { signal: controller.signal, headers })
     .then(async (response) => {
       if (!response.ok) throw new Error("Request failed");
       const data = await response.json();
@@ -46,15 +52,17 @@ export function fetchRemoteData<T>(url: string, force = false): Promise<T> {
       return data;
     })
     .catch((error) => {
+      if (entry.controller !== controller) throw error;
       publish({ ...entry.snapshot, loading: false, error: true });
       throw error;
     })
     .finally(() => {
       clearTimeout(timeout);
-      entry.pending = undefined;
-      entry.controller = undefined;
+      if (entry.pending === promise) entry.pending = undefined;
+      if (entry.controller === controller) entry.controller = undefined;
     });
-  return entry.pending as Promise<T>;
+  entry.pending = promise;
+  return promise as Promise<T>;
 }
 
 export function useRemoteData<T>(url: string | null, refreshMs = 0) {
@@ -70,10 +78,12 @@ export function useRemoteData<T>(url: string | null, refreshMs = 0) {
       if (document.visibilityState === "visible") void fetchRemoteData(url, true).catch(() => {});
     };
     if (refreshMs && !entry.timer) entry.timer = setInterval(refresh, refreshMs);
+    const stopPrefs = protectedSpoilerUrl(url) ? subscribeSpoilerPrefs(refresh) : undefined;
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       entry.listeners.delete(sync);
+      stopPrefs?.();
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
       if (!entry.listeners.size && entry.timer) {
@@ -99,4 +109,45 @@ export function useRemoteData<T>(url: string | null, refreshMs = 0) {
     error: current && state.error,
     retry,
   };
+}
+
+/** Subscribe to the same cache entries other callers already use. Does not start a second refresh timer. */
+export function useRemoteDataAll<T>(urls: readonly string[]) {
+  const key = urls.join("\n");
+  const [state, setState] = useState<{ key: string; rows: Snapshot[] }>({ key: "", rows: [] });
+  useEffect(() => {
+    const list = key ? key.split("\n") : [];
+    let active = true;
+    const sync = () => {
+      if (active) setState({ key, rows: list.map((url) => getEntry(url).snapshot) });
+    };
+    const releases = list.map((url) => {
+      const entry = getEntry(url);
+      entry.listeners.add(sync);
+      void fetchRemoteData(url).catch(() => {});
+      return () => {
+        entry.listeners.delete(sync);
+        queueMicrotask(() => {
+          if (!entry.listeners.size) {
+            entry.controller?.abort();
+            entries.delete(url);
+          }
+        });
+      };
+    });
+    sync();
+    return () => {
+      active = false;
+      releases.forEach((release) => release());
+    };
+  }, [key]);
+  const current = state.key === key;
+  return urls.map((_, index) => {
+    const row = current ? state.rows[index] : undefined;
+    return {
+      data: (row?.data ?? null) as T | null,
+      loading: !current || row?.loading !== false,
+      error: Boolean(row?.error),
+    };
+  });
 }

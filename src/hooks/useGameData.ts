@@ -1,8 +1,8 @@
 "use client";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useRemoteData } from "./useRemoteData";
 import { useTeam } from "./useTeam";
-import { GameInfo, TeamRecord, GamesResponse } from "@/lib/api";
+import { GameInfo, TeamRecord, GamesResponse, mergeGameReveal, noteGames, revealedGameOverlay, subscribeGameReveals } from "@/lib/api";
 
 interface GameDataState {
   lastGame: GameInfo | null;
@@ -32,12 +32,24 @@ export function useGameData() {
 
 export { GameDataContext };
 
+function useGameOverlay(teamId: string) {
+  const [overlay, setOverlay] = useState<GamesResponse | undefined>(undefined);
+  useEffect(() => {
+    setOverlay(revealedGameOverlay(teamId));
+    return subscribeGameReveals(() => setOverlay(revealedGameOverlay(teamId)));
+  }, [teamId]);
+  return overlay;
+}
+
 export function useGameDataFetcher(): GameDataState {
   const { selectedTeam } = useTeam();
+  const teamId = String(selectedTeam.id);
   const { data, loading, error, retry } = useRemoteData<GamesResponse>(`/api/games?teamId=${selectedTeam.id}`, 30000);
+  const overlay = useGameOverlay(teamId);
+  useEffect(() => { if (data) noteGames(teamId, data); }, [data, teamId]);
   return {
     ...defaultState,
-    ...data,
+    ...(data ? mergeGameReveal(data, overlay) : null),
     loading,
     error: error ? "Game data is unavailable" : null,
     retry,

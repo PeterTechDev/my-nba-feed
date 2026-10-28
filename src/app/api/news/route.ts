@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { teams } from "@/lib/teams";
 import type { NewsItem } from "@/lib/api";
 import { decodeXml } from "@/lib/communityFeed";
-import { isTeamNews, newestNews } from "@/lib/news";
+import { isTeamNews, newestNews, presentNews } from "@/lib/news";
 
-const SPOILERS = /\b\d{2,3}\s*[-–]\s*\d{2,3}\b|\b(final|recap|box score|postgame|beat|beats|defeat|defeats|edge|edges|blow out|blows out|blown out|rout|routs|survive|survives|stun|stuns|win|wins|won|winning|winless|unbeaten|undefeated|loss|losses|lose|loses|losing|lost)\b/i;
+const SPOILERS = /\b\d{2,3}\s*[-–—]\s*\d{2,3}\b(?![.,]\d)|\b(?:[5-9]\d|1[0-8]\d)\s*:\s*(?:[5-9]\d|1[0-8]\d)\b|\b(?:[A-Za-z][\w'.]{0,30}|76ers)\s+(?:[5-9]\d|1[0-8]\d)\s*,\s*(?:[A-Za-z][\w'.]{0,30}|76ers)\s+(?:[5-9]\d|1[0-8]\d)\b|\b\d\s*[-–—]\s*\d\b(?:\s+\w+){0,3}\s+\b(?:series|lead)\b|\b(?:series|lead)\b(?:\s+\w+){0,3}\s+\b\d\s*[-–—]\s*\d\b|\b(?:series\s+lead|sweeps?|sweeping|swept|forc(?:e[sd]?|ing)\s+(?:(?:a|the)\s+)?game\s+\d+|eliminat(?:e[sd]?|ing|ion)|advanc(?:e[sd]?|ing))\b|\b(final|recap|box scores?|postgame|beat|beats|beaten|defeat|defeats|defeated|edge|edges|edged|blow out|blows out|blown out|blew out|blowout|blowouts|rout|routs|routed|survive|survives|survived|stun|stuns|stunned|win|wins|won|winning|winless|unbeaten|undefeated|loss|losses|lose|loses|losing|lost|top|tops|fall to|falls to|fell to|down|downs|downed|outlast|outlasts|outlasted|hold off|holds off|held off|crush|crushes|crushed|cruise past|cruises past|cruised past|rally past|rallies past|rallied past|upset|upsets|sink|sinks|sank|sunk|topple|topples|toppled)\b|\b(?:lift(?:s|ed|ing)?|carr(?:y|ies|ied)|power(?:s|ed)?)\b(?:\s+\S+){0,4}\s+\b(?:past|over)\b|\bbuzzer[-–—\s]*beat(?:ers?|ing)\b|\bgame[-–—\s]+win(?:ners?|ning)\b|\b(?:up|down|leads?|trails?)\s+\d\s*[-–—]\s*\d\b|\b(?:leads?|trails?)\s+(?:the\s+)?series\b|\b(?:are|at|improv(?:e|es|ed)\s+to|mov(?:e|es|ed)\s+to|falls?\s+to)\s+\d\s*[-–—]\s*\d\b|\b(?:victory|win)\s+over\b|\b\d+\s*[-–—]\s*\d+\s+start\b|\bpush(?:es|ed)?\b(?:\s+\S+){0,4}\s+\bpast\b/i;
 const PROMOTIONS = /\b(promo code|sportsbook|prop bets?|best bets?|odds[\s,]+(?:and|picks))\b/i;
 
 function getCategory(title: string): NewsItem["category"] {
@@ -35,19 +35,63 @@ async function fetchNews(team: string): Promise<NewsItem[]> {
   return newestNews(items).slice(0, 10);
 }
 
+function spoilerFlags(req: NextRequest) {
+  let queryScores = false;
+  let queryHeadlines = false;
+  for (const [key, value] of req.nextUrl.searchParams.entries()) {
+    const name = key.toLowerCase();
+    if (name !== "hidescores" && name !== "hideheadlines") continue;
+    const normalized = value.trim().toLowerCase();
+    if (normalized !== "1" && normalized !== "true") continue;
+    if (name === "hidescores") queryScores = true;
+    else queryHeadlines = true;
+  }
+  const tokens = (req.headers?.get?.("x-nba-spoilers") ?? "").split(/[,;]/).map((part) => part.trim().toLowerCase()).filter(Boolean);
+  const known = new Set(["none", "scores", "headlines"]);
+  const unknown = tokens.some((token) => !known.has(token));
+  const explicitNone = tokens.length === 1 && tokens[0] === "none";
+  let hideScores = true;
+  let hideHeadlines = true;
+  if (!unknown && explicitNone) {
+    hideScores = false;
+    hideHeadlines = false;
+  } else if (!unknown && !tokens.includes("none") && tokens.some((token) => token === "scores" || token === "headlines")) {
+    hideScores = tokens.includes("scores");
+    hideHeadlines = tokens.includes("headlines");
+  }
+  if (queryScores) hideScores = true;
+  if (queryHeadlines) hideHeadlines = true;
+  return { hideScores, hideHeadlines };
+}
+
+function responseInit(status = 200) {
+  return { status, headers: { Vary: "x-nba-spoilers", "Cache-Control": "private, no-store" } };
+}
+
+function deliver(items: NewsItem[], team: string, hideHeadlines: boolean, reveal: string | null) {
+  return hideHeadlines ? presentNews(items, team, reveal) : items;
+}
+
 export async function GET(req: NextRequest) {
   const batch = req.nextUrl.searchParams.get("teams");
   const names = [...new Set((batch ?? req.nextUrl.searchParams.get("team") ?? "").split(","))];
   if (!names.length || names.some((name) => name !== "NBA" && !teams.some((team) => team.name === name))) {
-    return NextResponse.json({ error: "Valid teams required" }, { status: 400 });
+    return NextResponse.json({ error: "Valid teams required" }, responseInit(400));
   }
+  const { hideHeadlines } = spoilerFlags(req);
+  const reveal = req.nextUrl.searchParams.get("reveal");
   const results = await Promise.allSettled(names.map(fetchNews));
   if (!batch) {
     const result = results[0];
-    return result.status === "fulfilled" ? NextResponse.json(result.value) : NextResponse.json({ error: "News unavailable" }, { status: 502 });
+    return result.status === "fulfilled"
+      ? NextResponse.json(deliver(result.value, names[0], hideHeadlines, reveal), responseInit())
+      : NextResponse.json({ error: "News unavailable" }, responseInit(502));
   }
   const feeds = Object.fromEntries(names.map((name, i) => [name, {
-    items: results[i].status === "fulfilled" ? results[i].value : [], error: results[i].status === "rejected",
+    items: results[i].status === "fulfilled" ? deliver(results[i].value, name, hideHeadlines, reveal) : [],
+    error: results[i].status === "rejected",
+    ...(hideHeadlines && results[i].status === "fulfilled" ? { grouped: true } : {}),
   }]));
-  return NextResponse.json({ feeds }, { status: results.every((result) => result.status === "rejected") ? 502 : 200 });
+  const failed = results.every((result) => result.status === "rejected");
+  return NextResponse.json({ feeds }, responseInit(failed ? 502 : 200));
 }
