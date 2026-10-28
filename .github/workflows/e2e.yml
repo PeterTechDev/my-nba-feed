@@ -6,10 +6,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: e2e-${{ github.event.deployment.ref }}
+  cancel-in-progress: true
+
 jobs:
   playwright:
     name: preview smoke
-    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Preview'
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Preview' && github.event.deployment.creator.login == 'vercel[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -23,14 +27,25 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Validate preview URL
+        env:
+          PREVIEW_URL: ${{ github.event.deployment_status.target_url || github.event.deployment_status.environment_url }}
+        run: node tests/preview-url.mjs
+      - name: Require bypass secret
+        env:
+          VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: test -n "$VERCEL_BYPASS" || { echo "::error::VERCEL_AUTOMATION_BYPASS_SECRET ausente"; exit 1; }
       - name: Run Playwright
         env:
-          BASE_URL: ${{ github.event.deployment_status.target_url || github.event.deployment_status.environment_url }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: npm run test:e2e -- --reporter=line --reporter=html
+          # The preview has no BALLDONTLIE_KEY, and digest storage can 503.
+          # Without this flag those resource errors fail the smoke.
+          SMOKE_ALLOW_MISSING_API_KEY: "1"
+        run: npm run test:e2e -- --reporter=line,html
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: playwright-report
           path: playwright-report
+          retention-days: 7
           if-no-files-found: ignore

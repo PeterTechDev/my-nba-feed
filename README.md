@@ -167,10 +167,12 @@ official API and saves matches in private Blob storage; page visits never call
 the YouTube Data API. Previews and players respect spoiler protection. Configure
 the `YOUTUBE_API_KEY` Actions secret using the [setup guide](docs/youtube-highlights.md).
 
-Run `npm run lint`, `npm run build` and `node --experimental-strip-types --test tests/*.test.mjs`.
-The `tests/*regression.mjs` browser suites export functions that accept a
-Playwright page, with the app running on port 3000. Their API fixtures exercise
-errors, spoilers and retries without modifying production.
+Run `npm test` for the Node suite, `npm run test:ssr` for the Morning Briefing
+server render, and `npm run test:e2e` for Playwright. `test:e2e` needs `BASE_URL`.
+`VERCEL_BYPASS` is required when that origin is not localhost. Set
+`SMOKE_ALLOW_MISSING_API_KEY=1` to allow the browser's 503 console lines for
+`/api/games`, `/api/standings`, and `/api/digest` when the preview has no
+BALLDONTLIE key or digest storage. Without that variable, any 503 fails the smoke.
 
 ---
 

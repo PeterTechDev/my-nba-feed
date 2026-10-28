@@ -1,26 +1,19 @@
 import { expect, test } from "@playwright/test";
+import { registerPreviewBypass } from "./preview-bypass.mjs";
+
+// SMOKE_ALLOW_MISSING_API_KEY=1 tolerates the browser's failed-resource console
+// line when the status is 503 and the path is /api/games, /api/standings, or
+// /api/digest (including /api/digest/feedback). Those routes 503 without
+// BALLDONTLIE_KEY or digest storage. The preview job sets the variable because
+// that deployment has no key today. Unset, any 503 console error fails the smoke.
+// VERCEL_BYPASS is required when BASE_URL is not localhost. The bypass header is
+// added only for that origin.
 
 if (!process.env.BASE_URL) {
   throw new Error("Set BASE_URL to the origin of the running app.");
 }
 
-test.beforeEach(async ({ page, baseURL }) => {
-  const bypass = process.env.VERCEL_BYPASS;
-  if (!bypass || !baseURL) return;
-  const appOrigin = new URL(baseURL).origin;
-  await page.route("**/*", async (route) => {
-    if (new URL(route.request().url()).origin !== appOrigin) {
-      await route.continue();
-      return;
-    }
-    await route.continue({
-      headers: {
-        ...route.request().headers(),
-        "x-vercel-protection-bypass": bypass,
-      },
-    });
-  });
-});
+registerPreviewBypass();
 
 function watchPage(page) {
   const hydration = [];
@@ -29,7 +22,7 @@ function watchPage(page) {
   page.on("console", (message) => {
     const text = message.text();
     if (/#418|Hydration|hydration/.test(text)) hydration.push(`${message.type()}: ${text}`);
-    else if (message.type() === "error" && !isMissingKey503(message)) consoleErrors.push(text);
+    else if (message.type() === "error" && !isTolerated503(message)) consoleErrors.push(text);
   });
   page.on("pageerror", (error) => {
     const text = error instanceof Error ? error.message : String(error);
@@ -39,14 +32,13 @@ function watchPage(page) {
   return { hydration, consoleErrors, pageErrors };
 }
 
-// Chromium logs a failed fetch even when the app handles it. Without
-// BALLDONTLIE_KEY, /api/games and /api/standings both respond 503
-// "API key not configured". Those two resource errors are allowed.
-function isMissingKey503(message) {
+function isTolerated503(message) {
+  if (process.env.SMOKE_ALLOW_MISSING_API_KEY !== "1") return false;
   const location = message.location()?.url ?? "";
   let path = "";
-  try { path = new URL(location).pathname; } catch { path = ""; }
-  return (path === "/api/games" || path === "/api/standings") && /\b503\b/.test(message.text());
+  try { path = new URL(location).pathname; } catch { return false; }
+  if (!/\b503\b/.test(message.text())) return false;
+  return path === "/api/games" || path === "/api/standings" || path === "/api/digest" || path.startsWith("/api/digest/");
 }
 
 function assertQuiet(record) {
@@ -55,9 +47,12 @@ function assertQuiet(record) {
   expect(record.consoleErrors, record.consoleErrors.join("\n")).toEqual([]);
 }
 
+const SCORE = /\d{2,3}\s*[-–]\s*\d{2,3}/;
+
 test("home loads the team games without console or hydration errors", async ({ page }) => {
   const record = watchPage(page);
   await page.goto("/");
+  await page.waitForResponse((response) => new URL(response.url()).pathname === "/api/games");
   await expect(page.getByRole("heading", { name: "Boston Celtics", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Celtics games" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Games", exact: true })).toBeVisible();
@@ -67,6 +62,7 @@ test("home loads the team games without console or hydration errors", async ({ p
 test("standings loads its heading and a conference, empty state, or the data error", async ({ page }) => {
   const record = watchPage(page);
   await page.goto("/standings");
+  await page.waitForResponse((response) => new URL(response.url()).pathname === "/api/standings");
   await expect(page.getByRole("heading", { name: "Standings", exact: true })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Eastern Conference", exact: true })
@@ -79,6 +75,7 @@ test("standings loads its heading and a conference, empty state, or the data err
 test("the team header names the Celtics and opens their roster", async ({ page }) => {
   const record = watchPage(page);
   await page.goto("/");
+  await page.waitForResponse((response) => new URL(response.url()).pathname === "/api/games");
   await expect(page.getByRole("heading", { name: "Boston Celtics", exact: true })).toBeVisible();
   await expect(page.getByText("Eastern Conference", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Change focus team", exact: true })).toBeVisible();
@@ -87,19 +84,44 @@ test("the team header names the Celtics and opens their roster", async ({ page }
   assertQuiet(record);
 });
 
-test("spoiler protection stays on after reload", async ({ page }) => {
+test("spoiler protection hides the score and stays on after reload", async ({ page }) => {
   const record = watchPage(page);
+  await page.route("**/api/games?**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        lastGame: {
+          id: 1, date: "2026-10-26", status: "Final", isHome: true, won: true,
+          homeTeam: { id: 2, name: "Celtics", abbreviation: "BOS" },
+          awayTeam: { id: 5, name: "Bulls", abbreviation: "CHI" },
+          homeScore: 118, awayScore: 107,
+        },
+        currentGame: null, nextGame: null, record: { wins: 1, losses: 0 }, error: null,
+      }),
+    });
+  });
   const hidden = page.getByRole("button", { name: /Spoilers hidden by default/ });
   const shown = page.getByRole("button", { name: /Spoilers shown by default/ });
+  const games = page.getByRole("region", { name: "Celtics games" });
+  const score = () => games.getByText(SCORE);
   await page.goto("/");
+  await expect(games.getByRole("heading", { name: "Last Game", exact: true })).toBeVisible();
   await expect(hidden).toHaveAttribute("aria-pressed", "true");
+  await expect(score()).toHaveCount(0);
   await hidden.click();
   await expect(shown).toHaveAttribute("aria-pressed", "false");
+  await expect(score().first()).toBeVisible();
   await page.reload();
+  await expect(games.getByRole("heading", { name: "Last Game", exact: true })).toBeVisible();
   await expect(shown).toHaveAttribute("aria-pressed", "false");
+  await expect(score().first()).toBeVisible();
   await shown.click();
   await expect(hidden).toHaveAttribute("aria-pressed", "true");
+  await expect(score()).toHaveCount(0);
   await page.reload();
+  await expect(games.getByRole("heading", { name: "Last Game", exact: true })).toBeVisible();
   await expect(hidden).toHaveAttribute("aria-pressed", "true");
+  await expect(score()).toHaveCount(0);
   assertQuiet(record);
 });

@@ -32,9 +32,9 @@ const imports = {
 };
 
 test("news route decodes CDATA titles and amp entities", async () => {
-  const newer = new Date().toUTCString();
-  const older = new Date(Date.now() - 60 * 60 * 1000).toUTCString();
-  const xml = `<rss><item><title><![CDATA[Celtics practice report]]></title><source>ESPN &amp; Wire</source><link>https://news.google.com/rss/articles/cdata</link><pubDate>${newer}</pubDate></item><item><title>Celtics &amp; a quiet preview</title><source>ESPN</source><link>https://news.google.com/rss/articles/amp</link><pubDate>${older}</pubDate></item></rss>`;
+  const stamp = (hoursAgo) => new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toUTCString();
+  const item = (title, source, id, hoursAgo) => `<item><title>${title}</title><source>${source}</source><link>https://news.google.com/rss/articles/${id}</link><pubDate>${stamp(hoursAgo)}</pubDate></item>`;
+  const xml = `<rss>${item("<![CDATA[Celtics practice report]]>", "ESPN &amp; Wire", "cdata", 0)}${item("Celtics &amp; a quiet preview", "ESPN", "amp", 1)}${item("Celtics &#39;preview&#39;", "ESPN", "dec39", 2)}${item("Celtics &#x27;note&#x27;", "ESPN", "hex27", 3)}${item("Celtics &lt;report&gt;", "ESPN", "lt", 4)}${item("Celtics &quot;quote&quot;", "ESPN", "quot", 5)}</rss>`;
   const route = load("app/api/news/route.ts", {
     fetch: async () => ({ ok: true, text: async () => xml }),
   }, imports);
@@ -49,5 +49,9 @@ test("news route decodes CDATA titles and amp entities", async () => {
   assert.deepEqual(items, [
     { title: "Celtics practice report", source: "ESPN & Wire", safeTitle: "Celtics practice report", category: "analysis" },
     { title: "Celtics & a quiet preview", source: "ESPN", safeTitle: "Celtics & a quiet preview", category: "analysis" },
+    { title: "Celtics 'preview'", source: "ESPN", safeTitle: "Celtics 'preview'", category: "analysis" },
+    { title: "Celtics 'note'", source: "ESPN", safeTitle: "Celtics 'note'", category: "general" },
+    { title: "Celtics <report>", source: "ESPN", safeTitle: "Celtics <report>", category: "analysis" },
+    { title: "Celtics \"quote\"", source: "ESPN", safeTitle: "Celtics \"quote\"", category: "general" },
   ]);
 });
