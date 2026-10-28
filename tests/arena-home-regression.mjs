@@ -47,6 +47,7 @@ export default async function runArenaHomeRegression(page) {
 
     for (const width of [320, 390, 640, 768, 1024, 1200, 1280, 1440]) {
       await p.setViewportSize({ width, height: 1000 });
+      await p.getByRole("button", { name: "Reveal record", exact: true }).scrollIntoViewIfNeeded();
       const roster = p.getByRole("link", { name: "Celtics players", exact: true });
       const beforeReveal = await roster.boundingBox();
       const heroBefore = await p.locator("main > section").boundingBox();
