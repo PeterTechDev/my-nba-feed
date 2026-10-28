@@ -64,6 +64,37 @@ export const teams: Team[] = [
 export const getTeamById = (id: number) => teams.find((t) => t.id === id);
 export const getCeltics = () => teams.find((t) => t.abbreviation === "BOS")!;
 
+// ESPN scoreboard abbreviations differ from the app for a few teams.
+const espnAbbreviations: Record<string, string> = {
+  GS: "GSW",
+  UTAH: "UTA",
+  WSH: "WAS",
+  NO: "NOP",
+  NY: "NYK",
+  SA: "SAS",
+  PHO: "PHX",
+  CHO: "CHA",
+  BRK: "BKN",
+};
+
+export function teamByAbbreviation(abbreviation: string): Team | undefined {
+  const code = espnAbbreviations[abbreviation] ?? abbreviation;
+  return teams.find((team) => team.abbreviation === code);
+}
+
+const AMBIGUOUS_CITIES = new Set(["Los Angeles", "New York"]);
+
+// A manchete nomeia o time: nome, cidade + nome, ou a cidade sozinha se ela
+// não for ambígua. Possessivo ('s, s') cola no nome. Não decide spoiler.
+export function headlineIsAboutTeam(title: string, team: Team): boolean {
+  const phrases = [`${team.city} ${team.name}`, team.name];
+  if (!AMBIGUOUS_CITIES.has(team.city)) phrases.push(team.city);
+  const body = phrases.sort((a, b) => b.length - a.length)
+    .map((phrase) => phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  return new RegExp(`\\b(?:${body})(?:'s|s'|')?(?!\\w)`, "i").test(title);
+}
+
 // Version 0 persisted these eight IDs under the wrong team identities.
 export function migrateLegacyTeamId(id: number): number {
   return ({ 12: 13, 13: 12, 15: 16, 16: 15, 24: 25, 25: 24, 26: 27, 27: 26 } as Record<number, number>)[id] ?? id;

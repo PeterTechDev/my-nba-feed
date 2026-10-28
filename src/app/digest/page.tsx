@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Flame, ThumbsDown, ChevronDown, ChevronUp, BookOpen, Clock, Zap, BarChart2, Coffee, BookMarked } from "lucide-react";
 import MarkdownContent from "@/components/MarkdownContent";
 import DataError from "@/components/DataError";
-import { useSpoilerContext } from "@/components/SpoilerModeProvider";
+import { digestContentIsProtected, useSpoilerContext } from "@/components/SpoilerModeProvider";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import { formatGameDate } from "@/lib/nbaDate";
 import type { DigestEntry, FeedbackAgg } from "@/lib/digest";
@@ -30,7 +30,7 @@ interface DigestCardProps {
 
 function DigestCard({ digest, feedback, reaction, pending, reactionError, onReact }: DigestCardProps) {
   const { hideScores, hideHeadlines } = useSpoilerContext();
-  const protectedContent = hideScores || hideHeadlines;
+  const protectedContent = digestContentIsProtected({ hideScores, hideHeadlines });
   const [revealed, setRevealed] = useState(false);
   useEffect(() => setRevealed(false), [digest.date, hideScores, hideHeadlines]);
   const hidden = protectedContent && !revealed;
@@ -98,7 +98,7 @@ function ArchiveItem(props: DigestCardProps) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const { hideScores, hideHeadlines } = useSpoilerContext();
-  const hidden = hideScores || hideHeadlines;
+  const hidden = digestContentIsProtected({ hideScores, hideHeadlines });
   const { digest } = props;
   const meta = STYLE_META[digest.style] ?? STYLE_META.casual;
   return <div className="rounded-xl border border-[#2a2a2a] bg-[#161616] overflow-hidden">
