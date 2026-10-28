@@ -35,11 +35,12 @@ export default function EndOfSession() {
   const newsFailed = news.error || order.some((name) => Boolean(feeds[name]?.error));
   if (!hydrated || games.loading || news.loading || games.error || newsFailed) return null;
 
+  const coveredTeams = [...new Map([selectedTeam, ...favoriteTeams].map((team) => [team.id, team])).values()];
   const hasGames = Boolean(games.lastGame || games.currentGame || games.nextGame);
-  const hasNews = order.some((name) => (feeds[name]?.items.length ?? 0) > 0);
-  const severalTeams = favoriteTeams.length > 1;
-  const teamName = (favoriteTeams.length === 1 ? favoriteTeams[0] : selectedTeam).name;
-  const message = !hasGames && !hasNews
+  const hasTeamNews = coveredTeams.some((team) => (feeds[team.name]?.items.length ?? 0) > 0);
+  const severalTeams = coveredTeams.length > 1;
+  const teamName = coveredTeams[0].name;
+  const message = !hasGames && !hasTeamNews
     ? severalTeams ? "Nothing new for your teams. You can head out." : `Nothing new for the ${teamName}. You can head out.`
     : severalTeams ? "You’re up to date with your teams." : `You’re up to date with the ${teamName}. You can head out.`;
 
