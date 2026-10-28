@@ -10,6 +10,7 @@ const publicPaths = [
   "/about",
   "/digest",
   "/highlights",
+  "/top-plays",
   "/players",
   "/schedule",
   "/standings",

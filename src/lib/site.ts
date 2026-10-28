@@ -45,7 +45,7 @@ export const siteName = "NBA Feed";
 export const siteDescription =
   "Your teams' news, games and daily digest, with scores hidden until you reveal them.";
 
-type PublicPath = "/" | "/about" | "/digest" | "/highlights" | "/players" | "/schedule" | "/standings";
+type PublicPath = "/" | "/about" | "/digest" | "/highlights" | "/top-plays" | "/players" | "/schedule" | "/standings";
 
 /**
  * Per-route canonical and Open Graph. Next replaces the whole openGraph
