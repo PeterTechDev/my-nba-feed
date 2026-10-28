@@ -16,7 +16,7 @@ export async function syncYouTubeHighlights({ apiKey, publishToken, now = new Da
   const read = () => json(`${endpoint}?sync=1`, "Highlights read", { headers: { Authorization: `Bearer ${publishToken}` } });
   const existing = await read();
   if (!Array.isArray(existing.videos) || existing.syncedAt !== null && !Number.isFinite(Date.parse(existing.syncedAt))) throw new Error("Invalid saved highlights");
-  if (existing.syncedAt && now.getTime() - Date.parse(existing.syncedAt) < 30 * 60000) return { status: "already-synced", apiRequests: 0, added: 0 };
+  if (existing.topPlaysEnabled && existing.syncedAt && now.getTime() - Date.parse(existing.syncedAt) < 30 * 60000) return { status: "already-synced", apiRequests: 0, added: 0 };
 
   const youtube = async (resource, params) => {
     apiRequests++;

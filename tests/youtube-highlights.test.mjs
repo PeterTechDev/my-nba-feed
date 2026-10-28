@@ -118,7 +118,7 @@ test("countdowns sync alongside recaps, backfill old state and validate publicat
   const title = "NBA's Top 10 Plays of the Night | October 25, 2026";
   const top = { ...clip, title, date: "2026-10-25", topCount: 10 };
   delete top.awayTeamId; delete top.homeTeamId;
-  const f = fixture({ saved: { syncedAt: "2026-10-27T09:00:00Z", videos: [] },
+  const f = fixture({ saved: { syncedAt: "2026-10-27T11:10:00Z", videos: [] },
     pages: [{ items: [upload(clip.id, title, "2026-10-24T04:00:00Z")] }],
     details: { snippet: { channelId: NBA_CHANNEL_ID, title, thumbnails: { high: { url: clip.thumbnail } } } } });
   assert.equal((await run(f)).added, 1);

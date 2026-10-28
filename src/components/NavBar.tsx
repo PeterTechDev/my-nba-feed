@@ -107,7 +107,7 @@ const links = [
   { href: "/standings", label: "Standings", icon: BarChart3 },
   { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/highlights", label: "Highlights", icon: Play },
-import { BarChart3, Calendar, Play, Trophy, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
+  { href: "/top-plays", label: "Top Plays", icon: Trophy },
   { href: "/digest", label: "Digest", icon: BookOpen },
   { href: "/about", label: "About", icon: Info },
 ];
