@@ -17,6 +17,24 @@ if (!process.env.BASE_URL) {
   throw new Error("Set BASE_URL to the server origin, for example http://127.0.0.1:3000");
 }
 
+test.beforeEach(async ({ page, baseURL }) => {
+  const bypass = process.env.VERCEL_BYPASS;
+  if (!bypass || !baseURL) return;
+  const appOrigin = new URL(baseURL).origin;
+  await page.route("**/*", async (route) => {
+    if (new URL(route.request().url()).origin !== appOrigin) {
+      await route.continue();
+      return;
+    }
+    await route.continue({
+      headers: {
+        ...route.request().headers(),
+        "x-vercel-protection-bypass": bypass,
+      },
+    });
+  });
+});
+
 for (const timezoneId of ["America/Bahia", "UTC"]) {
   test.describe(timezoneId, () => {
     test.use({ timezoneId });
@@ -39,12 +57,14 @@ for (const timezoneId of ["America/Bahia", "UTC"]) {
         if (url.pathname === "/api/games") gamesStatuses.push(response.status());
       });
 
+      const labelBeforeGoto = briefingLabel();
       await page.goto("/");
+      const labelAfterGoto = briefingLabel();
       await page.getByText("Celtics, latest news", { exact: true }).click();
-      const label = briefingLabel();
       const heading = page.getByRole("heading", { name: "Morning Briefing", exact: true });
       await expect(heading).toBeVisible();
-      await expect(heading.locator("..").getByText(label, { exact: true })).toBeVisible();
+      const dateSlot = heading.locator("..");
+      await expect(dateSlot.getByText(labelBeforeGoto, { exact: true }).or(dateSlot.getByText(labelAfterGoto, { exact: true }))).toBeVisible();
       expect(hydration, hydration.join("\n")).toEqual([]);
 
       const games503 = gamesStatuses.filter((status) => status === 503).length;

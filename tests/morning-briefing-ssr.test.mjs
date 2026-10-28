@@ -17,6 +17,12 @@ const BRIEFING_DATE_FORMAT = {
 };
 const PLACEHOLDER = "Mon, Sep 30";
 const PLACEHOLDER_MARKUP = `<span class="invisible" aria-hidden="true">${PLACEHOLDER}</span>`;
+const APP_MARKER = "Morning Briefing";
+
+function protectionHeaders() {
+  const bypass = process.env.VERCEL_BYPASS;
+  return bypass ? { "x-vercel-protection-bypass": bypass } : {};
+}
 
 function briefingLabel(date) {
   const formatter = new Intl.DateTimeFormat("en-US", BRIEFING_DATE_FORMAT);
@@ -109,11 +115,12 @@ test("production homepage HTML reserves the Morning Briefing date instead of bak
         // A remote or not-yet-built tree has no local prerender timestamp.
       }
     }
-    const response = await fetch(new URL("/", origin));
-    assert.equal(response.status, 200);
+    const response = await fetch(new URL("/", origin), { headers: protectionHeaders(), redirect: "manual" });
+    assert.equal(response.status, 200, `expected the app homepage at 200 with redirects left unfollowed, received ${response.status}`);
     const servedAt = new Date(response.headers.get("date") ?? Date.now());
     instants.push(servedAt);
     const html = await response.text();
+    assert.ok(html.includes(APP_MARKER), "response is not the app homepage");
     const forbidden = [...new Set(instants.flatMap((instant) => briefingLabel(instant)))];
     assert.ok(forbidden.length > 0);
     for (const label of forbidden) {
