@@ -20,13 +20,13 @@ function spoilerFlags(req: NextRequest) {
   const tokens = (req.headers?.get?.("x-nba-spoilers") ?? "").split(/[,;]/).map((part) => part.trim().toLowerCase()).filter(Boolean);
   const known = new Set(["none", "scores", "headlines"]);
   const unknown = tokens.some((token) => !known.has(token));
-  const explicitNone = tokens.length > 0 && tokens.every((token) => token === "none");
+  const explicitNone = tokens.length === 1 && tokens[0] === "none";
   let hideScores = true;
   let hideHeadlines = true;
   if (!unknown && explicitNone) {
     hideScores = false;
     hideHeadlines = false;
-  } else if (!unknown && tokens.some((token) => token === "scores" || token === "headlines")) {
+  } else if (!unknown && !tokens.includes("none") && tokens.some((token) => token === "scores" || token === "headlines")) {
     hideScores = tokens.includes("scores");
     hideHeadlines = tokens.includes("headlines");
   }

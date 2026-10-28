@@ -125,11 +125,12 @@ Set `BALLDONTLIE_KEY` in your environment before starting the app.
 | Signal | Result |
 |---|---|
 | No `x-nba-spoilers` header, or an unknown token | Scores and spoiler headlines redacted |
-| `x-nba-spoilers: none` | Full payload |
-| `scores` and/or `headlines` (comma or semicolon, any case, trimmed) | Those parts stay redacted; the other part is included |
+| `x-nba-spoilers: none` as the only token (`None` and surrounding spaces count) | Full payload |
+| `none` together with any other token, such as `none,scores` | Stays closed. `none` does not open anything unless it is alone |
+| `scores` and/or `headlines` (comma or semicolon, any case, trimmed), with no `none` | Those parts stay redacted; the other part is included |
 | `hideScores=1` or `hideHeadlines=true` (name and value are case-insensitive; `1` or `true`) | Forces that part to stay redacted |
 
-`reveal=<id>` opens one item inside an otherwise redacted list: a news link or identity, a digest date, a game id, or `record`. The app sends the header on every one of these calls, including `none` when spoiler protection is off.
+`reveal=<id>` opens only that item. Every other headline, including others in the same related-coverage group, stays redacted the same way as a request without `reveal`. The id is a news link or identity, a digest date, a game id, or `record`. `?team=` and `?teams=` use that same grouping and redaction. The app sends the header on every one of these calls, including `none` when spoiler protection is off.
 
 ### Digest storage and publishing
 
