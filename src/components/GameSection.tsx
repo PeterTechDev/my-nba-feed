@@ -4,7 +4,7 @@ import { formatGameDate, formatTipoff, gameDaysAgo, parseGameDate } from "@/lib/
 import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
-import { getHighlightUrl, getOpponent, getTeamScore, getOpponentScore, type GameInfo } from "@/lib/api";
+import { getHighlightUrl, getOpponent, getTeamScore, getOpponentScore, revealedDigest, spoilerHeaders, subscribeDigestReveals, type GameInfo } from "@/lib/api";
 import ScoreReveal from "./ScoreReveal";
 import Link from "next/link";
 import { Play, ArrowUpRight } from "lucide-react";
@@ -62,7 +62,8 @@ export function LastGameCard() {
   const oppScore = getOpponentScore(lastGame);
   const opponent = getOpponent(lastGame);
   const opponentTeam = getTeamById((lastGame.isHome ? lastGame.awayTeam : lastGame.homeTeam).id);
-  const won = teamScore > oppScore;
+  const scoresKnown = typeof teamScore === "number" && typeof oppScore === "number";
+  const won = scoresKnown && teamScore > oppScore;
   const date = formatGameDate(lastGame.date, { month: "short", day: "numeric", year: "numeric" });
 
   return (
@@ -82,10 +83,12 @@ export function LastGameCard() {
           {opponentTeam && <img src={opponentTeam.logo} alt="" width={40} height={40} className="h-10 w-10 shrink-0 object-contain" />}
         </div>
         <ScoreReveal scope={`${selectedTeam.id}:${lastGame.id}`} label={`${selectedTeam.name} result`}>
-          <p className="flex items-center gap-3 text-3xl font-bold tabular-nums tracking-tight">
-            <span>{teamScore}</span><span className="text-xl text-white/50">–</span><span>{oppScore}</span>
-          </p>
-          <p className={`mt-2 text-sm font-semibold ${won ? "text-emerald-300" : "text-red-300"}`}>{won ? "Win" : "Loss"} · Final</p>
+          {scoresKnown ? <>
+            <p className="flex items-center gap-3 text-3xl font-bold tabular-nums tracking-tight">
+              <span>{teamScore}</span><span className="text-xl text-white/50">–</span><span>{oppScore}</span>
+            </p>
+            <p className={`mt-2 text-sm font-semibold ${won ? "text-emerald-300" : "text-red-300"}`}>{won ? "Win" : "Loss"} · Final</p>
+          </> : <p className="text-sm text-white/70">Score unavailable</p>}
         </ScoreReveal>
       </div>
       <div className={styles.gameFooter}>
@@ -248,6 +251,16 @@ export function HomeDigestCard({ favoriteTeams }: { favoriteTeams: Team[] }) {
   const [phase, setPhase] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [failure, setFailure] = useState<"timeout" | "failed">("failed");
   const [edition, setEdition] = useState<{ digest: DigestEntry; isToday: boolean } | null>(null);
+  const [overlay, setOverlay] = useState<DigestEntry | undefined>(undefined);
+  const { hideScores, hideHeadlines } = useSpoilerContext();
+
+  useEffect(() => {
+    const date = edition?.digest.date;
+    if (!date) return;
+    const sync = () => setOverlay(revealedDigest(date) as DigestEntry | undefined);
+    sync();
+    return subscribeDigestReveals(sync);
+  }, [edition]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -258,7 +271,7 @@ export function HomeDigestCard({ favoriteTeams }: { favoriteTeams: Team[] }) {
       controller.abort();
     }, 8000);
     setPhase("loading");
-    fetch("/api/digest", { signal: controller.signal, cache: "no-store" })
+    fetch("/api/digest", { signal: controller.signal, cache: "no-store", headers: spoilerHeaders() })
       .then(async (response) => {
         if (!response.ok) throw new Error("unavailable");
         const parsed = readDigest(await response.json());
@@ -283,7 +296,7 @@ export function HomeDigestCard({ favoriteTeams }: { favoriteTeams: Team[] }) {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [attempt]);
+  }, [attempt, hideScores, hideHeadlines]);
 
   if (phase === "loading") {
     return <section aria-label="Digest" lang="pt-BR" className={styles.digest}>
@@ -314,7 +327,10 @@ export function HomeDigestCard({ favoriteTeams }: { favoriteTeams: Team[] }) {
     </section>;
   }
 
-  const games = parseCoveredGames(edition.digest.games_covered);
+  const opened = overlay && !overlay.redacted ? overlay : null;
+  const locked = Boolean(edition.digest.redacted) && !opened;
+  const digest = opened ?? edition.digest;
+  const games = locked ? [] : parseCoveredGames(digest.games_covered);
   const subjects = summaryTeams(selectedTeam, favoriteTeams);
   const subjectIds = new Set(subjects.map((team) => team.id));
   const seenGames = new Set<string>();
@@ -335,9 +351,9 @@ export function HomeDigestCard({ favoriteTeams }: { favoriteTeams: Team[] }) {
     const team = teamByAbbreviation(abbr);
     return team ? subjectIds.has(team.id) : false;
   })).map(leagueLine);
-  const coveredOn = readDigestLeagueDate(edition.digest.content);
-  const results = openers.filter((line) => line.spoiler);
-  const quiet = openers.filter((line) => !line.spoiler);
+  const coveredOn = readDigestLeagueDate(digest.content);
+  const results = locked ? [] : openers.filter((line) => line.spoiler);
+  const quiet = locked ? [] : openers.filter((line) => !line.spoiler);
   const hasScores = results.length > 0 || league.length > 0;
 
   return <section aria-label="Digest" lang="pt-BR" className={styles.digest}>
@@ -347,7 +363,7 @@ export function HomeDigestCard({ favoriteTeams }: { favoriteTeams: Team[] }) {
     {quiet.length > 0 && <ul className="space-y-1 text-sm leading-6">
       {quiet.map((line) => <li key={line.text}>{line.text}</li>)}
     </ul>}
-    {hasScores && <div className="mt-3">
+    {(hasScores || locked) && <div className="mt-3">
       <ScoreReveal protectDigest scope={`digest:${edition.digest.date}:${selectedTeam.id}:${favoriteTeams.map((team) => team.id).join("-")}`} label="digest results" wording={DIGEST_WORDS}>
         {results.length > 0 && <ul className="space-y-1 text-sm leading-6">
           {results.map((line) => <li key={line.text}>{line.text}</li>)}

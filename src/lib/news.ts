@@ -21,11 +21,13 @@ export function isTeamNews(title: string, teamName: string): boolean {
 }
 
 export function newsIdentity(item: NewsItem): string[] {
+  if (!item.link) return item.identity ? [item.identity] : [words(getNewsTitle(item, false)) + ":" + new Date(item.pubDate).toISOString().slice(0, 10)];
   const url = new URL(item.link);
   url.hash = "";
   for (const key of [...url.searchParams.keys()]) {
     if (key.startsWith("utm_") || key === "oc") url.searchParams.delete(key);
   }
+  if (item.identity) return [url.href, item.identity];
   return [url.href, words(getNewsTitle(item, false)) + ":" + new Date(item.pubDate).toISOString().slice(0, 10)];
 }
 
@@ -33,7 +35,9 @@ export function newestNews(items: NewsItem[], now = Date.now()): NewsItem[] {
   const seen = new Set<string>();
   return items.filter((item) => {
     const published = Date.parse(item.pubDate);
-    try { if (new URL(item.link).protocol !== "https:") return false; } catch { return false; }
+    if (item.link) {
+      try { if (new URL(item.link).protocol !== "https:") return false; } catch { return false; }
+    } else if (!item.redacted) return false;
     return item.title.trim() && Number.isFinite(published) && published <= now && published >= now - 7 * 86400000;
   }).sort((a, b) => Date.parse(b.pubDate) - Date.parse(a.pubDate)).filter((item) => {
     const keys = newsIdentity(item);
@@ -109,8 +113,9 @@ export function groupNews(items: NewsItem[]): NewsItem[] {
 export function selectHomepageNews(feeds: NewsFeeds, order: string[], briefingTeam?: string): NewsFeeds {
   const seen = new Set<string>();
   return Object.fromEntries(order.map((name) => {
-    const available = newestNews(feeds[name]?.items ?? []).filter((item) => !newsIdentity(item).some((key) => seen.has(key)));
-    const grouped = groupNews(available);
+    const bucket = feeds[name];
+    const available = newestNews(bucket?.items ?? []).filter((item) => !newsIdentity(item).some((key) => seen.has(key)));
+    const grouped = bucket?.grouped ? available : groupNews(available);
     // Around the League filters the focus team after this, then keeps six.
     const items = name === "NBA" ? grouped : grouped.slice(0, name === briefingTeam ? 1 : 3);
     for (const item of items.flatMap((item) => [item, ...(item.related ?? [])])) newsIdentity(item).forEach((key) => seen.add(key));
@@ -122,4 +127,44 @@ export function newsVisitBoundary(items: NewsItem[], lastVisitAt: string | null)
   const visited = Date.parse(lastVisitAt ?? "");
   if (!Number.isFinite(visited)) return null;
   return items.filter((item) => Date.parse(item.pubDate) > visited).length;
+}
+
+function spoilerIdentity(item: NewsItem) {
+  const published = Date.parse(item.pubDate);
+  const day = Number.isFinite(published) ? new Date(published).toISOString().slice(0, 10) : item.pubDate;
+  const text = `${item.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()}:${day}`;
+  let hash = 5381;
+  for (let i = 0; i < text.length; i += 1) hash = Math.imul(hash, 33) ^ text.charCodeAt(i);
+  return (hash >>> 0).toString(16);
+}
+
+function coverHeadline(item: NewsItem): NewsItem {
+  const identity = item.identity ?? spoilerIdentity(item);
+  const safe = item.isSpoiler && item.safeTitle !== item.title
+    ? item.safeTitle
+    : `Spoiler-protected headline${item.source ? ` from ${item.source}` : ""}`;
+  return {
+    ...item, title: safe, safeTitle: safe, isSpoiler: true, redacted: true, identity,
+    category: item.category === "recap" ? "general" : item.category,
+    link: null,
+  };
+}
+
+function matchesReveal(item: NewsItem, reveal: string | null) {
+  if (!reveal) return false;
+  return reveal === item.link || reveal === item.identity || reveal === spoilerIdentity(item);
+}
+
+function sealNewsItem(item: NewsItem, team: string, reveal: string | null): NewsItem {
+  const identity = spoilerIdentity(item);
+  const nested = item.related?.map((entry) => sealNewsItem(entry, team, reveal));
+  const cluster = Boolean(item.isSpoiler || nested?.some((entry) => entry.isSpoiler || entry.redacted));
+  const related = cluster ? nested?.map((entry) => matchesReveal(entry, reveal) ? entry : coverHeadline(entry)) : nested;
+  const sealed = { ...item, related, identity, feed: team };
+  if (matchesReveal(item, reveal) || (!item.isSpoiler && !cluster)) return sealed;
+  return coverHeadline(sealed);
+}
+
+export function presentNews(items: NewsItem[], team: string, reveal: string | null): NewsItem[] {
+  return groupNews(items).map((item) => sealNewsItem(item, team, reveal));
 }

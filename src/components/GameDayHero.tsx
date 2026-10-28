@@ -62,7 +62,9 @@ export default function GameDayHero() {
       {isLive ? (
         <div>
           <ScoreReveal scope={`live:${selectedTeam.id}:${heroGame.id}`} label={`${selectedTeam.name} live score`}>
-            <p className="text-xl font-bold tabular-nums">{selectedTeam.abbreviation} {teamScore} – {opponent.abbreviation} {opponentScore}</p>
+            {typeof teamScore === "number" && typeof opponentScore === "number"
+              ? <p className="text-xl font-bold tabular-nums">{selectedTeam.abbreviation} {teamScore} – {opponent.abbreviation} {opponentScore}</p>
+              : <p className="text-sm text-white/70">Score unavailable</p>}
           </ScoreReveal>
         </div>
       ) : <div>

@@ -98,7 +98,7 @@ test("games API separates scheduled, live, final and postponed games", async () 
     "next/server": { NextResponse: { json: (body) => body } },
     "@/lib/nbaDate": dates, "@/lib/gameStatus": status,
   });
-  const request = { nextUrl: new URL("http://localhost/api/games?teamId=2") };
+  const request = { nextUrl: new URL("http://localhost/api/games?teamId=2"), headers: new Headers({ "x-nba-spoilers": "none" }) };
   let result = await route.GET(request);
   assert.equal(result.currentGame, null);
   assert.equal(result.lastGame.date, "2026-10-26");

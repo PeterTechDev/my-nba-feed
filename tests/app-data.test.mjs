@@ -283,14 +283,21 @@ test("news API preserves partial feeds and rejects invalid teams and total sourc
   const route = load("app/api/news/route.ts", { fetch: async (url) => ({ ok: !offline && !decodeURIComponent(url).includes("Lakers"), text: async () => `<rss>${fixture("Knicks vs Pistons Injury Report", "irrelevant")}${fixture("Celtics won 118-107", "recap")}${fixture("Celtics trade out of Boston denied", "trade")}${fixture("Celtics promo code with a bonus", "promo")}${fixture("Celtics winless start", "winless")}</rss>` }) }, {
     ...imports, "@/lib/communityFeed": load("lib/communityFeed.ts").exports,
   }).exports;
-  const request = (query) => ({ nextUrl: new URL("http://localhost/api/news?" + query) });
+  const request = (query, spoilers) => ({
+    nextUrl: new URL("http://localhost/api/news?" + query),
+    headers: spoilers ? new Headers({ "x-nba-spoilers": spoilers }) : new Headers(),
+  });
   const batch = await route.GET(request("teams=Celtics,Lakers"));
   assert.equal(batch.status, 200);
   assert.equal(batch.body.feeds.Lakers.error, true);
   assert.equal(batch.body.feeds.Celtics.items.length, 3);
   assert.equal(batch.body.feeds.Celtics.items.find((item) => item.category === "transaction").isSpoiler, false);
-  assert.equal(batch.body.feeds.Celtics.items.find((item) => item.title.includes("won")).isSpoiler, true);
-  assert.equal(batch.body.feeds.Celtics.items.find((item) => item.title.includes("winless")).isSpoiler, true);
+  const hidden = batch.body.feeds.Celtics.items.filter((item) => item.isSpoiler);
+  assert.equal(hidden.length, 2);
+  assert.ok(hidden.every((item) => item.redacted === true && item.title === "Spoiler-protected headline from ESPN"));
+  const revealed = await route.GET(request("teams=Celtics,Lakers", "none"));
+  assert.equal(revealed.body.feeds.Celtics.items.find((item) => item.title.includes("won")).isSpoiler, true);
+  assert.equal(revealed.body.feeds.Celtics.items.find((item) => item.title.includes("winless")).isSpoiler, true);
   assert.ok(batch.body.feeds.Celtics.items.every((item) => !item.title.includes("promo")));
   assert.equal((await route.GET(request("teams=NotATeam"))).status, 400);
   offline = true;
@@ -608,11 +615,18 @@ test("digest routes preserve reads, require publisher authentication and persist
     updateDigestDocument: async (key, empty, update) => { const value = update(data.get(key) ?? empty); data.set(key, value); return value; },
   };
   const route = load("app/api/digest/route.ts", { process: { env: { DIGEST_PUBLISH_TOKEN: "fixture-token" } } }, { ...imports, "@/lib/digestStorage": storage }).exports;
-  const request = (body, auth) => ({ json: async () => body, headers: new Headers(auth ? { authorization: auth } : {}), nextUrl: new URL("http://localhost/api/digest") });
+  const request = (body, auth, spoilers) => ({
+    json: async () => body,
+    headers: new Headers({ ...(auth ? { authorization: auth } : {}), ...(spoilers ? { "x-nba-spoilers": spoilers } : {}) }),
+    nextUrl: new URL("http://localhost/api/digest"),
+  });
   const entry = { date: "2026-10-27", style: "casual", title: "Recap", content: "A summary." };
   assert.equal((await route.POST(request(entry))).status, 401);
   assert.equal((await route.POST(request(entry, "Bearer fixture-token"))).status, 201);
-  assert.equal((await route.GET(request())).body.digest.title, "Recap");
+  const closed = await route.GET(request());
+  assert.equal(closed.body.digest.title, "NBA daily breakdown");
+  assert.equal(closed.body.digest.redacted, true);
+  assert.equal((await route.GET(request(undefined, undefined, "none"))).body.digest.title, "Recap");
   await route.POST(request({ ...entry, title: "Updated recap" }, "Bearer fixture-token"));
   assert.equal(data.get("digests.json").length, 1);
   const feedback = load("app/api/digest/feedback/route.ts", {}, { ...imports, "@/lib/digestStorage": storage }).exports;
