@@ -9,6 +9,23 @@ import FavoriteTeamsModal from "./FavoriteTeamsModal";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 
+function trapDialogFocus(event: React.KeyboardEvent<HTMLDialogElement>) {
+  if (event.key !== "Tab") return;
+  const dialog = event.currentTarget;
+  const focusable = [...dialog.querySelectorAll<HTMLElement>("button, [href], input, select, textarea")].filter((element) => !element.hasAttribute("disabled") && element.tabIndex >= 0);
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!first || !last) return;
+  const active = document.activeElement;
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 function RevealSpoilersDialog({ onDismiss, onConfirm, returnFocusRef }: {
   onDismiss: () => void;
   onConfirm: () => void;
@@ -38,9 +55,11 @@ function RevealSpoilersDialog({ onDismiss, onConfirm, returnFocusRef }: {
     <dialog
       ref={dialogRef}
       id="reveal-spoilers"
+      role="dialog"
       aria-labelledby="reveal-spoilers-title"
       aria-describedby="reveal-spoilers-description"
       onCancel={(event) => { event.preventDefault(); onDismiss(); }}
+      onKeyDown={trapDialogFocus}
       onClick={(event) => { if (event.target === event.currentTarget) onDismiss(); }}
       className="m-auto max-h-[85dvh] w-[calc(100%_-_2rem)] max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#141414] p-0 text-white backdrop:bg-black/75"
     >
