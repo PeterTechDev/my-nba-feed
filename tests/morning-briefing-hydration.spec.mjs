@@ -14,7 +14,7 @@ function briefingLabel(date = new Date()) {
 }
 
 if (!process.env.BASE_URL) {
-  throw new Error("Set BASE_URL to the server origin, for example http://127.0.0.1:3000");
+  throw new Error("Set BASE_URL to the origin of the running app.");
 }
 
 test.beforeEach(async ({ page, baseURL }) => {
@@ -60,11 +60,22 @@ for (const timezoneId of ["America/Bahia", "UTC"]) {
       const labelBeforeGoto = briefingLabel();
       await page.goto("/");
       const labelAfterGoto = briefingLabel();
+      await page.evaluate(() => new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }));
+      expect(hydration, hydration.join("\n")).toEqual([]);
       await page.getByText("Celtics, latest news", { exact: true }).click();
       const heading = page.getByRole("heading", { name: "Morning Briefing", exact: true });
       await expect(heading).toBeVisible();
+      expect(hydration, hydration.join("\n")).toEqual([]);
       const dateSlot = heading.locator("..");
-      await expect(dateSlot.getByText(labelBeforeGoto, { exact: true }).or(dateSlot.getByText(labelAfterGoto, { exact: true }))).toBeVisible();
+      const date = dateSlot.getByText(labelBeforeGoto, { exact: true }).or(dateSlot.getByText(labelAfterGoto, { exact: true }));
+      try {
+        await expect(date).toBeVisible();
+      } catch (error) {
+        if (hydration.length) throw new Error(hydration.join("\n"));
+        throw error;
+      }
       expect(hydration, hydration.join("\n")).toEqual([]);
 
       const games503 = gamesStatuses.filter((status) => status === 503).length;
