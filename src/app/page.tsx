@@ -33,7 +33,7 @@ function FeedContent() {
       <TeamHeader />
       <div className={styles.content}>
       <HomeDigestCard favoriteTeams={favoriteTeams} />
-      <section aria-label={`${selectedTeam.name} games`} className={styles.games}>
+      <section id="home-games" aria-label={`${selectedTeam.name} games`} className={styles.games} tabIndex={-1}>
         <h2 className={styles.sectionHeading}>Games</h2>
         <div className={styles.gameGrid}>
           <LastGameCard />

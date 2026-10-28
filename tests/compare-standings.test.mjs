@@ -95,6 +95,7 @@ const status = load("lib/gameStatus.ts");
 const teams = load("lib/teams.ts");
 let standingsData = { season: 2026, asOf: "2026-10-27", standings: [] };
 const pageImports = {
+  "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { abbreviation: "BOS" } }) },
   "@/lib/nbaDate": dates,
   "@/lib/gameStatus": status,
   "@/lib/teams": teams,

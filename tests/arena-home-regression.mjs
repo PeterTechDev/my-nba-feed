@@ -36,8 +36,27 @@ export default async function runArenaHomeRegression(page) {
     const entrance = await p.locator("main > section").evaluate(el => el.getAnimations({ subtree: true }).map(animation => ({ name: animation.animationName, iterations: animation.effect.getTiming().iterations })));
     assert.ok(entrance.some(animation => animation.name?.includes("arena-open")), "arena has its authored entrance");
     assert.ok(entrance.every(animation => animation.iterations === 1), "entrance does not loop");
-    await p.waitForTimeout(1100);
+    await p.waitForTimeout(4600);
+    const crest = p.getByRole("button", { name: /Change focus team from/ });
+    const crestBefore = await crest.boundingBox();
+    await p.mouse.move(crestBefore.x + crestBefore.width / 2, crestBefore.y + crestBefore.height / 2);
+    await p.mouse.down();
+    await p.waitForTimeout(180);
+    const crestPressed = await crest.boundingBox();
+    assert.ok(Math.abs(crestBefore.x + crestBefore.width / 2 - crestPressed.x - crestPressed.width / 2) < 1, "pressed crest keeps its horizontal center");
+    assert.ok(Math.abs(crestBefore.y + crestBefore.height / 2 - crestPressed.y - crestPressed.height / 2) < 1, "pressed crest keeps its vertical center");
+    await p.mouse.up();
+    await p.getByRole("dialog").waitFor();
+    await p.keyboard.press("Escape");
+    await p.waitForTimeout(300);
     assert.equal(await p.locator("main > section").evaluate(el => el.getAnimations({ subtree: true }).filter(animation => animation.playState === "running").length), 0);
+    const seat = p.getByRole("link", { name: /Your courtside corner/ });
+    await seat.focus();
+    await p.waitForTimeout(350);
+    assert.notEqual(await seat.locator("svg").first().evaluate(el => getComputedStyle(el).transform), "none", "basketball responds to keyboard focus");
+    await p.keyboard.press("Enter");
+    assert.equal(await p.locator("#home-games").evaluate(el => el === document.activeElement), true, "courtside link moves keyboard focus to games");
+    await p.getByRole("link", { name: "Back to top", exact: true }).click();
     assert.ok(await p.locator("main > section img").first().evaluate(image => image.complete && image.naturalWidth > 0));
     assert.equal(await p.locator("main details").first().evaluate(el => el.open), false);
     await p.getByRole("button", { name: "Reveal Celtics result", exact: true }).click();
@@ -65,12 +84,16 @@ export default async function runArenaHomeRegression(page) {
 
     await p.emulateMedia({ reducedMotion: "reduce" });
     await p.reload();
+    await p.waitForTimeout(200);
     assert.equal(await p.locator("main > section").evaluate(el => el.getAnimations({ subtree: true }).length), 0, "reduced motion is static");
+    await seat.focus();
+    assert.equal(await seat.locator("svg").first().evaluate(el => getComputedStyle(el).transform), "none", "reduced motion keeps the basketball still on focus");
     await p.setViewportSize({ width: 320, height: 844 });
     for (const team of teams) {
       await p.getByRole("button", { name: "Change focus team", exact: true }).click();
       await p.getByRole("button", { name: `${team.city} ${team.name}`, exact: true }).click();
       await p.getByRole("heading", { name: `${team.city} ${team.name}`, exact: true }).waitFor();
+      assert.ok((await seat.textContent()).includes(team.name), "courtside welcome follows the focus team");
       const title = await p.locator("h1 span").last().evaluate(el => ({ text: el.textContent, height: el.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(el).lineHeight), width: el.scrollWidth, available: el.clientWidth }));
       if (!team.name.includes(" ") && title.height > title.lineHeight * 1.2) issues.push(`${team.name}: split word`);
       if (title.width > title.available + 1) issues.push(`${team.name}: clipped title`);

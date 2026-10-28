@@ -6,6 +6,7 @@ import { formatGameDate } from "@/lib/nbaDate";
 import { compareStandings } from "@/lib/gameStatus";
 import { useState } from "react";
 import { teams } from "@/lib/teams";
+import { useTeam } from "@/hooks/useTeam";
 
 interface Standing {
   id: number;
@@ -18,6 +19,7 @@ interface Standing {
 }
 
 export default function StandingsPage() {
+  const { selectedTeam } = useTeam();
   const { data, loading, error, retry } = useRemoteData<{ standings: Standing[]; season: number; asOf: string }>("/api/standings");
   const standings = data?.standings || [];
   const [fullNames, setFullNames] = useState(false);
@@ -67,7 +69,7 @@ export default function StandingsPage() {
                   return (
                     <tr
                       key={team.id}
-                      className={`border-b border-white/5 hover:bg-white/5 transition ${
+                      className={`border-b border-white/5 ${team.abbreviation === selectedTeam.abbreviation ? "team-surface" : "hover:bg-white/5"} transition ${
                         i === 5 ? "border-b-2 border-b-emerald-500/30" : i === 9 ? "border-b-2 border-b-yellow-500/30" : ""
                       }`}
                     >
@@ -76,7 +78,7 @@ export default function StandingsPage() {
                         <div className="flex items-center gap-1.5 sm:gap-2">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={getLogoUrl(team.abbreviation)} alt="" className="w-5 h-5" />
-                          <span className="font-medium">{!fullNames && <span className="sr-only">{team.name}: </span>}{fullNames ? team.name : team.abbreviation}</span>
+                          <span className={`font-medium ${team.abbreviation === selectedTeam.abbreviation ? "team-text" : ""}`}>{!fullNames && <span className="sr-only">{team.name}: </span>}{fullNames ? team.name : team.abbreviation}{team.abbreviation === selectedTeam.abbreviation && <span className="sr-only"> · Focus team</span>}</span>
                           {isPlayoff && <><span aria-hidden="true" className="text-xs text-emerald-300 font-medium">P</span><span className="sr-only">Playoff position</span></>}
                           {isPlayIn && <><span aria-hidden="true" className="text-xs text-yellow-300 font-medium">PI</span><span className="sr-only">Play-In position</span></>}
                         </div>

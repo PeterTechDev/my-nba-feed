@@ -139,16 +139,16 @@ export default function SchedulePage() {
               return (
                 <div
                   key={day}
-                  className={`min-h-[110px] border-b border-r border-white/5 p-2 ${isToday ? "bg-white/5" : ""}`}
+                  className={`min-h-[110px] border-b border-r border-white/5 p-2 ${isToday ? "team-surface" : ""}`}
                 >
-                  <span aria-current={isToday ? "date" : undefined} className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full text-xs tabular-nums ${isToday ? "bg-amber-300 text-black font-semibold" : "text-white/70"}`}>{day}</span>
+                  <span aria-current={isToday ? "date" : undefined} className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full text-xs tabular-nums ${isToday ? "team-action font-semibold" : game ? "team-text font-semibold" : "text-white/70"}`}>{day}</span>
                   {game && opponent && (
                     <div className={`mt-2 rounded p-1.5 text-xs lg:text-sm ${
                       isFinal && !hideScores
                         ? won
                           ? "bg-emerald-500/10 text-emerald-400"
                           : "bg-red-500/10 text-red-400"
-                        : "bg-white/5 text-white/60"
+                        : "team-surface team-text"
                     }`}>
                       <div className="font-medium">
                         {isHome ? "vs" : "@"} {opponent.abbreviation}
@@ -202,9 +202,9 @@ export default function SchedulePage() {
           ) : (
             <div className="divide-y divide-white/5">
               {gamesThisMonth.map(({ day, game, isHome, opponent, isFinal, won, isToday }) => (
-                <div key={day} className={`flex items-center justify-between gap-3 px-4 py-4 ${isToday ? "bg-white/5" : ""}`}>
+                <div key={day} className={`flex items-center justify-between gap-3 px-4 py-4 ${isToday ? "team-surface" : ""}`}>
                   <div className="flex min-w-0 items-center gap-3">
-                    <span aria-current={isToday ? "date" : undefined} className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm tabular-nums ${isToday ? "bg-amber-300 text-black font-semibold" : "text-white/70"}`}>
+                    <span aria-current={isToday ? "date" : undefined} className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm tabular-nums ${isToday ? "team-action font-semibold" : "text-white/70"}`}>
                       {day}
                     </span>
                     <div className="min-w-0">

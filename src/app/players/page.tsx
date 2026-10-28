@@ -58,14 +58,14 @@ export default function PlayersPage() {
             <article key={p.id} className="py-2 sm:p-5 sm:rounded-xl sm:bg-[#161616] sm:border sm:border-[#2a2a2a]">
               <details className="group sm:hidden">
                 <summary className="min-h-11 cursor-pointer list-none flex items-center justify-between gap-3 py-2">
-                  <span className="min-w-0"><span className="block text-base font-semibold">{p.firstName} {p.lastName}</span><span className="text-sm text-white/70">{p.position || "Position unavailable"}{p.jerseyNumber ? ` · #${p.jerseyNumber}` : ""}</span></span>
+                  <span className="min-w-0"><span className="block text-base font-semibold">{p.firstName} {p.lastName}</span><span className="text-sm team-text">{p.position || "Position unavailable"}{p.jerseyNumber ? ` · #${p.jerseyNumber}` : ""}</span></span>
                   <span className="flex items-center gap-2 shrink-0 text-sm text-white/70"><span>Details</span><ChevronDown aria-hidden="true" className="h-4 w-4 group-open:rotate-180" /></span>
                 </summary>
                 <PlayerDetails player={p} />
               </details>
               <div className="hidden sm:block">
                 <h2 className="text-lg font-bold">{p.firstName} {p.lastName}</h2>
-                <p className="text-sm text-white/70">{p.position || "Position unavailable"}{p.jerseyNumber ? ` · #${p.jerseyNumber}` : ""}</p>
+                <p className="text-sm team-text">{p.position || "Position unavailable"}{p.jerseyNumber ? ` · #${p.jerseyNumber}` : ""}</p>
                 <PlayerDetails player={p} />
               </div>
             </article>

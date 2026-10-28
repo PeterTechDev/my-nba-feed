@@ -736,6 +736,7 @@ test("standings omit all result content until scores are revealed", () => {
   const snapshot = { season: 2026, asOf: "2026-10-27", standings: [{ id: 2, name: "Boston Celtics", abbreviation: "BOS", conference: "East", wins: 17, losses: 9 }] };
   const remote = { data: snapshot, loading: false, error: false, retry() {} };
   const mocked = { ...imports,
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { abbreviation: "BOS" } }) },
     "@/hooks/useRemoteData": { useRemoteData: () => remote },
     "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores }) },
     "@/components/DataError": load("components/DataError.tsx").exports,

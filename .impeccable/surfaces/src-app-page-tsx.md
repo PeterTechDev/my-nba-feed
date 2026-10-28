@@ -12,6 +12,12 @@ related_targets:
 
 # Homepage
 
+## October 28 refinement: your courtside corner
+
+The user requested delight and animation with a warm, tactile, personal basketball feeling. Preserve the arena composition while warming its wood and local surfaces. A compact ticket-like welcome beneath the controls names the selected team and links to Games, transferring keyboard focus to that section. Its 700ms settle belongs to the arena entrance; the basketball seam graphic rotates on hover or keyboard focus, and pressing the ticket gives a small physical response. No loops, new dependencies, audio or extra engagement flow. Reduced motion renders the ticket statically and retains color feedback. Identity bottom padding is now 40px, making room for the welcome without a separate hero section. Current local colors and the 40% team tint are recorded in DESIGN.md, superseding the earlier neutral surfaces/tint below.
+
+Verified with desktop/mobile renders, production build, lint, TypeScript and the arena browser regression (eight widths, all 30 teams, keyboard anchor/focus response and reduced motion). Live local data services returned errors; game interaction checks used fixtures. No physical-device performance testing.
+
 Mode: Operate, with optional Read content.
 
 On October 27, 2026 the user requested a quieter homepage that helps fans catch up without loops of overexposure. Preserve the established dark dashboard, team identity, real content and spoiler controls.

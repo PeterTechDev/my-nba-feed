@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, ReactNode } from "react";
 import { useTeam } from "@/hooks/useTeam";
+import { getChartColor } from "@/lib/teams";
 
 export default function TeamThemeProvider({ children }: { children: ReactNode }) {
   const { selectedTeam } = useTeam();
@@ -9,6 +10,8 @@ export default function TeamThemeProvider({ children }: { children: ReactNode })
     const root = document.documentElement;
     root.style.setProperty("--team-primary", selectedTeam.primaryColor);
     root.style.setProperty("--team-secondary", selectedTeam.secondaryColor);
+    root.style.setProperty("--team-accent-base", getChartColor(selectedTeam.primaryColor));
+    root.style.setProperty("--team-detail-base", getChartColor(selectedTeam.secondaryColor));
   }, [selectedTeam]);
 
   return <>{children}</>;

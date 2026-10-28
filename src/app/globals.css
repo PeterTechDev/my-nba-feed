@@ -5,6 +5,12 @@
 :root {
   --team-primary: #007A33;
   --team-secondary: #BA9653;
+  --team-accent-base: #8cc38c;
+  --team-detail-base: #BA9653;
+  --team-accent: color-mix(in srgb, var(--team-accent-base) 80%, white);
+  --team-detail: color-mix(in srgb, var(--team-detail-base) 80%, white);
+  --team-surface: color-mix(in srgb, var(--team-accent) 12%, #101010);
+  --team-surface-hover: color-mix(in srgb, var(--team-accent) 16%, #101010);
   --motion-quick: 140ms;
   --motion-enter: 240ms;
   --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -13,6 +19,26 @@
 body {
   background: #0a0a0a;
   color: #ededed;
+}
+
+.team-action {
+  background: var(--team-accent);
+  color: #0a0a0a;
+}
+
+.team-action:hover { background: color-mix(in srgb, var(--team-accent) 85%, white); }
+
+.team-text { color: var(--team-accent); }
+.team-surface { background: var(--team-surface); }
+.team-surface:hover { background: var(--team-surface-hover); }
+
+.team-nav-active {
+  background: var(--team-surface);
+  color: var(--team-accent);
+  text-decoration: underline;
+  text-decoration-color: var(--team-accent);
+  text-underline-offset: 7px;
+  text-decoration-thickness: 2px;
 }
 
 .scrollbar-hide {

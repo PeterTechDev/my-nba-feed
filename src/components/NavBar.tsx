@@ -167,7 +167,7 @@ export default function NavBar() {
     const Icon = link.icon;
     return (
       <Link key={link.href} href={link.href} onClick={() => setMenuOpen(false)} aria-current={active ? "page" : undefined}
-        className={`flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition xl:px-1.5 ${active ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
+        className={`flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition xl:px-1.5 ${active ? "team-nav-active" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
         <Icon aria-hidden="true" className="h-4 w-4 xl:hidden" />{link.label}
       </Link>
     );
