@@ -221,6 +221,7 @@ const roundThree = [
   { headline: "Karl-Anthony Towns, Knicks avert 0-4 start with victory over Pistons", expected: true, reason: "0-4 start e victory over" },
   { headline: "Oct. 28 - 95.7 WDAE", expected: false, reason: "hífen antes de decimal não é placar" },
   { headline: "victory over", expected: true, reason: "victory over" },
+  // Tirar só "win" de (?:victory|win)\s+over é equivalente: \bwin\b já casa "win over".
   { headline: "win over", expected: true, reason: "win over" },
   { headline: "0-4 start", expected: true, reason: "N-N start com hífen" },
   { headline: "0\u20134 start", expected: true, reason: "N-N start com en dash" },
@@ -232,8 +233,10 @@ const roundThree = [
   { headline: "pushed Boston past", expected: true, reason: "pushed … past" },
   { headline: "pushes the Celtics past", expected: true, reason: "pushes … past" },
   { headline: "pushed the Celtics past", expected: true, reason: "pushed … past" },
-  { headline: "118-107.5", expected: false, reason: "lookahead: odd com decimal não esconde" },
+  { headline: "118-107.5", expected: false, reason: "lookahead: odd com ponto decimal não esconde" },
+  { headline: "118-107,5", expected: false, reason: "lookahead: odd com vírgula decimal não esconde" },
   { headline: "118-107, Celtics win", expected: true, reason: "placar real com vírgula esconde" },
+  { headline: "Final: 118-107", expected: true, reason: "placar real depois de final esconde" },
   { headline: "118-107", expected: true, reason: "placar com hífen" },
   { headline: "118\u2013107", expected: true, reason: "placar com en dash" },
   { headline: "118\u2014107", expected: true, reason: "placar com em dash" },
@@ -272,10 +275,4 @@ test("SPOILERS.test on a repeated dotted string stays under 200 ms", () => {
   const elapsed = performance.now() - started;
   console.log(`SPOILERS_TIMING_MS ${elapsed}`);
   assert.ok(elapsed < 200, `SPOILERS.test took ${elapsed} ms`);
-});
-
-// "win over" também casa \bwin\b, então tirar só o win de (?:victory|win) não muda isSpoiler.
-// Esta linha mata esse sub-ramo: a alternativa tem de continuar no regex.
-test("win over sub-branch", () => {
-  assert.match(route.SPOILERS.source, /\(\?:victory\|win\)\\s\+over/);
 });
