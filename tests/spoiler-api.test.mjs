@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -480,6 +480,7 @@ test("every client fetch of news, digest and games sends the spoiler header for 
   assert.deepEqual(tally(delegated), {
     "src/app/digest/page.tsx": 2,
     "src/app/page.tsx": 1,
+    ...(existsSync(new URL("../src/components/EndOfSession.tsx", import.meta.url)) ? { "src/components/EndOfSession.tsx": 2 } : {}),
     "src/components/PersonalizedFeed.tsx": 1,
     "src/hooks/useGameData.ts": 1,
   });
