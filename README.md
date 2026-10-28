@@ -18,7 +18,7 @@ The result: checking on your team becomes a chore. You either get spoiled, get d
 
 NBA Feed cuts all of that out.
 
-One page. Your team. The score, the record, the next game, the schedule, and what fans are actually saying — with spoiler-free mode on by default so you control when you see results. No ads. No algorithm. No recommendations. No paywall. No FOMO loop.
+One page. Your team. The score, the record, the next game and the schedule — with spoiler-free mode on by default so you control when you see results. No ads. No algorithm. No recommendations. No paywall. No FOMO loop.
 
 Just basketball, on your terms.
 
@@ -30,8 +30,6 @@ Just basketball, on your terms.
 - **Team Dashboard** — Last game result, next game preview, and current W/L record — all in one view
 - **Standings** — Full conference standings updated live
 - **Schedule** — Upcoming games for any team
-- **Team Compare** — Head-to-head stat comparison between any two teams (PPG, OPPG, record)
-- **Social Feed** — Reddit-powered fan feed per team (r/lakers, r/bostonceltics, etc.)
 - **Spoiler-Free Mode** — Hide scores until you're ready to see them. Remembered across sessions.
 - **Team Selector** — Switch between all 30 NBA teams. Picks up the team's colors automatically.
 
@@ -58,7 +56,7 @@ as its short name.
 | Framework | Next.js 16 (App Router) |
 | Language | TypeScript |
 | Styling | Tailwind CSS |
-| Data | balldontlie API + Google News RSS + Reddit JSON |
+| Data | balldontlie API + Google News RSS |
 | Deployment | Vercel |
 
 ---
@@ -71,14 +69,11 @@ src/
 │   ├── page.tsx              # Main team dashboard
 │   ├── standings/            # League standings
 │   ├── schedule/             # Team schedule
-│   ├── compare/              # Team vs team comparison
 │   ├── highlights/           # Highlights feed
 │   └── api/                  # Server-side API routes
 │       ├── games/            # Game data + live scores
 │       ├── standings/        # Standings data
 │       ├── schedule/         # Schedule data
-│       ├── compare/          # Team comparison logic
-│       ├── social/           # Reddit feed proxy
 │       └── players/          # Player data
 ├── components/
 │   ├── TeamHeader.tsx        # Team banner with dynamic colors
@@ -94,7 +89,6 @@ src/
 └── lib/
     ├── api.ts                # API client + TypeScript interfaces
     ├── teams.ts              # All 30 teams with IDs and colors
-    ├── reddit.ts             # Reddit subreddit mappings per team
     └── nbaDate.ts            # NBA timezone-aware date helpers
 ```
 
@@ -165,9 +159,7 @@ Empty content is shown only after a successful read; storage failures have a ret
 ### Data fallbacks
 
 Rosters use BALLDONTLIE active players, falling back to the current ESPN roster
-when the API plan or service does not provide active players. Social tries Reddit
-JSON, then its RSS feed, then a clearly identified news index of Reddit links.
-Missing votes/comments are omitted rather than presented as zero.
+when the API plan or service does not provide active players.
 
 ### Regression checks
 
@@ -190,7 +182,7 @@ errors, spoilers and retries without modifying production.
 
 ## Screenshots
 
-> Dashboard showing team record, last game, next game, and Reddit social feed.
+> Dashboard showing team record, last game and next game.
 
 *Coming soon*
 

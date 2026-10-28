@@ -28,7 +28,7 @@ export default function TeamSelector() {
 
       {open && (
         <Modal title="Choose your focus team" onClose={() => setOpen(false)} wide>
-            <p className="mb-5 text-sm text-white/70">Sets your roster, games, highlights, social feed and briefing. Use My Teams to follow other teams for news.</p>
+            <p className="mb-5 text-sm text-white/70">Sets your roster, games, highlights and briefing. Use My Teams to follow other teams for news.</p>
             {(["East", "West"] as const).map((conf) => (
               <div key={conf} className="mb-6">
                 <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">
