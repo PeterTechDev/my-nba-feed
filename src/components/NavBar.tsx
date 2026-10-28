@@ -92,7 +92,7 @@ export default function NavBar() {
       <Modal title="Spoiler settings" onClose={() => setSettingsOpen(false)}>
           <p className="text-sm text-white/70">Choose what stays hidden by default. Revealing a post, digest or results view shows only that content without changing these defaults.</p>
           <div className="mt-5 space-y-3">
-            <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Hide scores and records</p>
                 <p className="text-xs text-white/70 mt-1">Protects game scores, records, standings and comparison statistics until reveal.</p>
@@ -101,10 +101,10 @@ export default function NavBar() {
                 type="checkbox"
                 checked={hideScores}
                 onChange={(event) => setHideScores(event.target.checked)}
-                className="h-4 w-4 accent-amber-500"
+                className="h-4 w-4 shrink-0 accent-amber-500"
               />
             </label>
-            <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Hide result headlines</p>
                 <p className="text-xs text-white/70 mt-1">Protects news headlines and all social titles and images until reveal.</p>
@@ -113,7 +113,7 @@ export default function NavBar() {
                 type="checkbox"
                 checked={hideHeadlines}
                 onChange={(event) => setHideHeadlines(event.target.checked)}
-                className="h-4 w-4 accent-amber-500"
+                className="h-4 w-4 shrink-0 accent-amber-500"
               />
             </label>
           </div>

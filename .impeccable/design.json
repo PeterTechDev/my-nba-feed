@@ -1,12 +1,12 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-27T20:46:06.026Z",
+  "generatedAt": "2026-10-27T23:58:39.074Z",
   "title": "Design System: NBA Feed",
   "extensions": {
     "colorMeta": {
       "canvas": {
         "role": "neutral",
-        "displayName": "canvas",
+        "displayName": "Canvas",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(27% 0 0)",
@@ -20,7 +20,7 @@
       },
       "panel": {
         "role": "neutral",
-        "displayName": "panel",
+        "displayName": "Panel",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(27% 0 0)",
@@ -34,7 +34,7 @@
       },
       "dialog": {
         "role": "neutral",
-        "displayName": "dialog",
+        "displayName": "Dialog",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(27% 0 0)",
@@ -48,7 +48,7 @@
       },
       "field": {
         "role": "neutral",
-        "displayName": "field",
+        "displayName": "Field",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(27% 0 0)",
@@ -62,7 +62,7 @@
       },
       "panel-border": {
         "role": "neutral",
-        "displayName": "panel border",
+        "displayName": "Panel border",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(27% 0 0)",
@@ -76,7 +76,7 @@
       },
       "text": {
         "role": "neutral",
-        "displayName": "text",
+        "displayName": "Text",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(27% 0 0)",
@@ -90,7 +90,7 @@
       },
       "text-muted": {
         "role": "neutral",
-        "displayName": "text muted",
+        "displayName": "Text muted",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(27% 0 0)",
@@ -104,7 +104,7 @@
       },
       "divider": {
         "role": "neutral",
-        "displayName": "divider",
+        "displayName": "Divider",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(27% 0 0)",
@@ -118,7 +118,7 @@
       },
       "control-hover": {
         "role": "neutral",
-        "displayName": "control hover",
+        "displayName": "Control hover",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(27% 0 0)",
@@ -132,7 +132,7 @@
       },
       "amber-link": {
         "role": "primary",
-        "displayName": "amber link",
+        "displayName": "Amber link",
         "tonalRamp": [
           "#451a03",
           "#78350f",
@@ -146,7 +146,7 @@
       },
       "amber-focus": {
         "role": "primary",
-        "displayName": "amber focus",
+        "displayName": "Amber focus",
         "tonalRamp": [
           "#451a03",
           "#78350f",
@@ -221,7 +221,7 @@
       "refersTo": "button-subdued",
       "description": "Focus-team selector and retry action.",
       "html": "<button class=\"ds-subdued\" type=\"button\">Change focus team</button>",
-      "css": ".ds-subdued{min-height:44px;padding:8px 16px;border:0;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;font:500 14px/20px var(--font-inter,Inter),sans-serif;transition:background-color var(--motion-quick,140ms)}.ds-subdued:hover{background:rgba(255,255,255,.2)}.ds-subdued:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}@media(prefers-reduced-motion:no-preference){.ds-subdued:active{transform:scale(.98)}}"
+      "css": ".ds-subdued{min-height:44px;flex-shrink:0;width:100%;padding:8px 16px;border:0;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;font:500 14px/20px var(--font-inter,Inter),sans-serif;transition:background-color var(--motion-quick,140ms)}.ds-subdued:hover{background:rgba(255,255,255,.2)}.ds-subdued:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}@media(prefers-reduced-motion:no-preference){.ds-subdued:active{transform:scale(.98)}}@media(min-width:640px){.ds-subdued{width:auto}}"
     },
     {
       "name": "Reveal button",
@@ -244,14 +244,14 @@
       "refersTo": "select",
       "description": "Native selector from the comparison view.",
       "html": "<label class=\"ds-select-label\" for=\"ds-team\">Team<select class=\"ds-select\" id=\"ds-team\"><option>Boston Celtics</option><option>Chicago Bulls</option></select></label>",
-      "css": ".ds-select-label{display:block;color:rgba(255,255,255,.7);font:400 12px/16px var(--font-inter,Inter),sans-serif}.ds-select{display:block;margin-top:4px;min-height:44px;width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:#1a1a1a;color:#fff;font:400 16px/24px var(--font-inter,Inter),sans-serif;cursor:pointer;color-scheme:dark}.ds-select:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}"
+      "css": ".ds-select-label{text-transform:uppercase;letter-spacing:.05em;display:block;color:rgba(255,255,255,.7);font:400 12px/16px var(--font-inter,Inter),sans-serif}.ds-select{text-transform:none;letter-spacing:normal;display:block;margin-top:4px;min-height:44px;width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:#1a1a1a;color:#fff;font:400 16px/24px var(--font-inter,Inter),sans-serif;cursor:pointer;color-scheme:dark}.ds-select:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}"
     },
     {
       "name": "Navigation links",
       "kind": "nav",
       "description": "Shared neutral active and hover treatment.",
       "html": "<nav class=\"ds-nav\" aria-label=\"Example navigation\"><a href=\"#home\" aria-current=\"page\">Home</a><a href=\"#about\">About</a></nav>",
-      "css": ".ds-nav{display:flex;gap:4px;padding:4px;background:#0a0a0a}.ds-nav a{display:flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;color:rgba(255,255,255,.7);text-decoration:none;font:500 14px/20px var(--font-inter,Inter),sans-serif;transition:color var(--motion-quick,140ms),background-color var(--motion-quick,140ms)}.ds-nav a:hover{background:rgba(255,255,255,.05);color:#fff}.ds-nav a[aria-current]{background:rgba(255,255,255,.1);color:#fff}.ds-nav a:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}"
+      "css": ".ds-nav{display:flex;gap:0;padding:0;background:#0a0a0a}.ds-nav a{display:flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;color:rgba(255,255,255,.7);text-decoration:none;font:500 14px/20px var(--font-inter,Inter),sans-serif;transition:color var(--motion-quick,140ms),background-color var(--motion-quick,140ms)}.ds-nav a:hover{background:rgba(255,255,255,.05);color:#fff}.ds-nav a[aria-current]{background:rgba(255,255,255,.1);color:#fff}.ds-nav a:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}@media(min-width:1280px){.ds-nav a{padding-inline:6px}}"
     },
     {
       "name": "Digest category badge",
@@ -259,6 +259,27 @@
       "description": "The existing casual category; local category colors are not global accents.",
       "html": "<span class=\"ds-chip\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M10 2v2M14 2v2M4 7h14v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4ZM18 8h1a3 3 0 1 1 0 6h-1M2 22h20\"/></svg>Casual</span>",
       "css": ".ds-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border:1px solid rgba(34,197,94,.3);border-radius:9999px;background:rgba(34,197,94,.15);color:#86efac;font:500 12px/16px var(--font-inter,Inter),sans-serif}"
+    },
+    {
+      "name": "Selected team",
+      "kind": "button",
+      "description": "Selected Nets state with a contrast-adjusted team border and amber check. Team artwork is omitted from this self-contained state specimen.",
+      "html": "<button class=\"ds-team-choice\" type=\"button\" aria-label=\"Brooklyn Nets\" aria-pressed=\"true\"><svg class=\"ds-team-check\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg><span class=\"ds-team-artwork\" aria-hidden=\"true\"></span><span>Nets</span></button>",
+      "css": ".ds-team-choice{position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:6px;padding:12px;border:2px solid #8c8c8c;border-radius:12px;background:rgba(0,0,0,.12549);color:rgba(255,255,255,.8);font:400 12px/15px var(--font-inter,Inter),sans-serif;cursor:pointer;transition:background-color var(--motion-quick,140ms),transform var(--motion-quick,140ms) var(--motion-ease,cubic-bezier(.16,1,.3,1))}.ds-team-choice:hover{background:rgba(0,0,0,.12549)}.ds-team-check{position:absolute;right:4px;top:4px;color:#fcd34d}.ds-team-choice:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}@media(prefers-reduced-motion:no-preference){.ds-team-choice:active{transform:scale(.98)}}.ds-team-artwork{display:block;width:40px;height:40px}"
+    },
+    {
+      "name": "Sticky dialog header",
+      "kind": "custom",
+      "description": "Modal title and Close stay above scrolling content. The application uses native dialog.showModal(), Escape dismissal, scroll locking and focus restoration.",
+      "html": "<section class=\"ds-dialog\" role=\"dialog\" aria-label=\"Spoiler settings\"><div class=\"ds-dialog-header\"><h2>Spoiler settings</h2><button class=\"ds-dialog-close\" type=\"button\">Close</button></div><div class=\"ds-dialog-body\"><p>Choose what stays hidden by default. Revealing a post, digest or results view shows only that content without changing these defaults.</p><label class=\"ds-dialog-setting\"><span><strong>Hide scores and records</strong><small>Protects game scores, records, standings and comparison statistics until reveal.</small></span><input type=\"checkbox\" checked></label><label class=\"ds-dialog-setting\"><span><strong>Hide result headlines</strong><small>Protects news headlines and all social titles and images until reveal.</small></span><input type=\"checkbox\" checked></label><p class=\"ds-dialog-note\">Protection applies inside NBA Feed. External sites and search results may contain spoilers.</p></div></section>",
+      "css": ".ds-dialog{max-height:85dvh;width:calc(100% - 2rem);max-width:448px;overflow-y:auto;scroll-padding-top:96px;scrollbar-color:#525252 #161616;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:#141414;color:#fff;font:400 14px/20px var(--font-inter,Inter),sans-serif;color-scheme:dark}.ds-dialog-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid rgba(255,255,255,.1);background:#141414;padding:12px 20px}.ds-dialog-header h2{margin:0;font-size:20px;line-height:28px;font-weight:700}.ds-dialog-close{min-height:44px;flex-shrink:0;border:0;border-radius:8px;padding:0 12px;background:transparent;color:rgba(255,255,255,.8);font:400 14px/20px var(--font-inter,Inter),sans-serif;cursor:pointer;transition:background-color var(--motion-quick,140ms)}.ds-dialog-close:hover{background:rgba(255,255,255,.1)}.ds-dialog-close:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}.ds-dialog-body{padding:20px}.ds-dialog-body>p{margin:0;color:rgba(255,255,255,.7)}.ds-dialog-setting{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px;padding:12px 16px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.03)}.ds-dialog-setting:first-of-type{margin-top:20px}.ds-dialog-setting strong{display:block;font-weight:500}.ds-dialog-setting small{display:block;margin-top:4px;color:rgba(255,255,255,.7);font-size:12px;line-height:16px}.ds-dialog-setting input{width:16px;height:16px;margin:0;flex-shrink:0;accent-color:#f59e0b}.ds-dialog-setting input:focus-visible{outline:2px solid #fbbf24;outline-offset:4px}.ds-dialog-body>.ds-dialog-note{margin-top:16px;font-size:12px;line-height:16px}@media(min-width:640px){.ds-dialog-header{padding-inline:24px}.ds-dialog-body{padding:24px}}@media(prefers-reduced-motion:no-preference){.ds-dialog-close:active{transform:scale(.98)}}"
+    },
+    {
+      "name": "Digest list",
+      "kind": "custom",
+      "description": "MarkdownContent list spacing and hanging indents, with existing protection copy as sample text.",
+      "html": "<ul class=\"ds-digest-list\"><li>Scores and result headlines are hidden by default.</li><li>Reveal a game, post, video preview or digest when you’re ready; revealing an item keeps your default protection in place.</li></ul>",
+      "css": ".ds-digest-list{list-style:disc outside;margin:12px 0;padding:0 0 0 20px;color:rgba(255,255,255,.8);font:400 16px/24px var(--font-inter,Inter),sans-serif}.ds-digest-list li+li{margin-top:8px}"
     }
   ],
   "narrative": {
@@ -271,13 +292,13 @@
     ],
     "rules": [],
     "dos": [
-      "Do reuse the dark shell, Inter and shared controls when extending the interface.",
-      "Do preserve keyboard focus visibility and reduced-motion behavior.",
-      "Do resolve team colors from the selected team rather than treating a fallback as the brand."
+      "**Do** reuse the dark shell, Inter and shared controls when extending the interface.",
+      "**Do** preserve keyboard focus visibility and reduced-motion behavior.",
+      "**Do** resolve team colors from the selected team rather than treating a fallback as the brand."
     ],
     "donts": [
-      "Don't promote an individual page's composition or type size into a global requirement.",
-      "Don't add shadow-based elevation to represent the sampled flat dashboard surfaces."
+      "**Don't** promote an individual page's composition or type size into a global requirement.",
+      "**Don't** add shadow-based elevation to represent the sampled flat dashboard surfaces."
     ]
   }
 }

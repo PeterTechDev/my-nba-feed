@@ -1,6 +1,7 @@
 "use client";
 import Modal from "./Modal";
-import { teams } from "@/lib/teams";
+import { teams, getChartColor } from "@/lib/teams";
+import { Check } from "lucide-react";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 
 interface FavoriteTeamsModalProps {
@@ -45,7 +46,7 @@ export default function FavoriteTeamsModal({ onClose }: FavoriteTeamsModalProps)
                       selected
                         ? {
                             backgroundColor: `${team.primaryColor}20`,
-                            border: `2px solid ${team.primaryColor}`,
+                            border: `2px solid ${getChartColor(team.primaryColor)}`,
                           }
                         : {
                             border: "2px solid transparent",
@@ -77,10 +78,7 @@ export default function FavoriteTeamsModal({ onClose }: FavoriteTeamsModalProps)
                       {team.name}
                     </span>
                     {selected && (
-                      <span
-                        className="team-selection-indicator absolute top-1 right-1 w-2.5 h-2.5 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: team.primaryColor }}
-                      />
+                      <Check aria-hidden="true" className="team-selection-indicator absolute right-1 top-1 h-4 w-4 text-amber-300" />
                     )}
                   </button>
                 );

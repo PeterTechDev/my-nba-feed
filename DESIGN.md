@@ -113,13 +113,15 @@ The sampled system uses tonal surfaces and thin borders without box shadows. Nat
 
 ## Shapes
 
-Controls have 8px corners, cards and selectable team tiles 12px, dialogs and team headers 16px. Fully rounded forms are reserved for compact status marks, counts and category badges. Borders are ordinarily 1px; selected team tiles use a 2px team-colored border.
+Controls have 8px corners, cards and selectable team tiles 12px, dialogs and team headers 16px. Fully rounded forms are reserved for compact status marks, counts, category badges and the current calendar date. Borders are ordinarily 1px; selected team tiles use a 2px contrast-adjusted team-colored border and an amber checkmark.
 
 ## Components
 
 - **Buttons:** subdued white-tint fill for focus-team selection and retry; outlined reveal controls; transparent navigation actions. Hover strengthens the fill or foreground. Keep the global focus treatment.
 - **Cards:** dark panel, quiet border and 12px corners. Use the existing flat section/list patterns where the surface already calls for them.
 - **Fields:** comparison uses native selects with a dark field fill, 8px corners and a 44px minimum height. Spoiler settings use native amber-accented checkboxes.
+- **Dialogs:** a sticky title and Close control stay visible above the scrolling content. Scroll padding keeps focused choices clear of the header.
+- **Reading and scrolling:** digest lists use hanging indents and spaced items. Scrollbars use neutral gray on panel gray, and page anchor scrolling leaves room for the sticky navigation. Highlight previews retain their 16:9 proportions at every breakpoint.
 - **Navigation:** sticky canvas-colored shell, 64px minimum row and the approved stacked logo in a 112px × 44px frame that hides its canvas margins. The home link's image has the accessible name My NBA Feed. Desktop uses 14px text links and a separate utility group with a thin divider. Active links use a white-tint fill and `aria-current`. Protection uses amber text; followed teams use an emerald heart with an inline neutral count. Below 640px, compact utilities keep accessible names and tooltips while their text labels are hidden. The small-screen menu uses a two-column link grid with 16px icons.
 - **Badges:** compact fully rounded digest category labels; selected-team counts and live dots remain small status treatments.
 - **Team header:** a team-colored band with a contrast-selected foreground, real team logo and a neutral inset for controls.

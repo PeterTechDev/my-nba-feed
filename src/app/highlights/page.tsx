@@ -41,7 +41,7 @@ function HighlightCard({ game, video, loading, failed }: { game: HighlightGame; 
   const matchup = `${game.isHome ? "vs" : "at"} ${game.opponent}`;
 
   return <article className="overflow-hidden rounded-xl border border-white/10 bg-[#161616]">
-    <div className="relative aspect-video min-h-[200px] bg-[#202020]">
+    <div className="relative aspect-video bg-[#202020]">
       {loading ? <div role="status" aria-label={`Loading highlights ${matchup}`} className="h-full animate-pulse bg-white/5" /> : video ? (
         protectedPreview ? <button type="button" onClick={() => setRevealed(true)} aria-label={`Reveal video preview ${matchup}`}
           className="flex h-full w-full flex-col items-center justify-center gap-3 p-5 text-white/80 hover:bg-white/5">
@@ -51,7 +51,7 @@ function HighlightCard({ game, video, loading, failed }: { game: HighlightGame; 
           title={`Full game highlights ${matchup}`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin" className="absolute inset-0 h-full w-full border-0" />
         : <button type="button" onClick={() => setPlaying(true)} aria-label={`Play highlights ${matchup}`}
-          aria-describedby="video-warning" className="group relative flex h-full min-h-[200px] w-full items-center justify-center hover:bg-white/5">
+          aria-describedby="video-warning" className="group relative flex h-full w-full items-center justify-center hover:bg-white/5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {!imageFailed && <img src={video.thumbnail} alt="" width={640} height={360} loading="lazy" onError={() => setImageFailed(true)} className="absolute inset-0 h-full w-full object-cover" />}
           <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-black/80 text-white transition-transform duration-200 group-hover:scale-110"><Play aria-hidden="true" className="h-6 w-6 fill-current" /></span>

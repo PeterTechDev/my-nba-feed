@@ -77,7 +77,7 @@ export default function SocialPage() {
       </div>
 
       {/* Source filter */}
-      <div className="flex gap-2 mt-4 mb-6 overflow-x-auto">
+      <div role="group" aria-label="Social sources" className="-mx-2 mt-2 mb-4 flex gap-2 overflow-x-auto p-2">
         <button
           onClick={() => setFilter(null)}
           aria-pressed={!activeFilter}

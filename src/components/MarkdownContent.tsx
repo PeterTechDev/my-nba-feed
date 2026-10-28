@@ -69,7 +69,7 @@ export default function MarkdownContent({ content, className = "" }: Props) {
       elements.push(
         <blockquote
           key={key()}
-          className="border-l-2 pl-4 my-3 text-white/60 italic"
+          className="border-l pl-4 my-3 text-white/70 italic"
           style={{ borderColor: "var(--team-primary)" }}
         >
           {parseInline(line.slice(2))}
@@ -84,14 +84,14 @@ export default function MarkdownContent({ content, className = "" }: Props) {
       const items: React.ReactNode[] = [];
       while (i < lines.length && (lines[i].startsWith("- ") || lines[i].startsWith("* "))) {
         items.push(
-          <li key={key()} className="ml-1">
+          <li key={key()}>
             {parseInline(lines[i].slice(2))}
           </li>
         );
         i++;
       }
       elements.push(
-        <ul key={key()} className="list-disc list-inside space-y-1 my-3 text-white/80">
+        <ul key={key()} className="list-disc list-outside pl-5 space-y-2 my-3 text-white/80">
           {items}
         </ul>
       );
@@ -103,14 +103,14 @@ export default function MarkdownContent({ content, className = "" }: Props) {
       const items: React.ReactNode[] = [];
       while (i < lines.length && /^\d+\. /.test(lines[i])) {
         items.push(
-          <li key={key()} className="ml-1">
+          <li key={key()}>
             {parseInline(lines[i].replace(/^\d+\. /, ""))}
           </li>
         );
         i++;
       }
       elements.push(
-        <ol key={key()} className="list-decimal list-inside space-y-1 my-3 text-white/80">
+        <ol key={key()} className="list-decimal list-outside pl-5 space-y-2 my-3 text-white/80">
           {items}
         </ol>
       );

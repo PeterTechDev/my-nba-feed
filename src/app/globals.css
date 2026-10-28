@@ -26,6 +26,8 @@ body {
 :root {
   color-scheme: dark;
   accent-color: #fbbf24;
+  scrollbar-color: #525252 #161616;
+  scroll-padding-top: 5rem;
 }
 
 :focus-visible {

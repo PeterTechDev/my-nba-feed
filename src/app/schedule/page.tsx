@@ -130,7 +130,7 @@ export default function SchedulePage() {
                   key={day}
                   className={`min-h-[110px] border-b border-r border-white/5 p-2 ${isToday ? "bg-white/5" : ""}`}
                 >
-                  <span className={`text-xs ${isToday ? "text-white font-bold" : "text-white/70"}`}>{day}</span>
+                  <span aria-current={isToday ? "date" : undefined} className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full text-xs tabular-nums ${isToday ? "bg-amber-300 text-black font-semibold" : "text-white/70"}`}>{day}</span>
                   {game && opponent && (
                     <div className={`mt-2 rounded p-1.5 text-xs lg:text-sm ${
                       isFinal && !hideScores
@@ -191,7 +191,7 @@ export default function SchedulePage() {
               {gamesThisMonth.map(({ day, game, isHome, opponent, isFinal, won, isToday }) => (
                 <div key={day} className={`flex items-center justify-between gap-3 px-4 py-4 ${isToday ? "bg-white/5" : ""}`}>
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className={`text-sm tabular-nums w-6 shrink-0 text-center ${isToday ? "text-white font-bold" : "text-white/70"}`}>
+                    <span aria-current={isToday ? "date" : undefined} className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm tabular-nums ${isToday ? "bg-amber-300 text-black font-semibold" : "text-white/70"}`}>
                       {day}
                     </span>
                     <div className="min-w-0">
