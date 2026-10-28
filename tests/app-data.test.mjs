@@ -680,26 +680,32 @@ test("active roster uses the active endpoint, and ESPN fallback never returns hi
 });
 
 test("schedule preserves tipoff/postponement and comparison counts overtime finals", async () => {
+  const at = "2026-10-27T18:00:00Z";
+  const { FixedDate } = fixedClock(at);
+  const nbaDates = load("lib/nbaDate.ts", { Date: FixedDate }).exports;
   const home_team = { id: 2, name: "Celtics", abbreviation: "BOS" }, visitor_team = { id: 3, name: "Nets", abbreviation: "BKN" };
   let games = [{ id: 1, date: "2026-10-27", datetime: "2026-10-27T23:30:00Z", status: "Scheduled", postponed: true, home_team, visitor_team, home_team_score: 0, visitor_team_score: 0 }];
   const fetch = async () => ({ ok: true, json: async () => ({ data: games }) });
-  const globals = { process: { env: { BALLDONTLIE_KEY: "fixture" } }, fetch };
-  const schedule = load("app/api/schedule/route.ts", globals, imports).exports;
+  const globals = { Date: FixedDate, process: { env: { BALLDONTLIE_KEY: "fixture" } }, fetch };
+  const routeImports = { ...imports, "@/lib/nbaDate": nbaDates };
+  const schedule = load("app/api/schedule/route.ts", globals, routeImports).exports;
   const result = await schedule.GET({ nextUrl: new URL("http://localhost/api/schedule?teamId=2") });
   assert.equal(result.body.games[0].startTime, "2026-10-27T23:30:00.000Z");
   assert.equal(result.body.games[0].status, "Postponed");
   games = [{ ...games[0], postponed: false, status: "Final/OT", home_team_score: 118, visitor_team_score: 114 }];
-  const compare = load("app/api/compare/route.ts", globals, imports).exports;
+  const compare = load("app/api/compare/route.ts", globals, routeImports).exports;
   const compared = await compare.GET({ nextUrl: new URL("http://localhost/api/compare?team1=2&team2=3") });
   assert.equal(compared.body.team1.wins, 1);
   assert.equal(compared.body.team1.gamesPlayed, 1);
   assert.equal(compared.body.headToHead.team1Wins, 1);
-  const standings = load("app/api/standings/route.ts", globals, imports).exports;
+  const standings = load("app/api/standings/route.ts", globals, routeImports).exports;
   const table = await standings.GET();
   assert.equal(table.body.standings.find((team) => team.id === 2).wins, 1);
-  assert.equal(table.body.season, dates.getNBASeason());
-  assert.equal(table.body.asOf, dates.formatNBADate());
-  assert.equal(compared.body.season, dates.getNBASeason());
+  assert.equal(nbaDates.formatNBADate(), "2026-10-27");
+  assert.equal(nbaDates.getNBASeason(), 2026);
+  assert.equal(table.body.season, nbaDates.getNBASeason());
+  assert.equal(table.body.asOf, nbaDates.formatNBADate());
+  assert.equal(compared.body.season, nbaDates.getNBASeason());
 });
 
 test("standings and comparison omit all result content until scores are revealed", () => {
