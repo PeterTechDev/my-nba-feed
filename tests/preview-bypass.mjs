@@ -4,6 +4,11 @@ function isLocalHost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
 }
 
+// The bypass header is added only on the BASE_URL origin. route.fetch does not
+// follow redirects (maxRedirects: 0): a 3xx is fulfilled as-is. The browser's
+// next request is routed again and receives the header only when that hop is
+// still this origin. route.continue() would let the header ride along to the
+// redirect target.
 export async function installPreviewBypass(page, baseURL) {
   if (!baseURL) throw new Error("Set BASE_URL to the origin of the running app.");
   const hostname = new URL(baseURL).hostname;
@@ -18,12 +23,22 @@ export async function installPreviewBypass(page, baseURL) {
       await route.continue();
       return;
     }
-    await route.continue({
-      headers: {
-        ...route.request().headers(),
-        "x-vercel-protection-bypass": bypass,
-      },
-    });
+    try {
+      const response = await route.fetch({
+        headers: {
+          ...route.request().headers(),
+          "x-vercel-protection-bypass": bypass,
+        },
+        maxRedirects: 0,
+      });
+      await route.fulfill({ response });
+    } catch (error) {
+      // An aborted prefetch disposes the fetch response. continue() here would
+      // send the header on to a redirect, so abort the already-dead request.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/disposed|aborted|Test ended|Target page, context or browser has been closed/i.test(message)) throw error;
+      await route.abort().catch(() => {});
+    }
   });
 }
 

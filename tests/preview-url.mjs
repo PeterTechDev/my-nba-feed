@@ -1,14 +1,17 @@
 import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-// Host only, anchored at the end. A query or a suffix on another domain does not match.
-const PREVIEW_HOST = /-petertechdevs-projects\.vercel\.app$/i;
+// Full hostname, case-insensitive. Nine-character deployment ids, or a git branch slug.
+const PREVIEW_HOST = /^my-nba-feed-(?:[a-z0-9]{9}|git-[a-z0-9-]+)-petertechdevs-projects\.vercel\.app$/i;
 
 export function previewBaseURL(raw) {
-  if (!raw) return null;
+  if (!raw || raw.includes("\\")) return null;
   let url;
   try { url = new URL(raw); } catch { return null; }
   if (url.protocol !== "https:") return null;
+  // WHATWG drops the default https port, so :443 arrives here as "".
+  if (url.port !== "") return null;
+  if (url.username || url.password) return null;
   if (!PREVIEW_HOST.test(url.hostname)) return null;
   return url.origin;
 }

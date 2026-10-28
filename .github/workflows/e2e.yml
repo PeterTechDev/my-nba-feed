@@ -7,7 +7,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: e2e-${{ github.event.deployment.ref }}
+  # deployment.ref can be a commit SHA, which would never cancel a superseded
+  # preview. environment is the stable group for this job (Preview).
+  group: e2e-${{ github.event.deployment.environment }}
   cancel-in-progress: true
 
 jobs:
@@ -38,9 +40,7 @@ jobs:
       - name: Run Playwright
         env:
           VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          # The preview has no BALLDONTLIE_KEY, and digest storage can 503.
-          # Without this flag those resource errors fail the smoke.
-          SMOKE_ALLOW_MISSING_API_KEY: "1"
+          SMOKE_ALLOW_MISSING_API_KEY: ${{ vars.SMOKE_ALLOW_MISSING_API_KEY }}
         run: npm run test:e2e -- --reporter=line,html
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()

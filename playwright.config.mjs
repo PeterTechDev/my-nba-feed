@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "tests",
-  testMatch: ["morning-briefing-hydration.spec.mjs", "smoke-pages.spec.mjs"],
+  testMatch: "**/*.spec.mjs",
   outputDir: "test-results",
   retries: 0,
   reporter: "line",

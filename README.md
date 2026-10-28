@@ -169,10 +169,13 @@ the `YOUTUBE_API_KEY` Actions secret using the [setup guide](docs/youtube-highli
 
 Run `npm test` for the Node suite, `npm run test:ssr` for the Morning Briefing
 server render, and `npm run test:e2e` for Playwright. `test:e2e` needs `BASE_URL`.
-`VERCEL_BYPASS` is required when that origin is not localhost. Set
-`SMOKE_ALLOW_MISSING_API_KEY=1` to allow the browser's 503 console lines for
-`/api/games`, `/api/standings`, and `/api/digest` when the preview has no
-BALLDONTLIE key or digest storage. Without that variable, any 503 fails the smoke.
+`VERCEL_BYPASS` is required when that origin is not localhost. The bypass
+header is sent only to that origin and is not forwarded across a redirect.
+`SMOKE_ALLOW_MISSING_API_KEY` defaults to empty, which does not tolerate any
+503 console line. Set the repository variable to `1` only when the preview has
+no BALLDONTLIE key or digest storage. That value tolerates 503 for the exact
+paths `/api/games`, `/api/standings`, and `/api/digest`. `/api/digest/feedback`
+is not tolerated.
 
 ---
 

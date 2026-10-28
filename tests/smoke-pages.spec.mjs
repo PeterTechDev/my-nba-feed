@@ -1,13 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { registerPreviewBypass } from "./preview-bypass.mjs";
+import { isTolerated503 } from "./smoke-console.mjs";
 
-// SMOKE_ALLOW_MISSING_API_KEY=1 tolerates the browser's failed-resource console
-// line when the status is 503 and the path is /api/games, /api/standings, or
-// /api/digest (including /api/digest/feedback). Those routes 503 without
-// BALLDONTLIE_KEY or digest storage. The preview job sets the variable because
-// that deployment has no key today. Unset, any 503 console error fails the smoke.
-// VERCEL_BYPASS is required when BASE_URL is not localhost. The bypass header is
-// added only for that origin.
+// SMOKE_ALLOW_MISSING_API_KEY=1 tolerates a 503 console line only for the exact
+// paths /api/games, /api/standings, and /api/digest. /api/digest/feedback is not
+// included. Empty or unset, any 503 fails the smoke. The workflow reads the
+// repository variable of the same name; it does not hardcode 1.
+// VERCEL_BYPASS is required when BASE_URL is not localhost.
 
 if (!process.env.BASE_URL) {
   throw new Error("Set BASE_URL to the origin of the running app.");
@@ -32,15 +31,6 @@ function watchPage(page) {
   return { hydration, consoleErrors, pageErrors };
 }
 
-function isTolerated503(message) {
-  if (process.env.SMOKE_ALLOW_MISSING_API_KEY !== "1") return false;
-  const location = message.location()?.url ?? "";
-  let path = "";
-  try { path = new URL(location).pathname; } catch { return false; }
-  if (!/\b503\b/.test(message.text())) return false;
-  return path === "/api/games" || path === "/api/standings" || path === "/api/digest" || path.startsWith("/api/digest/");
-}
-
 function assertQuiet(record) {
   expect(record.hydration, record.hydration.join("\n")).toEqual([]);
   expect(record.pageErrors, record.pageErrors.join("\n")).toEqual([]);
@@ -51,8 +41,9 @@ const SCORE = /\d{2,3}\s*[-–]\s*\d{2,3}/;
 
 test("home loads the team games without console or hydration errors", async ({ page }) => {
   const record = watchPage(page);
+  const games = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/games");
   await page.goto("/");
-  await page.waitForResponse((response) => new URL(response.url()).pathname === "/api/games");
+  await games;
   await expect(page.getByRole("heading", { name: "Boston Celtics", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Celtics games" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Games", exact: true })).toBeVisible();
@@ -61,8 +52,9 @@ test("home loads the team games without console or hydration errors", async ({ p
 
 test("standings loads its heading and a conference, empty state, or the data error", async ({ page }) => {
   const record = watchPage(page);
+  const standings = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/standings");
   await page.goto("/standings");
-  await page.waitForResponse((response) => new URL(response.url()).pathname === "/api/standings");
+  await standings;
   await expect(page.getByRole("heading", { name: "Standings", exact: true })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Eastern Conference", exact: true })
@@ -74,8 +66,9 @@ test("standings loads its heading and a conference, empty state, or the data err
 
 test("the team header names the Celtics and opens their roster", async ({ page }) => {
   const record = watchPage(page);
+  const games = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/games");
   await page.goto("/");
-  await page.waitForResponse((response) => new URL(response.url()).pathname === "/api/games");
+  await games;
   await expect(page.getByRole("heading", { name: "Boston Celtics", exact: true })).toBeVisible();
   await expect(page.getByText("Eastern Conference", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Change focus team", exact: true })).toBeVisible();
