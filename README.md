@@ -175,8 +175,8 @@ Specs directly under `tests/`, including bypass checks and any later
 part of that job. CI runs the local bypass specs against servers they start
 themselves. `VERCEL_BYPASS` is required when `BASE_URL` is not localhost. The
 bypass header is sent only to that origin. Same-origin redirects are followed
-with the header for up to 5 hops. A 303 becomes GET and drops the body. A 307
-or 308 keeps the method and body. A redirect to any other origin is returned
+with the header for up to 5 hops. POST on 301, 302, or 303 becomes GET and
+drops the body. A 307 or 308 keeps the method and body. A redirect to any other origin is returned
 as-is, without the header. `SMOKE_ALLOW_MISSING_API_KEY` defaults to empty,
 which does not tolerate any 503 console line. Set the repository variable to
 `1` only when the preview has no BALLDONTLIE key or digest storage. That value

@@ -17,16 +17,18 @@ function listen(handler, port) {
   });
 }
 
-async function expectSafeFailure(page, origin, path) {
+async function expectSafeFailure(page, origin, path, expected = `preview bypass fetch failed for GET ${path}`) {
   const previous = process.env.VERCEL_BYPASS;
   const seen = [];
   process.env.VERCEL_BYPASS = FIXTURE;
   setBypassFailureHook((message) => seen.push(message));
   try {
     await installPreviewBypass(page, origin);
+    const started = Date.now();
     await expect(page.goto(`${origin}${path}`)).rejects.toThrow();
-    await expect.poll(() => seen[0]).toBe(`preview bypass fetch failed for GET ${path}`);
+    await expect.poll(() => seen[0]).toBe(expected);
     assert.equal(seen.some((message) => message.includes(FIXTURE)), false);
+    return Date.now() - started;
   } finally {
     setBypassFailureHook();
     if (previous === undefined) delete process.env.VERCEL_BYPASS;
@@ -48,6 +50,41 @@ test("a stalled response reports a fetch failure without the bypass value", asyn
   page.setDefaultNavigationTimeout(28000);
   try {
     await expectSafeFailure(page, `http://127.0.0.1:${server.address().port}`, "/stall");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("slow body bytes still hit the total request timeout", async ({ page }) => {
+  test.setTimeout(45000);
+  const server = await listen((req, res) => {
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.write("x");
+    const drip = setInterval(() => res.write("x"), 1000);
+    res.on("close", () => clearInterval(drip));
+  }, 3372);
+  page.setDefaultNavigationTimeout(28000);
+  try {
+    const elapsed = await expectSafeFailure(page, `http://127.0.0.1:${server.address().port}`, "/drip");
+    assert.ok(elapsed < 25000, `elapsed ${elapsed}`);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("a reset while the body is still arriving is logged without the bypass value", async ({ page }) => {
+  const server = await listen((req, res) => {
+    res.writeHead(200, { "content-type": "text/plain", "content-length": "1000" });
+    res.write("hello");
+    setTimeout(() => req.socket.destroy(), 100);
+  }, 3376);
+  try {
+    await expectSafeFailure(
+      page,
+      `http://127.0.0.1:${server.address().port}`,
+      "/reset",
+      "preview bypass connection reset while reading GET /reset",
+    );
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

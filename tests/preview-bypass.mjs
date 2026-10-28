@@ -2,6 +2,12 @@ import http from "node:http";
 import https from "node:https";
 import { test } from "@playwright/test";
 
+// Limitations:
+// (2) Same-origin redirects are fetched here and the final response is fulfilled
+//     on the original route, so the page URL stays on the first address.
+// (5) The body is buffered in full before it is fulfilled. Content-Encoding is
+//     passed through unchanged; this does not stream or re-encode the body.
+
 const HEADER = "x-vercel-protection-bypass";
 // The default test timeout is 30s. There is no public getter for a page's
 // navigation timeout, so this stays a fixed 20s: a hung origin fails the
@@ -54,6 +60,23 @@ function nodeFetch({ url, method, headers, body, timeout }) {
   return new Promise((resolve, reject) => {
     const target = new URL(url);
     const lib = target.protocol === "https:" ? https : http;
+    const chunks = [];
+    let received = 0;
+    let settled = false;
+    let timedOut = false;
+    let timer;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    };
+    const ok = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
     const req = lib.request({
       protocol: target.protocol,
       hostname: target.hostname,
@@ -62,13 +85,33 @@ function nodeFetch({ url, method, headers, body, timeout }) {
       method,
       headers,
     }, (res) => {
-      const chunks = [];
-      res.on("data", (chunk) => chunks.push(chunk));
-      res.on("error", reject);
-      res.on("end", () => resolve({ status: res.statusCode || 0, headers: res.headers, body: Buffer.concat(chunks) }));
+      res.on("data", (chunk) => {
+        received += chunk.length;
+        chunks.push(chunk);
+      });
+      res.on("end", () => ok({ status: res.statusCode || 0, headers: res.headers, body: Buffer.concat(chunks) }));
+      res.on("aborted", () => {
+        const error = new Error(timedOut ? "timeout" : "reset");
+        error.timedOut = timedOut;
+        error.midBody = !timedOut && received > 0;
+        fail(error);
+      });
+      res.on("error", (error) => {
+        error.timedOut = timedOut;
+        error.midBody = !timedOut && received > 0;
+        fail(error);
+      });
     });
-    req.on("error", reject);
-    req.setTimeout(timeout, () => req.destroy(new Error("timeout")));
+    // Total deadline. req.setTimeout would reset whenever a byte arrives.
+    timer = setTimeout(() => {
+      timedOut = true;
+      req.destroy(new Error("timeout"));
+    }, timeout);
+    req.on("error", (error) => {
+      if (timedOut) error.timedOut = true;
+      else error.midBody = received > 0;
+      fail(error);
+    });
     if (body && method !== "GET" && method !== "HEAD") req.write(body);
     req.end();
   });
@@ -84,7 +127,8 @@ async function fulfill(route, result) {
 }
 
 // Same-origin redirects are requested again with the bypass header, up to 5 hops.
-// 303 becomes GET and drops the body. 307 and 308 keep the method and body.
+// POST on 301, 302, or 303 becomes GET with no body. 307 and 308 keep the method and body.
+// Set-Cookie from an intermediate 3xx is sent on the next hop and on the final response.
 // A 3xx to any other origin is returned unchanged, so that hop is routed again
 // and does not receive the header. The header is not passed to a Playwright API.
 // A failed request is aborted and reported with only the method and pathname.
@@ -108,18 +152,49 @@ export async function installPreviewBypass(page, baseURL) {
     let postData = route.request().postDataBuffer() ?? undefined;
     let headers = { ...(await route.request().allHeaders()), [HEADER]: bypass };
     for (const key of HOP_BY_HOP) delete headers[key];
+    const carried = [];
+    const absorbSetCookie = (responseHeaders) => {
+      const raw = responseHeaders["set-cookie"];
+      if (!raw) return;
+      const lines = Array.isArray(raw) ? raw : String(raw).split("\n");
+      for (const line of lines) {
+        if (!line) continue;
+        carried.push(line);
+        const pair = line.split(";")[0];
+        const eq = pair.indexOf("=");
+        if (eq <= 0) continue;
+        const name = pair.slice(0, eq).trim();
+        const value = pair.slice(eq + 1).trim();
+        const jar = new Map();
+        if (headers.cookie) {
+          for (const part of headers.cookie.split(";")) {
+            const trimmed = part.trim();
+            const cut = trimmed.indexOf("=");
+            if (cut > 0) jar.set(trimmed.slice(0, cut), trimmed.slice(cut + 1));
+          }
+        }
+        jar.set(name, value);
+        headers.cookie = [...jar.entries()].map(([key, item]) => `${key}=${item}`).join("; ");
+      }
+    };
+    const finish = async (result) => {
+      absorbSetCookie(result.headers);
+      const responseHeaders = { ...result.headers };
+      if (carried.length) responseHeaders["set-cookie"] = carried.join("\n");
+      await fulfill(route, { ...result, headers: responseHeaders });
+    };
     try {
       for (let followed = 0; ; followed++) {
         const result = await nodeFetch({ url, method, headers, body: postData, timeout: FETCH_TIMEOUT_MS });
         const status = result.status;
         const location = Array.isArray(result.headers.location) ? result.headers.location[0] : result.headers.location;
         if (!REDIRECT.has(status) || !location) {
-          await fulfill(route, result);
+          await finish(result);
           return;
         }
         const next = new URL(location, url);
         if (next.origin !== appOrigin) {
-          await fulfill(route, result);
+          await finish(result);
           return;
         }
         if (followed >= MAX_REDIRECTS) {
@@ -127,7 +202,8 @@ export async function installPreviewBypass(page, baseURL) {
           report(`preview bypass exceeded ${MAX_REDIRECTS} redirects for ${method} ${pathnameOf(url)}`);
           return;
         }
-        if (status === 303) {
+        absorbSetCookie(result.headers);
+        if ((status === 301 || status === 302 || status === 303) && method !== "GET" && method !== "HEAD") {
           method = "GET";
           postData = undefined;
           headers = withoutBody(headers);
@@ -136,7 +212,11 @@ export async function installPreviewBypass(page, baseURL) {
       }
     } catch (error) {
       await route.abort().catch(() => {});
-      if (isBenign(error)) return;
+      if (error && error.midBody) {
+        report(`preview bypass connection reset while reading ${method} ${pathnameOf(url)}`);
+        return;
+      }
+      if (isBenign(error) && !(error && error.timedOut)) return;
       report(`preview bypass fetch failed for ${method} ${pathnameOf(url)}`);
     }
   });

@@ -191,45 +191,56 @@ test("same-origin redirects stop after 5 hops", async () => {
   }
 });
 
-test("303 becomes GET and 307 keeps the POST body", async () => {
-  const hits = [];
-  const app = await listen(async (req, res) => {
-    const path = req.url.split("?")[0];
-    const body = await bodyOf(req);
-    hits.push({ path, method: req.method, body, bypass: req.headers["x-vercel-protection-bypass"] ?? null });
-    if (path === "/to-get") {
-      res.writeHead(303, { location: "/got" });
-      res.end();
-      return;
-    }
-    if (path === "/keep") {
-      res.writeHead(307, { location: "/kept" });
-      res.end();
-      return;
-    }
-    res.writeHead(200, { "content-type": "text/plain" });
-    res.end("done");
-  }, 3350);
-  try {
-    await withPage(async (page) => {
-      await installPreviewBypass(page, originOf(app));
-      await page.goto(`${originOf(app)}/start`);
-      const status = await page.evaluate(async () => {
-        const post = (path) => fetch(path, { method: "POST", body: "payload", headers: { "content-type": "text/plain" } });
-        return { toGet: (await post("/to-get")).status, keep: (await post("/keep")).status };
+for (const status of [301, 302, 303, 307, 308]) {
+  const drop = status === 301 || status === 302 || status === 303;
+  test(`POST ${status} ${drop ? "becomes GET without a body" : "keeps the method and body"}`, async () => {
+    const hits = [];
+    const app = await listen(async (req, res) => {
+      const path = req.url.split("?")[0];
+      const body = await bodyOf(req);
+      hits.push({
+        path,
+        method: req.method,
+        body,
+        type: req.headers["content-type"] ?? null,
+        length: req.headers["content-length"] ?? null,
+        bypass: req.headers["x-vercel-protection-bypass"] ?? null,
       });
-      assert.deepEqual(status, { toGet: 200, keep: 200 });
-      assert.equal(hit(hits, "/got")?.method, "GET");
-      assert.equal(hit(hits, "/got")?.body, "");
-      assert.equal(hit(hits, "/got")?.bypass, FIXTURE);
-      assert.equal(hit(hits, "/kept")?.method, "POST");
-      assert.equal(hit(hits, "/kept")?.body, "payload");
-      assert.equal(hit(hits, "/kept")?.bypass, FIXTURE);
-    });
-  } finally {
-    await new Promise((resolve) => app.close(resolve));
-  }
-});
+      if (path === "/from") {
+        res.writeHead(status, { location: "/landed" });
+        res.end();
+        return;
+      }
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.end("done");
+    }, 3350 + (status - 301));
+    try {
+      await withPage(async (page) => {
+        await installPreviewBypass(page, originOf(app));
+        await page.goto(`${originOf(app)}/start`);
+        const code = await page.evaluate(async () => {
+          const response = await fetch("/from", { method: "POST", body: "payload", headers: { "content-type": "text/plain" } });
+          return response.status;
+        });
+        assert.equal(code, 200);
+        const landed = hit(hits, "/landed");
+        assert.equal(landed?.bypass, FIXTURE);
+        if (drop) {
+          assert.equal(landed?.method, "GET");
+          assert.equal(landed?.body, "");
+          assert.equal(landed?.type, null);
+          assert.equal(landed?.length, null);
+        } else {
+          assert.equal(landed?.method, "POST");
+          assert.equal(landed?.body, "payload");
+          assert.equal(landed?.type, "text/plain");
+        }
+      });
+    } finally {
+      await new Promise((resolve) => app.close(resolve));
+    }
+  });
+}
 
 test("a context cookie reaches the same-origin bypass hop and not the next origin", async () => {
   const appHits = [];
@@ -278,5 +289,41 @@ test("a context cookie reaches the same-origin bypass hop and not the next origi
   } finally {
     await new Promise((resolve) => app.close(resolve));
     await new Promise((resolve) => other.close(resolve));
+  }
+});
+
+test("Set-Cookie from two redirect hops is sent on the next hop and to the browser", async () => {
+  const hits = [];
+  const app = await listen((req, res) => {
+    const path = req.url.split("?")[0];
+    hits.push({ path, cookie: req.headers.cookie ?? "" });
+    if (path === "/set-a") {
+      res.writeHead(302, { location: "/set-b", "set-cookie": "one=hop1; Path=/" });
+      res.end();
+      return;
+    }
+    if (path === "/set-b") {
+      res.writeHead(302, { location: "/set-c", "set-cookie": "two=hop2; Path=/" });
+      res.end();
+      return;
+    }
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("landed");
+  }, 3388);
+  try {
+    await withPage(async (page) => {
+      const origin = originOf(app);
+      await installPreviewBypass(page, origin);
+      await page.goto(`${origin}/set-a`);
+      await expect(page.getByText("landed", { exact: true })).toBeVisible();
+      assert.match(hit(hits, "/set-b")?.cookie ?? "", /(?:^|;\s*)one=hop1(?:;|$)/);
+      assert.doesNotMatch(hit(hits, "/set-b")?.cookie ?? "", /two=/);
+      assert.match(hit(hits, "/set-c")?.cookie ?? "", /(?:^|;\s*)one=hop1(?:;|$)/);
+      assert.match(hit(hits, "/set-c")?.cookie ?? "", /(?:^|;\s*)two=hop2(?:;|$)/);
+      const stored = (await page.context().cookies(origin)).map((cookie) => `${cookie.name}=${cookie.value}`).sort();
+      assert.deepEqual(stored, ["one=hop1", "two=hop2"]);
+    });
+  } finally {
+    await new Promise((resolve) => app.close(resolve));
   }
 });
