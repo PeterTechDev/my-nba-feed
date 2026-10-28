@@ -45,7 +45,7 @@ test("a dropped connection reports a fetch failure without the bypass value", as
 
 test("a stalled response reports a fetch failure without the bypass value", async ({ page }) => {
   const server = await listen(() => {}, 3370);
-  page.setDefaultNavigationTimeout(15000);
+  page.setDefaultNavigationTimeout(28000);
   try {
     await expectSafeFailure(page, `http://127.0.0.1:${server.address().port}`, "/stall");
   } finally {

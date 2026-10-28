@@ -3,6 +3,10 @@ import https from "node:https";
 import { test } from "@playwright/test";
 
 const HEADER = "x-vercel-protection-bypass";
+// The default test timeout is 30s. There is no public getter for a page's
+// navigation timeout, so this stays a fixed 20s: a hung origin fails the
+// request first and leaves about 10s for the spec to record it.
+const FETCH_TIMEOUT_MS = 20000;
 const MAX_REDIRECTS = 5;
 const REDIRECT = new Set([301, 302, 303, 307, 308]);
 const HOP_BY_HOP = new Set(["connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade", "host"]);
@@ -102,11 +106,11 @@ export async function installPreviewBypass(page, baseURL) {
     let url = current.href;
     let method = route.request().method();
     let postData = route.request().postDataBuffer() ?? undefined;
-    let headers = { ...route.request().headers(), [HEADER]: bypass };
+    let headers = { ...(await route.request().allHeaders()), [HEADER]: bypass };
     for (const key of HOP_BY_HOP) delete headers[key];
     try {
       for (let followed = 0; ; followed++) {
-        const result = await nodeFetch({ url, method, headers, body: postData, timeout: 5000 });
+        const result = await nodeFetch({ url, method, headers, body: postData, timeout: FETCH_TIMEOUT_MS });
         const status = result.status;
         const location = Array.isArray(result.headers.location) ? result.headers.location[0] : result.headers.location;
         if (!REDIRECT.has(status) || !location) {

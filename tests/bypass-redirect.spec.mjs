@@ -4,6 +4,7 @@ import { chromium, expect, test } from "@playwright/test";
 import { installPreviewBypass, setBypassFailureHook } from "./preview-bypass.mjs";
 
 const FIXTURE = ["FAKE", "BYPASS", "7f3a91"].join("-");
+const COOKIE = ["FAKE", "COOKIE", "c41d02"].join("-");
 
 function listen(handler, port) {
   return new Promise((resolve, reject) => {
@@ -227,5 +228,55 @@ test("303 becomes GET and 307 keeps the POST body", async () => {
     });
   } finally {
     await new Promise((resolve) => app.close(resolve));
+  }
+});
+
+test("a context cookie reaches the same-origin bypass hop and not the next origin", async () => {
+  const appHits = [];
+  const otherHits = [];
+  const record = (hits, req) => hits.push({
+    path: req.url.split("?")[0],
+    bypass: req.headers["x-vercel-protection-bypass"] ?? null,
+    cookie: req.headers.cookie ?? null,
+  });
+  const other = await listen((req, res) => {
+    record(otherHits, req);
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("other");
+  }, 3384);
+  const otherOrigin = `http://localhost:${other.address().port}`;
+  const app = await listen((req, res) => {
+    const path = req.url.split("?")[0];
+    record(appHits, req);
+    if (path === "/cookie-a") {
+      res.writeHead(302, { location: "/cookie-b" });
+      res.end();
+      return;
+    }
+    if (path === "/cookie-b") {
+      res.writeHead(302, { location: `${otherOrigin}/cookie-land` });
+      res.end();
+      return;
+    }
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("ok");
+  }, other.address().port + 1);
+  try {
+    await withPage(async (page) => {
+      const origin = originOf(app);
+      await page.context().addCookies([{ name: "session", value: COOKIE, url: origin }]);
+      await installPreviewBypass(page, origin);
+      await page.goto(`${origin}/cookie-a`);
+      await expect.poll(() => hit(otherHits, "/cookie-land")?.path).toBe("/cookie-land");
+      assert.equal(hit(appHits, "/cookie-a")?.cookie, `session=${COOKIE}`);
+      assert.equal(hit(appHits, "/cookie-b")?.cookie, `session=${COOKIE}`);
+      assert.equal(hit(appHits, "/cookie-a")?.bypass, FIXTURE);
+      assert.equal(hit(appHits, "/cookie-b")?.bypass, FIXTURE);
+      assert.equal(hit(otherHits, "/cookie-land")?.bypass, null);
+      assert.equal(hit(otherHits, "/cookie-land")?.cookie, null);
+    });
+  } finally {
+    await new Promise((resolve) => app.close(resolve));
+    await new Promise((resolve) => other.close(resolve));
   }
 });
