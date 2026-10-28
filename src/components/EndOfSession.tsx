@@ -39,12 +39,13 @@ export default function EndOfSession() {
   if (!hydrated || gamesLoading || news.loading || gamesFailed || newsFailed) return null;
 
   const live = coveredGames.some((game) => Boolean(game.data?.currentGame));
-  const hasGames = live || coveredTeams.some((team, index) => {
-    const data = coveredGames[index].data;
+  const hasGames = coveredGames.some((game) => {
+    const data = game.data;
     if (!data) return false;
-    if (team.id === selectedTeam.id) return Boolean(data.lastGame || data.nextGame);
-    const daysAgo = data.lastGame ? gameDaysAgo(data.lastGame.date) : null;
-    return Boolean(data.nextGame || daysAgo === 0 || daysAgo === 1);
+    if (data.currentGame) return true;
+    const finalDays = data.lastGame ? gameDaysAgo(data.lastGame.date) : null;
+    const nextDays = data.nextGame ? gameDaysAgo(data.nextGame.startTime || data.nextGame.date) : null;
+    return finalDays === 0 || finalDays === 1 || nextDays === 0;
   });
   const hasTeamNews = coveredTeams.some((team) => (feeds[team.name]?.items.length ?? 0) > 0);
   const severalTeams = coveredTeams.length > 1;
