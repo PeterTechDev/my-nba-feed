@@ -68,13 +68,23 @@ function hoursAgo(hours) {
 
 const beat = "Celtics beat Nets 118-107";
 const highlights = "Celtics highlights against the Nets";
+const injury = "Celtics injury report";
+const beatUrl = "https://upstream.example/celtics/beat";
+const highlightsUrl = "https://upstream.example/celtics/highlights";
+const injuryUrl = "https://upstream.example/celtics/injury";
 
 function newsFetch() {
   const items = [
-    { title: beat, link: "https://news.google.com/rss/articles/beat1", pubDate: hoursAgo(1) },
-    { title: highlights, link: "https://news.google.com/rss/articles/hl1", pubDate: hoursAgo(2) },
+    { title: beat, link: beatUrl, pubDate: hoursAgo(1) },
+    { title: highlights, link: highlightsUrl, pubDate: hoursAgo(2) },
   ];
   return async () => ({ ok: true, text: async () => rss(items) });
+}
+
+function eachNews(body, visit) {
+  const items = Array.isArray(body) ? body : body.feeds.Celtics.items;
+  const walk = (item) => { visit(item); for (const related of item.related ?? []) walk(related); };
+  items.forEach(walk);
 }
 
 function callNews(route, query, spoilers) {
@@ -115,7 +125,10 @@ test("news stays redacted until x-nba-spoilers is none", async () => {
   const spoiler = hidden.find((item) => item.redacted && item.title === "Spoiler-protected headline from ESPN");
   assert.ok(spoiler, "closed news redacts the spoiler headline");
   assert.equal(spoiler.isSpoiler, true);
+  assert.equal(hidden.every((item) => item.link === null), true);
   assert.equal(JSON.stringify(closed.body).includes("118-107"), false);
+  assert.equal(JSON.stringify(closed.body).includes(beatUrl), false);
+  assert.equal(JSON.stringify(closed.body).includes(highlightsUrl), false);
   const revealed = await callNews(route, "team=Celtics", "none");
   assert.equal(revealed.status, 200);
   assertCache(revealed, "news revealed");
@@ -123,6 +136,8 @@ test("news stays redacted until x-nba-spoilers is none", async () => {
   assert.ok(open);
   assert.equal(open.isSpoiler, true);
   assert.equal(open.redacted, undefined);
+  assert.equal(open.link, beatUrl);
+  assert.equal(revealed.body.find((item) => item.title === highlights).link, highlightsUrl);
   assert.equal((await callNews(route, "team=NotATeam")).status, 400);
   assertCache(await callNews(route, "team=NotATeam"), "news 400");
   const semicolon = await callNews(route, "team=Celtics", "none;");
@@ -132,23 +147,56 @@ test("news stays redacted until x-nba-spoilers is none", async () => {
 
 test("grupo com um spoiler no related sai todo redigido sem header e inteiro com none", async () => {
   const route = newsStack(async () => ({ ok: true, text: async () => rss([
-    { title: highlights, link: "https://news.google.com/rss/articles/hl1", pubDate: hoursAgo(1) },
-    { title: beat, link: "https://news.google.com/rss/articles/beat1", pubDate: hoursAgo(2) },
+    { title: highlights, link: highlightsUrl, pubDate: hoursAgo(1) },
+    { title: beat, link: beatUrl, pubDate: hoursAgo(2) },
+    { title: injury, link: injuryUrl, pubDate: hoursAgo(3) },
   ]) }));
   const closed = await callNews(route, "team=Celtics");
   const top = closed.body;
-  assert.equal(top.length, 1);
-  assert.equal(top[0].isSpoiler, true);
-  assert.equal(top[0].title, "Spoiler-protected headline from ESPN");
-  assert.equal(top[0].related?.length, 1);
-  assert.equal(top[0].related[0].isSpoiler, true);
-  assert.equal(top[0].related[0].title, "Spoiler-protected headline from ESPN");
-  assert.equal(JSON.stringify(closed.body).includes("highlights against"), false);
-  assert.equal(JSON.stringify(closed.body).includes("118-107"), false);
+  const group = top.find((item) => item.related?.length);
+  const plain = top.find((item) => item.title === injury);
+  assert.ok(group);
+  assert.equal(group.isSpoiler, true);
+  assert.equal(group.title, "Spoiler-protected headline from ESPN");
+  assert.equal(group.link, null);
+  assert.equal(group.related.length, 1);
+  assert.equal(group.related[0].isSpoiler, true);
+  assert.equal(group.related[0].title, "Spoiler-protected headline from ESPN");
+  assert.equal(group.related[0].link, null);
+  assert.equal(plain.link, injuryUrl);
+  assert.equal(plain.isSpoiler, false);
+  const closedJson = JSON.stringify(closed.body);
+  assert.equal(closedJson.includes(highlightsUrl), false);
+  assert.equal(closedJson.includes(beatUrl), false);
+  assert.equal(closedJson.includes("118-107"), false);
+  assert.equal(closedJson.includes("highlights against"), false);
   const revealed = await callNews(route, "team=Celtics", "none");
   const open = flatNews(revealed.body);
-  assert.equal(open.find((item) => item.title === highlights).isSpoiler, false);
-  assert.equal(open.find((item) => item.title === beat).isSpoiler, true);
+  assert.equal(open.find((item) => item.title === highlights).link, highlightsUrl);
+  assert.equal(open.find((item) => item.title === beat).link, beatUrl);
+  assert.equal(open.find((item) => item.title === injury).link, injuryUrl);
+  const openedRelated = await callNews(route, `team=Celtics&reveal=${encodeURIComponent(beatUrl)}`);
+  let openedBeat = null;
+  let sealedParent = null;
+  eachNews(openedRelated.body, (item) => {
+    if (item.link === beatUrl) openedBeat = item;
+    if (item.title === "Spoiler-protected headline from ESPN") sealedParent = item;
+  });
+  assert.equal(openedBeat.title, beat);
+  assert.equal(openedBeat.redacted, undefined);
+  assert.equal(sealedParent.link, null);
+  assert.equal(JSON.stringify(openedRelated.body).includes(highlightsUrl), false);
+  const openedParent = await callNews(route, `team=Celtics&reveal=${encodeURIComponent(highlightsUrl)}`);
+  let openedHighlights = null;
+  let sealedRelated = null;
+  eachNews(openedParent.body, (item) => {
+    if (item.link === highlightsUrl) openedHighlights = item;
+    if (item.link === null && item.related === undefined) sealedRelated = item;
+  });
+  assert.equal(openedHighlights.title, highlights);
+  assert.equal(openedHighlights.link, highlightsUrl);
+  assert.equal(sealedRelated.link, null);
+  assert.equal(JSON.stringify(openedParent.body).includes(beatUrl), false);
 });
 
 test("digest stays redacted until x-nba-spoilers is none", async () => {

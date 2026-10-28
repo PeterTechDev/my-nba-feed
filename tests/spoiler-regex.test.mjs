@@ -293,7 +293,21 @@ const boundaryNegatives = [
   { headline: "floss routine", expected: false, reason: "floss contém loss" },
 ];
 
-const cases = [...acceptedPrice, ...devTable, ...devScripts, ...criterionSpellings, ...roundTwo, ...scoreFormats, ...scoreBandEdges, ...seriesTriggers, ...newVerbForms, ...obviousNegatives, ...boundaryNegatives];
+// a31986e: victory/win over, N-N start, box scores, push past. O lookahead deixa o decimal de fora.
+const roundThree = [
+  { headline: "Karl-Anthony Towns, Knicks avert 0-4 start with victory over Pistons", expected: true, reason: "0-4 start e victory over" },
+  { headline: "victory over", expected: true, reason: "só victory over" },
+  { headline: "win over", expected: true, reason: "só win over" },
+  { headline: "0-4 start", expected: true, reason: "N-N start com hífen" },
+  { headline: "0\u20134 start", expected: true, reason: "N-N start com en dash" },
+  { headline: "box scores", expected: true, reason: "box scores no plural" },
+  { headline: "push past", expected: true, reason: "só push past" },
+  { headline: "pushes the ball past", expected: true, reason: "só pushes … past" },
+  { headline: "pushed Boston past", expected: true, reason: "só pushed … past" },
+  { headline: "Oct. 28 - 95.7 WDAE", expected: false, reason: "28 - 95.7 é decimal, não placar" },
+];
+
+const cases = [...acceptedPrice, ...devTable, ...devScripts, ...criterionSpellings, ...roundTwo, ...scoreFormats, ...scoreBandEdges, ...seriesTriggers, ...newVerbForms, ...roundThree, ...obviousNegatives, ...boundaryNegatives];
 const seen = new Set();
 for (const row of cases) {
   assert.equal(seen.has(row.headline), false, `duplicate headline: ${row.headline}`);
