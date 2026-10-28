@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -8,6 +8,57 @@ import Modal from "./Modal";
 import FavoriteTeamsModal from "./FavoriteTeamsModal";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { useSpoilerContext } from "./SpoilerModeProvider";
+
+function RevealSpoilersDialog({ onDismiss, onConfirm, returnFocusRef }: {
+  onDismiss: () => void;
+  onConfirm: () => void;
+  returnFocusRef: React.RefObject<HTMLButtonElement>;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const previousFocus = document.activeElement;
+    const opener = returnFocusRef.current;
+    const previousOverflow = document.body.style.overflow;
+    if (!dialog.open) dialog.showModal();
+    document.body.style.overflow = "hidden";
+    cancelRef.current?.focus();
+    return () => {
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+      if (opener?.isConnected) opener.focus();
+      else if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+    };
+  }, [returnFocusRef]);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      id="reveal-spoilers"
+      aria-labelledby="reveal-spoilers-title"
+      aria-describedby="reveal-spoilers-description"
+      onCancel={(event) => { event.preventDefault(); onDismiss(); }}
+      onClick={(event) => { if (event.target === event.currentTarget) onDismiss(); }}
+      className="m-auto max-h-[85dvh] w-[calc(100%_-_2rem)] max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#141414] p-0 text-white backdrop:bg-black/75"
+    >
+      <form className="p-5 sm:p-6" onSubmit={(event) => { event.preventDefault(); onDismiss(); }}>
+        <h2 id="reveal-spoilers-title" className="text-xl font-bold">Show scores and headlines?</h2>
+        <p id="reveal-spoilers-description" className="mt-2 text-sm text-white/70">Scores, records and headlines will show across NBA Feed. This choice is saved in this browser.</p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button ref={cancelRef} type="submit" autoFocus className="min-h-11 w-full rounded-lg bg-white/10 px-4 text-sm font-medium text-white hover:bg-white/20 sm:w-auto">
+            Keep hidden
+          </button>
+          <button type="button" onClick={onConfirm} className="min-h-11 w-full rounded-lg border border-white/15 px-4 text-sm font-medium text-amber-300 hover:bg-amber-500/10 sm:w-auto">
+            Show scores and headlines
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
 
 const links = [
   { href: "/standings", label: "Standings", icon: BarChart3 },
@@ -26,8 +77,37 @@ export default function NavBar() {
   const [myTeamsOpen, setMyTeamsOpen] = useState(false);
   const { favoriteTeamIds } = useFavoriteTeams();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmReveal, setConfirmReveal] = useState(false);
+  const [revealNotice, setRevealNotice] = useState(false);
+  const protectionButtonRef = useRef<HTMLButtonElement>(null);
   const mobileProtection = spoilerFree ? "Spoilers hidden" : hideScores ? "Scores hidden" : hideHeadlines ? "Headlines hidden" : "Spoilers shown";
   const protection = `${mobileProtection} by default`;
+
+  useEffect(() => {
+    if (revealNotice && (hideScores || hideHeadlines)) setRevealNotice(false);
+  }, [hideScores, hideHeadlines, revealNotice]);
+
+  function onProtectionClick() {
+    if (spoilerFree) {
+      setConfirmReveal(true);
+      return;
+    }
+    toggleSpoiler();
+    setRevealNotice(false);
+  }
+
+  function confirmShowSpoilers() {
+    toggleSpoiler();
+    setRevealNotice(true);
+    setConfirmReveal(false);
+  }
+
+  function hideAgain() {
+    if (spoilerFree) return;
+    toggleSpoiler();
+    setRevealNotice(false);
+    protectionButtonRef.current?.focus();
+  }
 
   const navigationLinks = links.map((link) => {
     const active = pathname === link.href;
@@ -50,7 +130,9 @@ export default function NavBar() {
           </Link>
           <div className="hidden xl:flex xl:items-center">{navigationLinks}</div>
           <div className="flex items-center gap-1 xl:ml-auto xl:border-l xl:border-white/10 xl:pl-3">
-          <button type="button" onClick={toggleSpoiler}
+          <button ref={protectionButtonRef} type="button" onClick={onProtectionClick}
+            aria-haspopup={spoilerFree ? "dialog" : undefined}
+            aria-controls={confirmReveal ? "reveal-spoilers" : undefined}
             aria-label={`${protection}. ${spoilerFree ? "Show scores and headlines by default" : "Hide scores and headlines by default"}`}
             title={`${protection}. Individual items can be revealed.`}
             aria-pressed={spoilerFree ? true : hideScores || hideHeadlines ? "mixed" : false}
@@ -84,6 +166,16 @@ export default function NavBar() {
             <Settings aria-hidden="true" className="h-4 w-4" />Spoiler settings
           </button>
         </div>
+      </div>
+      <div role="status" aria-live="polite" aria-atomic="true" className={revealNotice ? "border-t border-white/10" : "sr-only"}>
+        {revealNotice && (
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 px-4 sm:px-8">
+            <span className="text-sm text-white">Scores and headlines are shown.</span>
+            <button type="button" onClick={hideAgain} className="min-h-11 rounded-lg px-3 text-sm font-medium text-amber-300 hover:bg-amber-500/10">
+              Hide again
+            </button>
+          </div>
+        )}
       </div>
     </nav>
     {settingsOpen && (
@@ -119,6 +211,13 @@ export default function NavBar() {
       </Modal>
     )}
     {myTeamsOpen && <FavoriteTeamsModal onClose={() => setMyTeamsOpen(false)} />}
+    {confirmReveal && (
+      <RevealSpoilersDialog
+        returnFocusRef={protectionButtonRef}
+        onDismiss={() => setConfirmReveal(false)}
+        onConfirm={confirmShowSpoilers}
+      />
+    )}
     </>
   );
 }
