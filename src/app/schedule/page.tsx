@@ -3,6 +3,7 @@ import { useRemoteData } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
 import TeamSelector from "@/components/TeamSelector";
 import GoogleCalendarLink from "@/components/GoogleCalendarLink";
+import GameRecapLink from "@/components/GameRecapLink";
 import { useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
@@ -37,7 +38,7 @@ function getFirstDayOfWeek(year: number, month: number) {
 
 export default function SchedulePage() {
   const { selectedTeam } = useTeam();
-  const { hideScores } = useSpoilerContext();
+  const { hideScores, hideHeadlines } = useSpoilerContext();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"calendar" | "list">("calendar");
 
@@ -94,6 +95,7 @@ export default function SchedulePage() {
       </div>
 
       {error ? <DataError subject="the schedule" retry={retry} /> : <>
+      {(hideScores || hideHeadlines) && games.some((game) => isFinalStatus(game.status)) && <p className="mb-4 text-xs text-white/70">YouTube recaps may contain spoilers.</p>}
       {/* Desktop: Calendar grid */}
       {!loading && games.length === 0 && view === "calendar" && <p role="status" className="hidden md:block mb-4 text-sm text-white/70">No games scheduled this month. Choose another month or focus team.</p>}
       <div className={`${view === "calendar" ? "hidden md:block" : "hidden"} rounded-xl bg-[#161616] border border-[#2a2a2a] overflow-hidden`}>
@@ -153,6 +155,7 @@ export default function SchedulePage() {
                       )}
                       {!isFinal && <div className="text-white/70 break-words">{gameStatus(game)}</div>}
                       <GoogleCalendarLink game={game} compact />
+                      {isFinal && <GameRecapLink teamId={selectedTeam.id} date={game.date} homeTeam={game.homeTeam.name} awayTeam={game.awayTeam.name} />}
                     </div>
                   )}
                 </div>
@@ -204,6 +207,7 @@ export default function SchedulePage() {
                         {new Date(year, month, day).toLocaleDateString("en-US", { weekday: "short" })}
                       </p>
                       <GoogleCalendarLink game={game} compact />
+                      {isFinal && <GameRecapLink teamId={selectedTeam.id} date={game.date} homeTeam={game.homeTeam.name} awayTeam={game.awayTeam.name} />}
                     </div>
                   </div>
                   {isFinal ? (
