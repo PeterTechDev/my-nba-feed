@@ -657,17 +657,76 @@ test("a 22:00 EDT tipoff still belongs to that Eastern day on the hero", () => {
   }
 });
 
+function zoneDay(iso, timeZone) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+}
+
 test("the hero date line uses the Eastern day of a late tipoff", () => {
   const clock = "2026-10-28T02:00:00Z";
+  assert.equal(zoneDay(clock, "America/New_York"), "2026-10-27");
+  assert.equal(zoneDay(clock, "UTC"), "2026-10-28");
+  assert.equal(zoneDay(clock, "Asia/Tokyo"), "2026-10-28");
+  assert.equal(zoneDay(clock, "Pacific/Kiritimati"), "2026-10-28");
   const nbaDates = datesAt(clock);
+  assert.equal(nbaDates.gameDaysAgo(clock, new Date(clock)), 0);
   const view = renderHero({
     currentGame: null,
     nextGame: scheduledGame(celtics, "2026-10-27", clock),
   }, nbaDates);
   try {
+    assert.match(view.container.textContent, /vs Nets/);
     assert.match(view.container.textContent, /Today/);
     assert.match(view.container.textContent, /Oct 27 · Home/);
     assert.doesNotMatch(view.container.textContent, /Oct 28/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("the hero date line stays on Oct 27 when Bahia has already reached Oct 28", () => {
+  const clock = "2026-10-28T03:30:00Z";
+  const start = "2026-10-28T03:45:00Z";
+  assert.equal(zoneDay(clock, "America/New_York"), "2026-10-27");
+  assert.equal(zoneDay(clock, "America/Bahia"), "2026-10-28");
+  assert.equal(zoneDay(start, "America/New_York"), "2026-10-27");
+  assert.equal(zoneDay(start, "America/Bahia"), "2026-10-28");
+  assert.equal(zoneDay(start, "UTC"), "2026-10-28");
+  assert.equal(zoneDay(start, "Asia/Tokyo"), "2026-10-28");
+  assert.equal(zoneDay(start, "Pacific/Kiritimati"), "2026-10-28");
+  const nbaDates = datesAt(clock);
+  assert.equal(nbaDates.gameDaysAgo(start, new Date(clock)), 0);
+  const view = renderHero({
+    currentGame: null,
+    nextGame: scheduledGame(celtics, "2026-10-27", start),
+  }, nbaDates);
+  try {
+    assert.match(view.container.textContent, /vs Nets/);
+    assert.match(view.container.textContent, /Today/);
+    assert.match(view.container.textContent, /Oct 27 · Home/);
+    assert.doesNotMatch(view.container.textContent, /Oct 28/);
+  } finally {
+    view.unmount();
+  }
+});
+
+test("the hero date line is Oct 28 just after Eastern midnight while Los Angeles is still on Oct 27", () => {
+  const clock = "2026-10-28T04:30:00Z";
+  const start = "2026-10-28T05:00:00Z";
+  assert.equal(zoneDay(clock, "America/New_York"), "2026-10-28");
+  assert.equal(zoneDay(clock, "America/Los_Angeles"), "2026-10-27");
+  assert.equal(zoneDay(start, "America/New_York"), "2026-10-28");
+  assert.equal(zoneDay(start, "America/Los_Angeles"), "2026-10-27");
+  const nbaDates = datesAt(clock);
+  assert.equal(nbaDates.gameDaysAgo(start, new Date(clock)), 0);
+  const view = renderHero({
+    currentGame: null,
+    nextGame: scheduledGame(celtics, "2026-10-28", start),
+  }, nbaDates);
+  try {
+    assert.match(view.container.textContent, /vs Nets/);
+    assert.match(view.container.textContent, /Today/);
+    assert.match(view.container.textContent, /Oct 28 · Home/);
+    assert.doesNotMatch(view.container.textContent, /Oct 27/);
   } finally {
     view.unmount();
   }
