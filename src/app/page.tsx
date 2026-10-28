@@ -53,7 +53,7 @@ function FeedContent() {
           {!hasPersonalized && <NewsFeed {...focus} news={focus.news.slice(1)} />}
           {hasPersonalized && <details className="border-t border-white/10 pt-2">
             <summary className="min-h-11 cursor-pointer py-3 font-medium text-white/70 hover:text-white">Around the League</summary>
-            <LeagueNewsSection {...newsState("NBA")} news={newsState("NBA").news.filter((item) => !headlineIsAboutTeam(item.title, selectedTeam))} />
+            <LeagueNewsSection {...newsState("NBA")} news={newsState("NBA").news.filter((item) => !headlineIsAboutTeam(item.title, selectedTeam)).slice(0, 6)} />
           </details>}
         </div>
       </details>
