@@ -1,3 +1,4 @@
+import { fetchBallDontLie } from "@/lib/ballDontLie";
 import { NextRequest, NextResponse } from "next/server";
 import { getTeamById } from "@/lib/teams";
 
@@ -18,9 +19,7 @@ export async function GET(req: NextRequest) {
   const key = process.env.BALLDONTLIE_KEY;
   if (key) {
     try {
-      const response = await fetch(`https://api.balldontlie.io/v1/players/active?team_ids[]=${team.id}&per_page=100`, {
-        headers: { Authorization: key }, next: { revalidate: 3600 }, signal: AbortSignal.timeout(5000),
-      });
+      const response = await fetchBallDontLie(`https://api.balldontlie.io/v1/players/active?team_ids[]=${team.id}&per_page=100`, 3600);
       if (response.ok) {
         const json = await response.json();
         if (!Array.isArray(json.data) || json.meta?.next_cursor) throw new Error("Incomplete active roster");

@@ -1,3 +1,4 @@
+import { leagueServices, publishStandings } from "./helpers/league-services.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -9,12 +10,13 @@ import { createElement } from "react";
 
 const require = createRequire(import.meta.url);
 function load(file, globals = {}, imports = {}) {
+  imports = { ...leagueServices(globals.fetch), ...imports };
   const source = readFileSync(new URL("../src/" + file, import.meta.url), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX,
   } }).outputText;
   const exports = {};
-  const scope = { exports, require: (id) => imports[id] ?? (id.endsWith(".module.css") ? { default: new Proxy({}, { get: (_target, key) => key }) } : require(id)), Date, URL, AbortSignal, Response, Buffer, setTimeout, ...globals };
+  const scope = { exports, URLSearchParams, Buffer, require: (id) => imports[id] ?? (id.endsWith(".module.css") ? { default: new Proxy({}, { get: (_target, key) => key }) } : require(id)), Date, URL, AbortSignal, Response, Buffer, setTimeout, ...globals };
   vm.runInNewContext(code, scope);
   return { exports, code, scope };
 }
@@ -57,7 +59,7 @@ function nbaHighlightWindow(at) {
 function loadDatedLeagueRoutes(at, fetch) {
   const { FixedDate } = fixedClock(at);
   const nbaDates = load("lib/nbaDate.ts", { Date: FixedDate }).exports;
-  const globals = { Date: FixedDate, process: { env: { BALLDONTLIE_KEY: "fixture" } }, fetch };
+  const globals = { Date: FixedDate, process: { env: { BALLDONTLIE_KEY: "fixture", DIGEST_PUBLISH_TOKEN: "fixture-publisher" } }, fetch };
   const routeImports = { ...imports, "@/lib/nbaDate": nbaDates };
   return {
     nbaDates,
@@ -682,7 +684,7 @@ test("active roster uses the active endpoint, and ESPN fallback never returns hi
     if (url.includes("balldontlie")) return { ok: !failActive, json: async () => ({ data: [{ id: 1, first_name: "Active", last_name: "Player" }] }) };
     return { ok: true, json: async () => ({ athletes: [{ id: "4", firstName: "Current", lastName: "Player", jersey: "7", position: { abbreviation: "G" } }] }) };
   };
-  const route = load("app/api/players/route.ts", { process: { env: { BALLDONTLIE_KEY: "fixture" } }, fetch }, imports).exports;
+  const route = load("app/api/players/route.ts", { process: { env: { BALLDONTLIE_KEY: "fixture", DIGEST_PUBLISH_TOKEN: "fixture-publisher" } }, fetch }, imports).exports;
   const request = { nextUrl: new URL("http://localhost/api/players?teamId=16") };
   let result = await route.GET(request);
   assert.match(urls[0], /\/players\/active\?team_ids\[\]=16/);
@@ -703,11 +705,13 @@ test("schedule preserves tipoff/postponement and overtime finals count in standi
   assert.equal(result.body.games[0].startTime, "2026-10-27T23:30:00.000Z");
   assert.equal(result.body.games[0].status, "Postponed");
   games = [{ ...games[0], postponed: false, status: "Final/OT", home_team_score: 118, visitor_team_score: 114 }];
+  await publishStandings(standings);
   const table = await standings.GET();
   assert.equal(table.body.standings.find((team) => team.id === 2).wins, 1);
   assert.equal(table.body.season, 2026);
   assert.equal(table.body.asOf, "2026-10-27");
   const beforeMidnight = loadDatedLeagueRoutes("2026-10-28T03:00:00Z", fetch);
+  await publishStandings(beforeMidnight.standings);
   const evening = await beforeMidnight.standings.GET();
   assert.equal(evening.body.asOf, "2026-10-27", "2026-10-28T03:00:00Z is still 2026-10-27 in America/New_York");
   assert.equal(evening.body.season, 2026);
@@ -721,6 +725,7 @@ test("the NBA season changes on October 1 in America/New_York", async () => {
   ];
   for (const [at, season, label] of edges) {
     const { standings } = loadDatedLeagueRoutes(at, fetch);
+    await publishStandings(standings);
     const table = await standings.GET();
     assert.equal(table.body.season, season, label);
   }

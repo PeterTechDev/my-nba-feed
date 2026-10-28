@@ -1,12 +1,11 @@
-import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
+import { fetchBallDontLie } from "@/lib/ballDontLie";
+import { readDigestDocument, updateDigestDocument } from "@/lib/digestStorage";
+import { NextRequest, NextResponse } from "next/server";
 import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
 import { compareStandings, isFinalStatus } from "@/lib/gameStatus";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 interface TeamRecord {
   id: number;
@@ -42,65 +41,42 @@ interface BDLGamesResponse {
   };
 }
 
+interface Snapshot { standings: TeamRecord[]; season: number; asOf: string }
+interface State { snapshot: Snapshot | null; progress: { season: number; asOf: string; cursor: string | null; games: BDLGame[]; pages: number } | null }
+const DOCUMENT = "standings-cache.json";
+const EMPTY: State = { snapshot: null, progress: null };
+
 export async function GET() {
-  const key = process.env.BALLDONTLIE_KEY || "";
-  if (!key) return NextResponse.json({ standings: [], error: "API key not configured" }, { status: 503 });
-
-  const season = getNBASeason();
-
   try {
-    // Fetch all games for the season (paginated).
-    // NOTE: BallDontLie free tier can rate-limit (429) if we hammer it.
-    // We keep requests sequential + add retry/backoff on 429.
-    const allGames: BDLGame[] = [];
-    let cursor: string | null = null;
-    let page = 0;
+    const { snapshot } = await readDigestDocument<State>(DOCUMENT, EMPTY);
+    if (!snapshot || snapshot.season !== getNBASeason()) return NextResponse.json({ standings: [], error: "Standings are being updated" }, { status: 503, headers: { "Retry-After": "60" } });
+    return NextResponse.json({ ...snapshot, error: null });
+  } catch {
+    return NextResponse.json({ standings: [], error: "Standings storage unavailable" }, { status: 503 });
+  }
+}
 
-    const seasonStart = `${season}-10-01`;
-    const seasonEnd = formatNBADate();
-
-    const fetchPage = async (url: string) => {
-      let attempt = 0;
-      // a few attempts is enough to smooth over burst limits
-      while (attempt < 4) {
-        const res = await fetch(url, {
-          headers: { Authorization: key },
-          next: { revalidate: 3600 },
-        });
-
-        if (res.status !== 429) return res;
-
-        const retryAfter = Number(res.headers.get("retry-after") || "0");
-        const delayMs = retryAfter > 0 ? retryAfter * 1000 : 750 * (attempt + 1);
-        await sleep(delayMs);
-        attempt++;
-      }
-
-      return fetch(url, {
-        headers: { Authorization: key },
-        next: { revalidate: 3600 },
-      });
-    };
-
-    do {
-      const baseParams = `seasons[]=${season}&per_page=100&start_date=${seasonStart}&end_date=${seasonEnd}`;
-      const fetchUrl: string = cursor
-        ? `${BDL_BASE}/games?${baseParams}&cursor=${cursor}`
-        : `${BDL_BASE}/games?${baseParams}`;
-
-      const res = await fetchPage(fetchUrl);
-      if (!res.ok) return NextResponse.json({ standings: [], error: `API ${res.status}` }, { status: 502 });
-
-      const json: BDLGamesResponse = await res.json();
-      allGames.push(...(json.data || []));
-      cursor = json.meta?.next_cursor || null;
-      page++;
-
-      // small pacing to avoid burst limits even when not returning 429
-      await sleep(150);
-
-      if (page > 20) break; // safety limit
-    } while (cursor);
+export async function POST(req: NextRequest) {
+  const expected = process.env.DIGEST_PUBLISH_TOKEN;
+  const supplied = req.headers.get("authorization")?.replace(/^Bearer /i, "") ?? "";
+  if (!expected || Buffer.byteLength(expected) !== Buffer.byteLength(supplied) || !timingSafeEqual(Buffer.from(expected), Buffer.from(supplied))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const season = getNBASeason(), seasonEnd = formatNBADate();
+    const state = await readDigestDocument<State>(DOCUMENT, EMPTY);
+    const progress = state.progress?.season === season && state.progress.asOf === seasonEnd ? state.progress : { season, asOf: seasonEnd, cursor: null, games: [], pages: 0 };
+    const params = new URLSearchParams({ "seasons[]": String(season), per_page: "100", start_date: `${season}-10-01`, end_date: seasonEnd });
+    if (progress.cursor) params.set("cursor", progress.cursor);
+    const response = await fetchBallDontLie(`${BDL_BASE}/games?${params}`, 3600);
+    if (!response.ok) return NextResponse.json({ error: `API ${response.status}` }, { status: response.status === 429 ? 429 : 502, headers: { "Retry-After": response.headers.get("retry-after") ?? "60" } });
+    const json: BDLGamesResponse = await response.json();
+    if (!Array.isArray(json.data)) throw new Error("Invalid standings page");
+    const allGames = [...progress.games, ...json.data];
+    const cursor = json.meta?.next_cursor ? String(json.meta.next_cursor) : null;
+    if (cursor && (cursor === progress.cursor || progress.pages >= 20)) throw new Error("Incomplete standings pagination");
+    if (cursor) {
+      await updateDigestDocument<State>(DOCUMENT, EMPTY, (current) => ({ ...current, progress: { season, asOf: seasonEnd, cursor, games: allGames, pages: progress.pages + 1 } }));
+      return NextResponse.json({ complete: false }, { status: 202 });
+    }
 
     // Compute records
     const records: Record<number, TeamRecord> = {};
@@ -145,7 +121,8 @@ export async function GET() {
 
     const standings = Object.values(records).sort(compareStandings);
 
-    return NextResponse.json({ standings, season, asOf: seasonEnd, error: null });
+    await updateDigestDocument<State>(DOCUMENT, EMPTY, () => ({ snapshot: { standings, season, asOf: seasonEnd }, progress: null }));
+    return NextResponse.json({ complete: true });
   } catch {
     return NextResponse.json({ standings: [], error: "Failed to fetch" }, { status: 500 });
   }

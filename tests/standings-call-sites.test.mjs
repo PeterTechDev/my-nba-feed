@@ -1,3 +1,4 @@
+import { leagueServices, publishStandings } from "./helpers/league-services.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -9,13 +10,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const require = createRequire(import.meta.url);
 function load(file, globals = {}, imports = {}) {
+  imports = { ...leagueServices(globals.fetch), ...imports };
   const source = readFileSync(new URL("../src/" + file, import.meta.url), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX,
   } }).outputText;
   const exports = {};
   vm.runInNewContext(code, {
-    exports,
+    exports, URLSearchParams, Buffer,
     require: (id) => imports[id] ?? require(id),
     setTimeout, clearTimeout, AbortController, URL, Date,
     ...globals,
@@ -61,7 +63,8 @@ test("standings API returns compareStandings order, not numeric id order", async
     headers: { get: () => null },
     json: async () => ({ data: games, meta: { next_cursor: null } }),
   });
-  const route = load("app/api/standings/route.ts", { process: { env: { BALLDONTLIE_KEY: "fixture" } }, fetch }, imports);
+  const route = load("app/api/standings/route.ts", { process: { env: { BALLDONTLIE_KEY: "fixture", DIGEST_PUBLISH_TOKEN: "fixture-publisher" } }, fetch }, imports);
+  await publishStandings(route);
   const result = await route.GET();
   assert.equal(result.status, 200);
   // Copy out of the route's vm realm before deep equality.

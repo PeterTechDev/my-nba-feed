@@ -1,0 +1,25 @@
+name: Standings snapshot
+on:
+  schedule:
+    - cron: '40 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: standings-snapshot
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.21.1'
+      - run: node scripts/sync-standings.mjs
+        env:
+          DIGEST_PUBLISH_TOKEN: ${{ secrets.DIGEST_PUBLISH_TOKEN }}

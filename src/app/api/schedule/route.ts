@@ -1,6 +1,8 @@
+import { fetchBallDontLie } from "@/lib/ballDontLie";
 import { NextRequest, NextResponse } from "next/server";
 import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
 import { getGameStartTime } from "@/lib/gameStatus";
+import { getTeamById } from "@/lib/teams";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
@@ -23,11 +25,11 @@ interface BDLGame {
 }
 
 export async function GET(req: NextRequest) {
-  const teamId = req.nextUrl.searchParams.get("teamId");
+  const team = getTeamById(Number(req.nextUrl.searchParams.get("teamId")));
   const startDate = req.nextUrl.searchParams.get("start");
   const endDate = req.nextUrl.searchParams.get("end");
 
-  if (!teamId) return NextResponse.json({ games: [], error: "teamId required" }, { status: 400 });
+  if (!team) return NextResponse.json({ games: [], error: "Valid teamId required" }, { status: 400 });
 
   const key = process.env.BALLDONTLIE_KEY || "";
   if (!key) return NextResponse.json({ games: [], error: "API key not configured" }, { status: 503 });
@@ -37,27 +39,17 @@ export async function GET(req: NextRequest) {
     const defaultStart = `${season}-10-01`;
     const defaultEnd = formatNBADate();
 
-    let url = `${BDL_BASE}/games?team_ids[]=${teamId}&per_page=100`;
-    url += `&start_date=${startDate || defaultStart}`;
-    url += `&end_date=${endDate || defaultEnd}`;
-
-    let res = await fetch(url, {
-      headers: { Authorization: key },
-      next: { revalidate: 300 },
-    });
-
-    // smooth over BallDontLie burst limits
-    if (res.status === 429) {
-      const retryAfter = Number(res.headers.get("retry-after") || "0");
-      const delayMs = retryAfter > 0 ? retryAfter * 1000 : 1000;
-      await new Promise((r) => setTimeout(r, delayMs));
-      res = await fetch(url, {
-        headers: { Authorization: key },
-        next: { revalidate: 300 },
-      });
+    const start = startDate ?? defaultStart, end = endDate ?? defaultEnd;
+    const validDate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
+    if (!validDate(start) || !validDate(end) || start > end || Date.parse(end) - Date.parse(start) > 366 * 86400000 || start < `${season - 1}-01-01` || end > `${season + 2}-12-31`) {
+      return NextResponse.json({ games: [], error: "Valid dates and a range of at most 366 days required" }, { status: 400 });
     }
+    const params = new URLSearchParams({ "team_ids[]": String(team.id), per_page: "100", start_date: start, end_date: end });
+    const url = `${BDL_BASE}/games?${params}`;
 
-    if (!res.ok) return NextResponse.json({ games: [], error: `API ${res.status}` }, { status: 502 });
+    const res = await fetchBallDontLie(url, 300);
+
+    if (!res.ok) return NextResponse.json({ games: [], error: `API ${res.status}` }, { status: res.status === 429 ? 503 : 502, headers: { "Retry-After": res.headers?.get("retry-after") ?? "60" } });
 
     const json = await res.json();
     const games = ((json.data || []) as BDLGame[]).map((g) => ({

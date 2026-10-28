@@ -4,6 +4,8 @@
 
 **Live →** [my-nba-feed.vercel.app](https://my-nba-feed.vercel.app)
 
+API caching, shared quota limits and standings snapshot setup: [API cache](docs/api-cache.md).
+
 ---
 
 ## The Problem

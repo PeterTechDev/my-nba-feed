@@ -1,15 +1,10 @@
 import { Youtube } from "lucide-react";
-import { useRemoteData } from "@/hooks/useRemoteData";
-import { getHighlightUrl, type HighlightsResponse } from "@/lib/api";
-import { formatNBADate } from "@/lib/nbaDate";
+import { getHighlightUrl, type HighlightVideo } from "@/lib/api";
 
-export default function GameRecapLink({ teamId, date, homeTeam, awayTeam }: {
-  teamId: number; date: string; homeTeam: string; awayTeam: string;
+export default function GameRecapLink({ date, homeTeam, awayTeam, video }: {
+  date: string; homeTeam: string; awayTeam: string; video?: HighlightVideo;
 }) {
   const gameDate = date.slice(0, 10);
-  const recent = gameDate >= formatNBADate(new Date(Date.now() - 30 * 86400000)) && gameDate <= formatNBADate();
-  const { data } = useRemoteData<HighlightsResponse>(recent ? `/api/highlights?teamId=${teamId}&dates=${gameDate}` : null);
-  const video = data?.videos[gameDate];
   const label = `${video ? "Watch" : "Find"} ${awayTeam} at ${homeTeam} recap on YouTube (opens in a new tab)`;
   return (
     <a href={video?.url ?? getHighlightUrl(awayTeam, homeTeam, gameDate)} target="_blank" rel="noopener noreferrer"

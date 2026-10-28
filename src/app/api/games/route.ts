@@ -1,6 +1,8 @@
+import { fetchBallDontLie } from "@/lib/ballDontLie";
 import { NextRequest, NextResponse } from "next/server";
 import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
 import { getGameStartTime, isFinalStatus, isLiveStatus } from "@/lib/gameStatus";
+import { getTeamById } from "@/lib/teams";
 
 const BDL_BASE = "https://api.balldontlie.io/v1";
 
@@ -50,10 +52,11 @@ function responseInit(status = 200) {
 }
 
 export async function GET(req: NextRequest) {
-  const teamId = req.nextUrl.searchParams.get("teamId");
-  if (!teamId) {
+  const team = getTeamById(Number(req.nextUrl.searchParams.get("teamId")));
+  if (!team) {
     return NextResponse.json({ error: "teamId required" }, responseInit(400));
   }
+  const teamId = String(team.id);
 
   const key = process.env.BALLDONTLIE_KEY || "";
   if (!key) {
@@ -67,16 +70,13 @@ export async function GET(req: NextRequest) {
   const url = `${BDL_BASE}/games?team_ids[]=${teamId}&seasons[]=${season}&per_page=100`;
 
   try {
-    const res = await fetch(url, {
-      headers: { Authorization: key },
-      next: { revalidate: 30 },
-    });
+    const res = await fetchBallDontLie(url, 30);
 
     if (!res.ok) {
       const status = res.status;
       return NextResponse.json(
         { error: `BallDontLie API returned ${status}`, lastGame: null, currentGame: null, nextGame: null, record: { wins: 0, losses: 0 } },
-        responseInit(502)
+        { status: status === 429 ? 503 : 502, headers: { ...responseInit().headers, "Retry-After": res.headers?.get("retry-after") ?? "60" } }
       );
     }
 

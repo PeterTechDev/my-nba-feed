@@ -1,3 +1,4 @@
+import { leagueServices } from "./helpers/league-services.mjs";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -11,6 +12,7 @@ const require = createRequire(import.meta.url);
 const root = new URL("../", import.meta.url);
 
 function load(file, globals = {}, imports = {}, extra = "") {
+  imports = { ...leagueServices(globals.fetch), ...imports };
   const source = readFileSync(new URL("../src/" + file, import.meta.url), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX,
@@ -250,9 +252,9 @@ test("games stay redacted until x-nba-spoilers is none", async () => {
     { id: 12, date: shift(today, 1), status: "7:30 pm ET", home_team: home, visitor_team: away, home_team_score: 0, visitor_team_score: 0 },
   ];
   const route = load("app/api/games/route.ts", {
-    process: { env: { BALLDONTLIE_KEY: "fixture" } },
+    process: { env: { BALLDONTLIE_KEY: "fixture", DIGEST_PUBLISH_TOKEN: "fixture-publisher" } },
     fetch: async () => ({ ok: true, json: async () => ({ data: games }) }),
-  }, { ...server, "@/lib/nbaDate": dates, "@/lib/gameStatus": status }).exports;
+  }, { ...server, "@/lib/teams": { getTeamById: id => id >= 1 && id <= 30 ? { id } : undefined }, "@/lib/nbaDate": dates, "@/lib/gameStatus": status }).exports;
   const call = (spoilers, query = "teamId=2") => route.GET({
     nextUrl: new URL("http://localhost/api/games?" + query),
     headers: spoilers ? new Headers({ "x-nba-spoilers": spoilers }) : new Headers(),

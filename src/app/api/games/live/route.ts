@@ -1,3 +1,4 @@
+import { fetchBallDontLie } from "@/lib/ballDontLie";
 import { NextResponse } from "next/server";
 import { formatNBADate } from "@/lib/nbaDate";
 
@@ -28,12 +29,9 @@ export async function GET() {
   const today = formatNBADate();
 
   try {
-    const res = await fetch(`${BDL_BASE}/games?dates[]=${today}&per_page=100`, {
-      headers: { Authorization: key },
-      next: { revalidate: 30 },
-    });
+    const res = await fetchBallDontLie(`${BDL_BASE}/games?dates[]=${today}&per_page=100`, 30);
 
-    if (!res.ok) return NextResponse.json({ games: [], error: `API ${res.status}` }, { status: 502 });
+    if (!res.ok) return NextResponse.json({ games: [], error: `API ${res.status}` }, { status: res.status === 429 ? 503 : 502, headers: { "Retry-After": res.headers?.get("retry-after") ?? "60" } });
 
     const json = await res.json();
     const games = ((json.data || []) as BDLGame[]).map((g) => ({

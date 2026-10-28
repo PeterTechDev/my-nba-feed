@@ -1,3 +1,4 @@
+import { leagueServices } from "./helpers/league-services.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -7,10 +8,11 @@ import ts from "typescript";
 
 const require = createRequire(import.meta.url);
 function load(file, globals = {}, imports = {}) {
+  imports = { ...leagueServices(globals.fetch), ...imports };
   const source = readFileSync(new URL("../src/" + file, import.meta.url), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const exports = {};
-  vm.runInNewContext(code, { exports, require: (id) => imports[id] ?? require(id), ...globals });
+  vm.runInNewContext(code, { exports, URLSearchParams, Buffer, require: (id) => imports[id] ?? require(id), ...globals });
   return exports;
 }
 const status = load("lib/gameStatus.ts");
@@ -99,11 +101,11 @@ test("games API separates scheduled, live, final and postponed games", async () 
     { ...base, id: 3, date: "2026-10-27", status: "Postponed", postponed: true },
   ];
   const route = load("app/api/games/route.ts", {
-    Date: FixedDate, process: { env: { BALLDONTLIE_KEY: "fixture" } },
+    Date: FixedDate, process: { env: { BALLDONTLIE_KEY: "fixture", DIGEST_PUBLISH_TOKEN: "fixture-publisher" } },
     fetch: async () => ({ ok: true, json: async () => ({ data: games }) }),
   }, {
     "next/server": { NextResponse: { json: (body) => body } },
-    "@/lib/nbaDate": dates, "@/lib/gameStatus": status,
+    "@/lib/nbaDate": dates, "@/lib/gameStatus": status, "@/lib/teams": { getTeamById: id => ({ id }) },
   });
   const request = { nextUrl: new URL("http://localhost/api/games?teamId=2"), headers: new Headers({ "x-nba-spoilers": "none" }) };
   let result = await route.GET(request);

@@ -1,5 +1,5 @@
 "use client";
-import { useRemoteData } from "@/hooks/useRemoteData";
+import { useRemoteData, useRemoteDataAll } from "@/hooks/useRemoteData";
 import DataError from "@/components/DataError";
 import TeamSelector from "@/components/TeamSelector";
 import GoogleCalendarLink from "@/components/GoogleCalendarLink";
@@ -7,7 +7,8 @@ import GameRecapLink from "@/components/GameRecapLink";
 import { useState } from "react";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
-import { formatTipoff } from "@/lib/nbaDate";
+import { formatTipoff, formatNBADate } from "@/lib/nbaDate";
+import type { HighlightsResponse } from "@/lib/api";
 import { isFinalStatus, isLiveStatus } from "@/lib/gameStatus";
 
 interface ScheduleGame {
@@ -53,6 +54,13 @@ export default function SchedulePage() {
     `/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`, 30000
   );
   const games = data?.games || [];
+  const oldest = formatNBADate(new Date(Date.now() - 30 * 86400000));
+  const leagueToday = formatNBADate();
+  const dates = [...new Set(games.filter((game) => isFinalStatus(game.status)).map((game) => game.date.slice(0, 10)))]
+    .filter((date) => date >= oldest && date <= leagueToday).sort();
+  const highlightPages = useRemoteDataAll<HighlightsResponse>(Array.from({ length: Math.ceil(dates.length / 15) }, (_, i) =>
+    `/api/highlights?teamId=${selectedTeam.id}&dates=${dates.slice(i * 15, i * 15 + 15).join(",")}`));
+  const highlights = Object.assign({}, ...highlightPages.map((page) => page.data?.videos)) as HighlightsResponse["videos"];
 
   const getGameForDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -155,7 +163,7 @@ export default function SchedulePage() {
                       )}
                       {!isFinal && <div className="text-white/70 break-words">{gameStatus(game)}</div>}
                       <GoogleCalendarLink game={game} compact />
-                      {isFinal && <GameRecapLink teamId={selectedTeam.id} date={game.date} homeTeam={game.homeTeam.name} awayTeam={game.awayTeam.name} />}
+                      {isFinal && <GameRecapLink video={highlights[game.date.slice(0, 10)]} date={game.date} homeTeam={game.homeTeam.name} awayTeam={game.awayTeam.name} />}
                     </div>
                   )}
                 </div>
@@ -207,7 +215,7 @@ export default function SchedulePage() {
                         {new Date(year, month, day).toLocaleDateString("en-US", { weekday: "short" })}
                       </p>
                       <GoogleCalendarLink game={game} compact />
-                      {isFinal && <GameRecapLink teamId={selectedTeam.id} date={game.date} homeTeam={game.homeTeam.name} awayTeam={game.awayTeam.name} />}
+                      {isFinal && <GameRecapLink video={highlights[game.date.slice(0, 10)]} date={game.date} homeTeam={game.homeTeam.name} awayTeam={game.awayTeam.name} />}
                     </div>
                   </div>
                   {isFinal ? (
