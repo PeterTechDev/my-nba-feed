@@ -267,6 +267,7 @@ const homePage = load("app/page.tsx", {
   "@/components/GameDataProvider": { default: ({ children }) => children },
   "@/components/TopPlaysCard": { default: () => null },
   "@/components/MorningBriefingCard": { default: () => null },
+  "@/components/EndOfSession": { default: () => null },
   "@/components/PersonalizedFeed": {
     default: () => null,
     LeagueNewsSection: ({ news }) => {
