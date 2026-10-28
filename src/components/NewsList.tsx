@@ -22,15 +22,21 @@ export function NewsLinkWarning() {
   return (hideHeadlines || hideScores) ? <p className="mb-3 text-sm text-white/70">Article links open external sites and may contain spoilers.</p> : null;
 }
 
+function storyKey(item: NewsItem): string {
+  const related = item.related?.map(storyKey).join("\n") ?? "";
+  return `${item.link}:${item.redacted ? 1 : 0}:${item.title}:${related}`;
+}
+
 function NewsStory({ item }: { item: NewsItem }) {
   const { hideHeadlines } = useSpoilerContext();
   const [revealed, setRevealed] = useState(false);
   const [copy, setCopy] = useReducer((_current: NewsItem, next: NewsItem) => next, item);
-  const itemKey = `${item.link}:${item.redacted ? 1 : 0}:${item.title}`;
+  const itemKey = storyKey(item);
   const latest = useRef(item);
   latest.current = item;
   useEffect(() => { if (!revealed) setCopy(latest.current); }, [itemKey, revealed]);
   const hidden = hideHeadlines && copy.isSpoiler && !revealed;
+  const linked = !hidden && !copy.redacted;
   const toggle = () => {
     if (!revealed && copy.redacted) {
       void revealNewsItem(copy).then((full) => { if (!full) return; setCopy(full); setRevealed(true); });
@@ -38,12 +44,18 @@ function NewsStory({ item }: { item: NewsItem }) {
     }
     setRevealed((value) => !value);
   };
+  const title = <span className="min-w-0 flex-1">{getNewsTitle(copy, hidden)}</span>;
   return <>
-    <a href={hidden ? undefined : copy.link} target={hidden ? undefined : "_blank"} rel={hidden ? undefined : "noopener noreferrer"}
-      className={`flex min-h-11 items-center gap-2 break-words text-base font-medium leading-relaxed sm:text-sm ${hidden ? "text-white/70" : "text-white/90 hover:text-white"}`}>
-      <span className="min-w-0 flex-1">{getNewsTitle(copy, hidden)}</span>
-      {!hidden && <><ExternalLink aria-hidden="true" className="h-4 w-4 shrink-0 text-white/70" /><span className="sr-only">(opens in a new tab)</span></>}
-    </a>
+    {linked ? (
+      <a href={copy.link} target="_blank" rel="noopener noreferrer"
+        className="flex min-h-11 items-center gap-2 break-words text-base font-medium leading-relaxed text-white/90 hover:text-white sm:text-sm">
+        {title}
+        <ExternalLink aria-hidden="true" className="h-4 w-4 shrink-0 text-white/70" />
+        <span className="sr-only">(opens in a new tab)</span>
+      </a>
+    ) : (
+      <p className="flex min-h-11 items-center gap-2 break-words text-base font-medium leading-relaxed text-white/70 sm:text-sm">{title}</p>
+    )}
     <p className="mt-1 text-sm text-white/70">{copy.source && `${copy.source} · `}{formatNewsAge(copy.pubDate)}</p>
     {hideHeadlines && copy.isSpoiler && <div className="mt-2 flex flex-wrap items-center gap-2">
       {revealed && <span role="status" className="text-sm text-amber-200">Headline revealed</span>}

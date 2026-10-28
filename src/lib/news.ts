@@ -168,7 +168,7 @@ function sealNewsItem(item: NewsItem, team: string, reveal: string | null): News
   const cluster = Boolean(item.isSpoiler || nested?.some((entry) => entry.isSpoiler || entry.redacted));
   const related = cluster ? nested?.map((entry) => matchesReveal(entry, reveal) ? entry : coverHeadline(entry)) : nested;
   const sealed = { ...item, related, identity, feed: team };
-  if (matchesReveal(item, reveal) || !item.isSpoiler) return sealed;
+  if (matchesReveal(item, reveal) || (!item.isSpoiler && !cluster)) return sealed;
   return coverHeadline(sealed);
 }
 
