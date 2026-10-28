@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTeamById, teams } from "@/lib/teams";
 import { formatNBADate } from "@/lib/nbaDate";
 import { readDigestDocument, updateDigestDocument } from "@/lib/digestStorage";
-import { EMPTY_HIGHLIGHTS, HIGHLIGHTS_DOCUMENT, parseHighlightPublication, recentHighlights, type YouTubeHighlights } from "@/lib/youtubeHighlights";
+import { EMPTY_HIGHLIGHTS, HIGHLIGHTS_DOCUMENT, parseHighlightPublication, highlightKey, recentHighlights, type YouTubeHighlights } from "@/lib/youtubeHighlights";
 import type { HighlightVideo } from "@/lib/api";
 
 function authorized(req: NextRequest) {
@@ -20,6 +20,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ...state, videos: recentHighlights(state) }, { headers: { "Cache-Control": "no-store" } });
     } catch {
       return NextResponse.json({ error: "Highlights storage unavailable" }, { status: 503 });
+    }
+  }
+  if (req.nextUrl.searchParams.get("kind") === "top-plays") {
+    try {
+      const state = await readDigestDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS);
+      return NextResponse.json({ videos: recentHighlights(state).filter((video) => video.topCount)
+        .sort((a, b) => b.date.localeCompare(a.date) || (b.topCount ?? 0) - (a.topCount ?? 0)), syncedAt: state.syncedAt });
+    } catch {
+      return NextResponse.json({ error: "Top plays unavailable" }, { status: 503 });
     }
   }
   const team = getTeamById(Number(req.nextUrl.searchParams.get("teamId")));
@@ -55,9 +64,9 @@ export async function POST(req: NextRequest) {
   }
   try {
     await updateDigestDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS, (current) => {
-      const byGame = new Map(recentHighlights(current).map((video) => [`${video.date}:${video.awayTeamId}:${video.homeTeamId}`, video]));
-      for (const video of publication.videos) byGame.set(`${video.date}:${video.awayTeamId}:${video.homeTeamId}`, video);
-      return { syncedAt: current.syncedAt && current.syncedAt > publication.syncedAt! ? current.syncedAt : publication.syncedAt, videos: [...byGame.values()] };
+      const byGame = new Map(recentHighlights(current).map((video) => [highlightKey(video), video]));
+      for (const video of publication.videos) byGame.set(highlightKey(video), video);
+      return { topPlaysEnabled: current.topPlaysEnabled || publication.topPlaysEnabled, syncedAt: current.syncedAt && current.syncedAt > publication.syncedAt! ? current.syncedAt : publication.syncedAt, videos: [...byGame.values()] };
     });
     return NextResponse.json({ success: true }, { status: 201 });
   } catch {

@@ -106,7 +106,19 @@ test("highlights read saved YouTube videos without calling YouTube, and authenti
   assert.equal((await post({ syncedAt: now.toISOString(), videos: [{ ...clip, id: "bad" }] }, "publisher")).status, 400);
   assert.equal((await post({ syncedAt: now.toISOString(), videos: [] }, "publisher")).status, 201);
   assert.equal(state.videos.length, 1, "An incremental sync preserves previously saved games");
+  const countdown = { id: "TOPPLAYS123", date: "2026-10-26", topCount: 10,
+    title: "NBA's Top 10 Plays of the Night | October 26, 2026", thumbnail: "https://i.ytimg.com/vi/TOPPLAYS123/hqdefault.jpg", duration: 136, retrievedAt: now.toISOString() };
+  const previous = { ...countdown, id: "TOPPLAYS125", date: "2026-10-25", topCount: 5,
+    title: "NBA's Top 5 Plays of the Night | October 25, 2026", thumbnail: "https://i.ytimg.com/vi/TOPPLAYS125/hqdefault.jpg" };
+  assert.equal((await post({ syncedAt: now.toISOString(), topPlaysEnabled: true, videos: [previous, countdown] }, "publisher")).status, 201);
+  assert.equal(state.videos.length, 3, "Countdowns do not replace team recaps");
+  assert.equal(state.topPlaysEnabled, true);
+  const countdowns = await get("kind=top-plays");
+  assert.equal(countdowns.body.videos.length, 2);
+  assert.equal(countdowns.body.videos[0].id, countdown.id, "Newest night is first");
+  assert.equal((await get()).body.videos["2026-10-26"].id, clip.id, "Team queries exclude countdowns");
   unavailable = true;
+  assert.equal((await get("kind=top-plays")).status, 503);
   result = await get();
   assert.equal(result.status, 503);
   assert.match(result.body.error, /storage unavailable/);

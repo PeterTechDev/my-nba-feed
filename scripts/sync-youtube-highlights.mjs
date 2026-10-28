@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url";
 import { teams } from "../src/lib/teams.ts";
-import { NBA_CHANNEL_ID, highlightMatch, parseHighlightPublication } from "../src/lib/youtubeHighlights.ts";
+import { NBA_CHANNEL_ID, highlightMatch, topPlayMatch, highlightKey, parseHighlightPublication } from "../src/lib/youtubeHighlights.ts";
 
 export const endpoint = "https://my-nba-feed.vercel.app/api/highlights";
 
@@ -27,8 +27,8 @@ export async function syncYouTubeHighlights({ apiKey, publishToken, now = new Da
   const playlistId = channel?.contentDetails?.relatedPlaylists?.uploads;
   if (typeof playlistId !== "string" || !/^[\w-]{10,100}$/.test(playlistId)) throw new Error("NBA uploads playlist unavailable");
   const oldestGame = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
-  const publishedSince = Math.max(now.getTime() - 30 * 86400000, existing.syncedAt ? Date.parse(existing.syncedAt) - 48 * 3600000 : 0);
-  const savedGames = new Set(existing.videos.map((video) => `${video.date}:${video.awayTeamId}:${video.homeTeamId}`));
+  const publishedSince = !existing.topPlaysEnabled ? now.getTime() - 30 * 86400000 : Math.max(now.getTime() - 30 * 86400000, existing.syncedAt ? Date.parse(existing.syncedAt) - 48 * 3600000 : 0);
+  const savedGames = new Set(existing.videos.map(highlightKey));
   const candidates = new Map();
   const pages = new Set();
   let pageToken = "", finished = false;
@@ -41,10 +41,10 @@ export async function syncYouTubeHighlights({ apiKey, publishToken, now = new Da
       if (!Number.isFinite(published)) continue;
       if (published < publishedSince) { reachedOldUploads = true; continue; }
       const title = item.snippet?.title;
-      const game = typeof title === "string" ? highlightMatch(title, teams) : null;
+      const game = typeof title === "string" ? (topPlayMatch(title) ?? highlightMatch(title, teams)) : null;
       const id = item.contentDetails?.videoId;
       if (!game || !/^[\w-]{11}$/.test(id ?? "") || game.date < oldestGame || game.date > now.toISOString().slice(0, 10)) continue;
-      const key = `${game.date}:${game.awayTeamId}:${game.homeTeamId}`;
+      const key = highlightKey(game);
       if (savedGames.has(key)) continue;
       const previous = candidates.get(key);
       // Prefer the standard recap when the channel also uploads an extended version.
@@ -65,8 +65,8 @@ export async function syncYouTubeHighlights({ apiKey, publishToken, now = new Da
     for (const video of batch.items) {
       const candidate = requested.find((item) => item.id === video.id);
       if (!candidate || video.snippet?.channelId !== NBA_CHANNEL_ID || video.status?.embeddable !== true || video.status?.privacyStatus !== "public") continue;
-      const game = highlightMatch(video.snippet.title, teams);
-      if (!game || game.date !== candidate.date || game.awayTeamId !== candidate.awayTeamId || game.homeTeamId !== candidate.homeTeamId) continue;
+      const game = topPlayMatch(video.snippet.title) ?? highlightMatch(video.snippet.title, teams);
+      if (!game || highlightKey(game) !== highlightKey(candidate)) continue;
       const duration = video.contentDetails?.duration?.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
       if (!duration) continue;
       const thumbnails = video.snippet.thumbnails;
@@ -75,7 +75,7 @@ export async function syncYouTubeHighlights({ apiKey, publishToken, now = new Da
         duration: Number(duration[1] ?? 0) * 3600 + Number(duration[2] ?? 0) * 60 + Number(duration[3] ?? 0), retrievedAt: now.toISOString() });
     }
   }
-  const publication = parseHighlightPublication({ syncedAt: now.toISOString(), videos }, teams, now);
+  const publication = parseHighlightPublication({ syncedAt: now.toISOString(), topPlaysEnabled: true, videos }, teams, now);
   const saved = await json(endpoint, "Highlights publication", {
     method: "POST", headers: { Authorization: `Bearer ${publishToken}`, "Content-Type": "application/json" }, body: JSON.stringify(publication),
   });

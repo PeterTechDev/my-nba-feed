@@ -122,3 +122,28 @@ npm run build
 - [Boas práticas para chaves de API](https://cloud.google.com/docs/authentication/api-keys-best-practices)
 - [Player e seus parâmetros](https://developers.google.com/youtube/player_parameters)
 - [Retenção dos dados da API](https://developers.google.com/youtube/terms/developer-policies#e.-handling-youtube-data-and-content)
+
+
+## Nightly Top Plays
+
+`/top-plays` shows the NBA channel's dated Top 10 and Top 5 Plays of the Night,
+newest first, with previous nights underneath. It uses the same daily workflow,
+credentials and private document as full-game highlights. No extra API key is needed.
+`GET /api/highlights?kind=top-plays` returns only countdowns; team queries still
+return only matching game recaps. Preview reveal and playback respect spoiler defaults.
+
+The first sync with this version scans the last 30 days to backfill countdowns,
+then records `topPlaysEnabled` and resumes incremental scans. Deploy the updated
+API before running the updated workflow. Until the first successful sync, the
+page shows an empty state with an official-channel search link. Titles must identify
+Top 5/10 Plays of the Night and a valid date; weekly and player compilations are excluded.
+
+The main navigation and the homepage's **More from the NBA** disclosure link to
+the page. With protection enabled, reveal the preview before playing; **Hide
+preview** also stops playback. **Close player** restores the visible preview.
+Loading, empty and retryable error states use the existing dashboard controls.
+
+Visual review: ship, with desktop, 390px, 320px, protected, empty and error
+captures in `.impeccable/review/top-plays-*.png`. Review metadata and its existing
+NBA thumbnail are fixtures only; they were not published. Production thumbnails
+are supplied by the official NBA YouTube sync, with no generated artwork added.

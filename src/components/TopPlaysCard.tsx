@@ -16,8 +16,8 @@ export default function TopPlaysCard() {
       </Link>
       <details className="text-white/70">
         <summary className="min-h-11 cursor-pointer py-3 text-sm hover:text-white">More from the NBA</summary>
-        <a href={`https://www.youtube.com/@NBA/search?query=${encodeURIComponent("Top 10 Plays of the Night")}`} target="_blank" rel="noopener noreferrer"
-          className="flex min-h-11 items-center justify-between gap-2 text-sm underline underline-offset-4">Top 10 plays<ArrowUpRight aria-hidden="true" className="h-4 w-4" /><span className="sr-only">on YouTube (opens in a new tab)</span></a>
+        <Link href="/top-plays"
+          className="flex min-h-11 items-center justify-between gap-2 text-sm underline underline-offset-4">Top 10 & Top 5 of the night<ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
         <a href="https://www.youtube.com/@NBA/videos" target="_blank" rel="noopener noreferrer"
           className="flex min-h-11 items-center justify-between gap-2 text-sm underline underline-offset-4">NBA uploads<ArrowUpRight aria-hidden="true" className="h-4 w-4" /><span className="sr-only">on YouTube (opens in a new tab)</span></a>
         {(hideScores || hideHeadlines) && <p className="mt-2 text-xs">YouTube results may contain spoilers.</p>}

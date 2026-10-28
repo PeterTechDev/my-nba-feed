@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { BarChart3, Calendar, Play, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
+import { BarChart3, Calendar, Play, Trophy, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
 import Modal from "./Modal";
 import FavoriteTeamsModal from "./FavoriteTeamsModal";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
@@ -107,6 +107,7 @@ const links = [
   { href: "/standings", label: "Standings", icon: BarChart3 },
   { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/highlights", label: "Highlights", icon: Play },
+import { BarChart3, Calendar, Play, Trophy, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
   { href: "/digest", label: "Digest", icon: BookOpen },
   { href: "/about", label: "About", icon: Info },
 ];

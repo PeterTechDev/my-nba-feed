@@ -1,0 +1,68 @@
+.page {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 48px 32px;
+}
+
+.header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.title { font-size: clamp(48px, 7vw, 96px); font-weight: 850; line-height: .95; letter-spacing: -.04em; }
+.title span { color: #fbbf24; }
+.intro { padding-bottom: 4px; font-size: 18px; line-height: 1.5; }
+.intro span { color: #ffffffb3; }
+.warning { margin: 28px 0 20px; max-width: 75ch; font-size: 12px; line-height: 1.65; color: #ffffffb3; }
+.screen { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; background: #161616; }
+.preview { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 100%; }
+.preview:focus-visible { outline-offset: -6px; }
+.thumbnail, .player { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; }
+.featured .thumbnail { object-fit: contain; background: #000; }
+.playButton { position: relative; display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: #000d; color: #fff; transition: background-color 160ms, transform 240ms var(--motion-ease); }
+.featured .playButton { width: 80px; height: 80px; background: #fbbf24; color: #0a0a0a; }
+.featured .playButton svg { width: 28px; height: 28px; }
+.preview:hover .playButton { transform: scale(1.06); background: #fcd34d; color: #0a0a0a; }
+.actionLabel { position: relative; padding: 6px 12px; border-radius: 8px; background: #000d; color: #fff; font-size: 14px; }
+.protected { background: #161616; }
+.protectedTitle { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: clamp(64px, 18vw, 240px); font-weight: 850; letter-spacing: -.04em; color: #ffffff0d; user-select: none; }
+.caption { padding-top: 16px; }
+.featured .caption { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-top: 24px; }
+.featureTitle { font-size: clamp(22px, 2.4vw, 32px); line-height: 1.2; font-weight: 700; letter-spacing: -.025em; }
+.description { max-width: 60ch; margin-top: 12px; font-size: 14px; line-height: 1.6; color: #ffffffb3; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin-top: 8px; }
+.featured .actions { justify-content: flex-end; flex-shrink: 0; max-width: 260px; margin-top: 0; }
+.archive { margin-top: 48px; padding-top: 28px; border-top: 1px solid #ffffff1a; }
+.archiveGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px 24px; }
+.archiveVideo { min-width: 0; }
+.empty { display: flex; min-height: 320px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; background: #161616; padding: 32px; text-align: center; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .featured .thumbnail { animation: reveal 650ms var(--motion-ease) both; }
+  .featured .player { animation: playerIn 450ms var(--motion-ease) both; }
+  .featured .playing::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: #0a0a0a; transform-origin: top; animation: curtain 650ms var(--motion-ease) both; }
+}
+@keyframes reveal { from { clip-path: inset(7% 0); transform: scale(1.025); } to { clip-path: inset(0); transform: scale(1); } }
+@keyframes playerIn { from { opacity: .4; } to { opacity: 1; } }
+@keyframes curtain { from { transform: scaleY(1); } to { transform: scaleY(0); } }
+
+@media (max-width: 767px) {
+  .page { padding: 32px 16px; }
+  .header { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .title { font-size: clamp(48px, 12vw, 80px); }
+  .intro { font-size: 16px; }
+  .intro br { display: none; }
+  .intro span::before { content: " "; }
+  .warning { margin-top: 20px; }
+  .featured .caption { flex-direction: column; gap: 12px; padding-top: 20px; }
+  .featured .actions { max-width: none; justify-content: flex-start; }
+  .featured .playButton { width: 56px; height: 56px; }
+  .archiveGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 16px; }
+}
+@media (max-width: 479px) {
+  .archiveGrid { grid-template-columns: 1fr; }
+  .archiveVideo { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .archiveVideo .caption { padding-top: 0; }
+  .archiveVideo .actions { margin-top: 0; }
+  .archiveVideo .playButton { width: 44px; height: 44px; }
+  .archiveVideo .actionLabel { display: none; }
+  .archiveVideo .preview { gap: 0; }
+  .archiveVideo:has(.playing) { display: block; }
+  .archiveVideo:has(.playing) .caption { padding-top: 16px; }
+}

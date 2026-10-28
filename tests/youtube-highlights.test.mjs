@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { syncYouTubeHighlights, endpoint } from "../scripts/sync-youtube-highlights.mjs";
 import { teams } from "../src/lib/teams.ts";
-import { NBA_CHANNEL_ID, highlightMatch, parseHighlightPublication, recentHighlights } from "../src/lib/youtubeHighlights.ts";
+import { NBA_CHANNEL_ID, highlightMatch, topPlayMatch, highlightKey, parseHighlightPublication, recentHighlights } from "../src/lib/youtubeHighlights.ts";
 
 const now = new Date("2026-10-27T11:15:00Z");
 const title = "BULLS at CELTICS | FULL GAME HIGHLIGHTS | October 26, 2026";
@@ -103,4 +103,32 @@ test("missing keys fail before network requests", async () => {
   await assert.rejects(syncYouTubeHighlights({ publishToken: "publisher", fetcher: () => { called = true; } }), /YOUTUBE_API_KEY/);
   await assert.rejects(syncYouTubeHighlights({ apiKey: "key", fetcher: () => { called = true; } }), /DIGEST_PUBLISH_TOKEN/);
   assert.equal(called, false);
+});
+
+
+test("nightly countdowns accept Top 5 and Top 10 only, with real dates", () => {
+  for (const count of [5, 10]) {
+    assert.deepEqual(topPlayMatch(`NBA's Top ${count} Plays of the Night | October 26, 2026`), { date: "2026-10-26", topCount: count });
+  }
+  assert.deepEqual(topPlayMatch("NBA\u2019s Top 5 Plays of the Night! October 26, 2026"), { date: "2026-10-26", topCount: 5 });
+  for (const title of ["NBA's Top 10 Plays of the Week | October 26, 2026", "NBA's Top 15 Plays of the Night | October 26, 2026", "NBA's Top 5 Plays of the Night | February 30, 2026", "Fan Top 5 Plays of the Night | October 26, 2026"]) assert.equal(topPlayMatch(title), null);
+});
+
+test("countdowns sync alongside recaps, backfill old state and validate publication", async () => {
+  const title = "NBA's Top 10 Plays of the Night | October 25, 2026";
+  const top = { ...clip, title, date: "2026-10-25", topCount: 10 };
+  delete top.awayTeamId; delete top.homeTeamId;
+  const f = fixture({ saved: { syncedAt: "2026-10-27T09:00:00Z", videos: [] },
+    pages: [{ items: [upload(clip.id, title, "2026-10-24T04:00:00Z")] }],
+    details: { snippet: { channelId: NBA_CHANNEL_ID, title, thumbnails: { high: { url: clip.thumbnail } } } } });
+  assert.equal((await run(f)).added, 1);
+  assert.deepEqual(f.saved.videos, [top]);
+  assert.equal(f.saved.topPlaysEnabled, true);
+  assert.notEqual(highlightKey(top), highlightKey(clip));
+  const parse = (videos) => parseHighlightPublication({ syncedAt: now.toISOString(), videos }, teams, now);
+  assert.deepEqual(parse([top]).videos, [top]);
+  for (const changes of [{ topCount: 5 }, { awayTeamId: 1 }, { homeTeamId: 2 }, { date: "2026-10-26" }, { thumbnail: "https://evil.test/x" }]) assert.throws(() => parse([{ ...top, ...changes }]));
+  assert.throws(() => parse([top, top]));
+  const mixed = parse([top, { ...clip, id: "OTHER123456", thumbnail: "https://i.ytimg.com/vi/OTHER123456/hqdefault.jpg" }]);
+  assert.equal(mixed.videos.length, 2);
 });
