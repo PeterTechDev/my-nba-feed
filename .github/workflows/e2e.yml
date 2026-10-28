@@ -7,10 +7,9 @@ permissions:
   contents: read
 
 concurrency:
-  # One preview's e2e does not cancel another's. If ref arrives as a SHA,
-  # each push stays in its own group.
+  # The group serializes runs of the same ref and does not cancel any of them.
+  # If ref is a SHA, each push has its own group.
   group: e2e-${{ github.event.deployment.environment }}-${{ github.event.deployment.ref }}
-  cancel-in-progress: true
 
 jobs:
   playwright:
@@ -39,6 +38,7 @@ jobs:
         run: test -n "$VERCEL_BYPASS" || { echo "::error::VERCEL_AUTOMATION_BYPASS_SECRET ausente"; exit 1; }
       - name: Run Playwright
         env:
+          PLAYWRIGHT_PREVIEW: "1"
           VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           SMOKE_ALLOW_MISSING_API_KEY: ${{ vars.SMOKE_ALLOW_MISSING_API_KEY }}
         run: npm run test:e2e -- --reporter=line,html

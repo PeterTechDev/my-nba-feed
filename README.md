@@ -167,15 +167,21 @@ official API and saves matches in private Blob storage; page visits never call
 the YouTube Data API. Previews and players respect spoiler protection. Configure
 the `YOUTUBE_API_KEY` Actions secret using the [setup guide](docs/youtube-highlights.md).
 
-Run `npm test` for the Node suite, `npm run test:ssr` for the Morning Briefing
-server render, and `npm run test:e2e` for Playwright. `test:e2e` needs `BASE_URL`.
-`VERCEL_BYPASS` is required when that origin is not localhost. The bypass
-header is sent only to that origin and is not forwarded across a redirect.
-`SMOKE_ALLOW_MISSING_API_KEY` defaults to empty, which does not tolerate any
-503 console line. Set the repository variable to `1` only when the preview has
-no BALLDONTLIE key or digest storage. That value tolerates 503 for the exact
-paths `/api/games`, `/api/standings`, and `/api/digest`. `/api/digest/feedback`
-is not tolerated.
+Run `npm test` for the Node suite and `npm run test:ssr` for the Morning Briefing
+server render. Playwright specs live in two places. `tests/preview/` is the
+preview job (`PLAYWRIGHT_PREVIEW=1`, `npm run test:e2e` against `BASE_URL`).
+Specs directly under `tests/`, including bypass checks and any later
+`digest-reveal-gating` or `spoiler-reveal-confirm` spec, are local and are not
+part of that job. CI runs the local bypass specs against servers they start
+themselves. `VERCEL_BYPASS` is required when `BASE_URL` is not localhost. The
+bypass header is sent only to that origin. Same-origin redirects are followed
+with the header for up to 5 hops. A 303 becomes GET and drops the body. A 307
+or 308 keeps the method and body. A redirect to any other origin is returned
+as-is, without the header. `SMOKE_ALLOW_MISSING_API_KEY` defaults to empty,
+which does not tolerate any 503 console line. Set the repository variable to
+`1` only when the preview has no BALLDONTLIE key or digest storage. That value
+tolerates 503 for the exact paths `/api/games`, `/api/standings`, and
+`/api/digest`. `/api/digest/feedback` is not tolerated.
 
 ---
 

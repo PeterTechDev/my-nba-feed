@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { registerPreviewBypass } from "./preview-bypass.mjs";
+import { registerPreviewBypass } from "../preview-bypass.mjs";
 
 // Same call MorningBriefingCard makes after mount:
 // new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" })

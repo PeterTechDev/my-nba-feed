@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { registerPreviewBypass } from "./preview-bypass.mjs";
-import { isTolerated503 } from "./smoke-console.mjs";
+import { registerPreviewBypass } from "../preview-bypass.mjs";
+import { isTolerated503 } from "../smoke-console.mjs";
 
 // SMOKE_ALLOW_MISSING_API_KEY=1 tolerates a 503 console line only for the exact
 // paths /api/games, /api/standings, and /api/digest. /api/digest/feedback is not
