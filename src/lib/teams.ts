@@ -87,7 +87,7 @@ const LEADING_ARTICLES = new Set(["the", "a", "an"]);
 const SPOILER_FIGURE = /(?<![\d/])(?:\d{2,3}[-–—]\d{2,3}|\d{1,2}[-–—]\d{1,2})(?![\d/]|[-–—]\d)/;
 
 function textTokens(value: string): string[] {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
 }
 
 function containsTokens(words: string[], phrase: string[]): boolean {
@@ -149,20 +149,21 @@ function clausesOf(title: string): string[] {
 function teamInAdjacentAndPair(words: string[], team: Team): boolean {
   const names = clubNamePhrases(team);
   for (let index = 0; index < words.length; index += 1) {
-    if (words[index] !== "and" && words[index] !== "&") continue;
+    if (words[index] !== "and") continue;
     const onLeft = names.some((phrase) => phraseEndsAt(words, index - 1, phrase));
     const onRight = names.some((phrase) => phraseStartsAt(words, index + 1, phrase));
-    if (!onLeft && !onRight) continue;
-    const otherSideIsClub = teams.some((other) => other.id !== team.id && clubNamePhrases(other).some((phrase) =>
-      (onLeft && phraseStartsAt(words, index + 1, phrase)) || (onRight && phraseEndsAt(words, index - 1, phrase))));
-    if (otherSideIsClub) return true;
+    // Nome colado ao "and". Se o outro lado também for time, só esse par conta
+    // (quem está fora dele não entra aqui). Se o outro lado não for time,
+    // o par não restringe e este nome ainda vale.
+    if (onLeft || onRight) return true;
   }
   return false;
 }
 
 // A manchete é sobre o time quando começa por ele, quando a oração em que ele
-// aparece tem placar ou campanha, ou quando o nome dele é um dos dois lados
-// adjacentes de "X and/& Y". Menção fora desse par, ou número noutra oração, não conta.
+// aparece tem placar ou campanha, ou quando o nome dele está colado a "and".
+// "X and Y" só fecha a frase nos dois times quando os dois lados são times.
+// Menção fora desse par, ou número noutra oração, não conta.
 export function headlineIsAboutTeam(title: string, team: Team): boolean {
   const words = textTokens(title);
   const phrases = teamPhrases(team);
