@@ -28,15 +28,6 @@ function load(file, imports = {}) {
   return exports;
 }
 
-function spoilerFigure() {
-  const source = readFileSync(new URL("../src/lib/teams.ts", import.meta.url), "utf8");
-  const line = source.split("\n").find((entry) => entry.startsWith("const SPOILER_FIGURE = "));
-  assert.ok(line, "SPOILER_FIGURE lives in src/lib/teams.ts");
-  const expression = line.slice(line.indexOf("=") + 1).trim().replace(/;$/, "");
-  return Function(`"use strict"; return (${expression});`)();
-}
-
-const SPOILER_FIGURE = spoilerFigure();
 const team = (abbreviation) => {
   const found = teams.find((entry) => entry.abbreviation === abbreviation);
   assert.ok(found, abbreviation);
@@ -46,36 +37,34 @@ const count = (html, needle) => html.split(needle).length - 1;
 const visibleText = (html) => html.replace(/datetime="[^"]*"/gi, "").replace(/<[^>]+>/g, " ");
 const RECORD = /\b\d{1,2}[–—-]\d{1,2}\b/;
 
-// Locked to 4399b6c. Two cells differ from the 9183b88 explorer matrix;
-// both are the same at c6159a8 and 4399b6c.
+// headlineIsAboutTeam names the club: name, city + name, or a city that is not
+// Los Angeles or New York. Possessives are 's, s' and a trailing apostrophe.
+// There is no score regex and no "and" pair rule in src/lib/teams.ts.
+const COLUMNS = ["BOS", "BKN", "NYK", "LAL", "LAC"];
 const MATRIX = [
   { h: "Celtics edge Nets 121-115 behind late run", BOS: true, BKN: true, NYK: false, LAL: false, LAC: false },
   { h: "Celtics star Jayson Tatum listed as questionable with ankle injury", BOS: true, BKN: false, NYK: false, LAL: false, LAC: false },
   { h: "Boston rallies past Brooklyn 121-115", BOS: true, BKN: true, NYK: false, LAL: false, LAC: false },
-  { h: "Knicks top Heat; Celtics loom next on schedule", BOS: false, BKN: false, NYK: true, LAL: false, LAC: false },
-  { h: "C's hold off Nets in overtime thriller", BOS: false, BKN: false, NYK: false, LAL: false, LAC: false },
+  { h: "Knicks top Heat; Celtics loom next on schedule", BOS: true, BKN: false, NYK: true, LAL: false, LAC: false },
+  { h: "C's hold off Nets in overtime thriller", BOS: false, BKN: true, NYK: false, LAL: false, LAC: false },
   { h: "Jayson Tatum drops 40 in overtime win", BOS: false, BKN: false, NYK: false, LAL: false, LAC: false },
-  { h: "CELTICS ROUT NETS AT TD GARDEN", BOS: true, BKN: false, NYK: false, LAL: false, LAC: false },
+  { h: "CELTICS ROUT NETS AT TD GARDEN", BOS: true, BKN: true, NYK: false, LAL: false, LAC: false },
   { h: "celtics' bench shines in comeback", BOS: true, BKN: false, NYK: false, LAL: false, LAC: false },
   { h: "Boston Marathon organizers announce 2027 route", BOS: true, BKN: false, NYK: false, LAL: false, LAC: false },
-  { h: "Nets trade Cam Thomas to Celtics in three-team deal", BOS: false, BKN: true, NYK: false, LAL: false, LAC: false },
+  { h: "Nets trade Cam Thomas to Celtics in three-team deal", BOS: true, BKN: true, NYK: false, LAL: false, LAC: false },
   { h: "New York Knicks win 110-104 at Brooklyn", BOS: false, BKN: true, NYK: true, LAL: false, LAC: false },
   { h: "Los Angeles beats Sacramento 118-104", BOS: false, BKN: false, NYK: false, LAL: false, LAC: false },
   { h: "LA Clippers sign veteran guard", BOS: false, BKN: false, NYK: false, LAL: false, LAC: true },
-  { h: "Takeaways: How the Celtics held off the Nets in OT", BOS: false, BKN: false, NYK: false, LAL: false, LAC: false },
+  { h: "Takeaways: How the Celtics held off the Nets in OT", BOS: true, BKN: true, NYK: false, LAL: false, LAC: false },
   { h: "Nets fall to Celtics 115-121", BOS: true, BKN: true, NYK: false, LAL: false, LAC: false },
   { h: "Lakers trade talk heats up", BOS: false, BKN: false, NYK: false, LAL: true, LAC: false },
-  // 9183b88 had BKN false. The pair "Knicks and Nets" counts for both teams.
   { h: "Knicks and Nets renew New York rivalry", BOS: false, BKN: true, NYK: true, LAL: false, LAC: false },
   { h: "Boston College stuns Duke 78-70", BOS: true, BKN: false, NYK: false, LAL: false, LAC: false },
-  { h: "Red Sox, Celtics share Boston spotlight", BOS: false, BKN: false, NYK: false, LAL: false, LAC: false },
-  // 9183b88 had BOS false. A 3-1 record in the same clause counts.
+  { h: "Red Sox, Celtics share Boston spotlight", BOS: true, BKN: false, NYK: false, LAL: false, LAC: false },
   { h: "Why the Celtics are 3-1", BOS: true, BKN: false, NYK: false, LAL: false, LAC: false },
   { h: "Cs win again", BOS: false, BKN: false, NYK: false, LAL: false, LAC: false },
   { h: "The Celtics' Jayson Tatum: 'We needed that'", BOS: true, BKN: false, NYK: false, LAL: false, LAC: false },
 ];
-
-const COLUMNS = ["BOS", "BKN", "NYK", "LAL", "LAC"];
 
 for (const row of MATRIX) {
   test(`headline: ${row.h}`, () => {
@@ -85,77 +74,91 @@ for (const row of MATRIX) {
   });
 }
 
-const EDGES = [
-  ["CELTICS", { BOS: true, BKN: false }],
-  ["celtics", { BOS: true }],
-  ["CeLtIcS rout", { BOS: true, BKN: false }],
-  ["Celtics'", { BOS: true }],
-  ["celtics' bench shines", { BOS: true, BKN: false }],
-  ["The Celtics' Jayson Tatum", { BOS: true, BKN: false }],
-  ["Netsuke exhibition opens", { BKN: false, BOS: false }],
-  ["Netsuke exhibition opens in Boston", { BKN: false, BOS: false }],
-  ["Heated rivalry talk", { MIA: false }],
-  ["Heat win again", { MIA: true, BOS: false }],
-  ["The Heat win", { MIA: true }],
-  ["LA", { LAL: false, LAC: false }],
-  ["Los Angeles", { LAL: false, LAC: false }],
-  ["LA Lakers sign a guard", { LAL: true, LAC: false }],
-  ["LA Clippers sign a guard", { LAL: false, LAC: true }],
-  ["Los Angeles Lakers host the Clippers", { LAL: true, LAC: false }],
-  ["Los Angeles Clippers and Lakers trade", { LAL: true, LAC: true }],
-  ["New York", { NYK: true, BKN: false }],
-  ["Brooklyn", { BKN: true, NYK: false }],
-  ["Celtics and Lakers open a back-to-back", { BOS: true, LAL: true, LAC: false }],
-  ["Celtics 12-3", { BOS: true }],
-  ["Notes: the Celtics are 12-3", { BOS: true }],
-  ["Notes: the Celtics are 29-15", { BOS: true }],
-  ["Notes: Celtics visit on 10/26", { BOS: false }],
-  ["Notes: Celtics visit on 10-26-2026", { BOS: false }],
-  ["Notes: Celtics tip at 8:30", { BOS: false }],
+const RULES = [
+  { rule: "nome", h: "Celtics", BOS: true, BKN: false },
+  { rule: "nome", h: "celtics", BOS: true },
+  { rule: "nome", h: "CELTICS", BOS: true, BKN: false },
+  { rule: "nome", h: "Celtics'", BOS: true },
+  { rule: "nome", h: "celtics' bench shines", BOS: true, BKN: false },
+  { rule: "nome", h: "Celtics's bench", BOS: true },
+  { rule: "nome", h: "Nets'", BKN: true, BOS: false },
+  // The roster spelling is Celtics, so Celtic's is not that name plus a possessive.
+  { rule: "nome", h: "Celtic's", BOS: false },
+  { rule: "nome", h: "76ers", PHI: true },
+  { rule: "nome", h: "Sixers", PHI: false },
+  { rule: "nome", h: "Trail Blazers", POR: true },
+  { rule: "nome", h: "Blazers", POR: false },
+  { rule: "cidade + nome", h: "Boston Celtics", BOS: true, BKN: false },
+  { rule: "cidade + nome", h: "Brooklyn Nets", BKN: true, NYK: false },
+  { rule: "cidade + nome", h: "Los Angeles Lakers", LAL: true, LAC: false },
+  { rule: "cidade + nome", h: "New York Knicks", NYK: true, BKN: false },
+  // "LA" is not a city on the roster. Clippers/Lakers match as the club name.
+  { rule: "cidade + nome", h: "LA Clippers", LAC: true, LAL: false },
+  { rule: "cidade + nome", h: "LA Lakers", LAL: true, LAC: false },
+  { rule: "cidade + nome", h: "LA", LAL: false, LAC: false },
+  { rule: "cidade", h: "Boston", BOS: true },
+  { rule: "cidade", h: "Brooklyn", BKN: true, NYK: false },
+  { rule: "cidade", h: "Miami", MIA: true, BOS: false },
+  { rule: "cidade", h: "Los Angeles", LAL: false, LAC: false },
+  { rule: "cidade", h: "New York", NYK: false, BKN: false },
+  // City alone is the documented price of the rule.
+  { rule: "cidade", h: "Boston Marathon organizers announce 2027 route", BOS: true, BKN: false },
+  { rule: "cidade", h: "Boston College stuns Duke 78-70", BOS: true, BKN: false },
+  { rule: "fronteira", h: "Netsuke exhibition opens", BKN: false, BOS: false },
+  { rule: "fronteira", h: "Heated rivalry talk", MIA: false },
+  { rule: "fronteira", h: "Magical evening on the floor", ORL: false },
+  { rule: "fronteira", h: "Bullseye drill", CHI: false },
+  { rule: "fronteira", h: "Sunset over the water", PHX: false },
+  { rule: "fronteira", h: "Lakers trade talk heats up", MIA: false, LAL: true },
+  { rule: "dois times", h: "Celtics and Lakers open a back-to-back", BOS: true, LAL: true, LAC: false },
+  { rule: "dois times", h: "Los Angeles Clippers and Lakers trade", LAL: true, LAC: true },
+  { rule: "dois times", h: "Knicks & Nets", BKN: true, NYK: true, BOS: false },
+  // Accepted price: the name matches even when it is not the subject of the clause.
+  { rule: "preço aceito", h: "Heat wave and Celtics fans", MIA: true, BOS: true },
+  { rule: "preço aceito", h: "Magic Johnson and Celtics legends", ORL: true, BOS: true },
 ];
 
-for (const [headline, expected] of EDGES) {
-  test(`edge: ${headline}`, () => {
-    for (const [abbreviation, value] of Object.entries(expected)) {
-      assert.equal(headlineIsAboutTeam(headline, team(abbreviation)), value, `${headline} / ${abbreviation}`);
+for (const row of RULES) {
+  test(`${row.rule}: ${row.h}`, () => {
+    for (const [abbreviation, value] of Object.entries(row)) {
+      if (abbreviation === "rule" || abbreviation === "h") continue;
+      assert.equal(headlineIsAboutTeam(row.h, team(abbreviation)), value, `${row.h} / ${abbreviation}`);
     }
   });
 }
 
-describe("regra do and / número por oração", () => {
-  test("Warriors and Lakers talk trade as Celtics watch is not about Boston", () => {
-    const headline = "Warriors and Lakers talk trade as Celtics watch";
-    assert.equal(headlineIsAboutTeam(headline, team("BOS")), false);
-    assert.equal(headlineIsAboutTeam(headline, team("GSW")), true);
-    assert.equal(headlineIsAboutTeam(headline, team("LAL")), true);
-  });
+test("fronteira: every roster name stops at a word boundary", () => {
+  for (const entry of teams) {
+    assert.equal(headlineIsAboutTeam(entry.name, entry), true, entry.name);
+    assert.equal(headlineIsAboutTeam(`${entry.name}xyz`, entry), false, `${entry.name}xyz`);
+    assert.equal(headlineIsAboutTeam(`${entry.city} ${entry.name}`, entry), true, `${entry.city} ${entry.name}`);
+    const cityAlone = entry.city !== "Los Angeles" && entry.city !== "New York";
+    assert.equal(headlineIsAboutTeam(entry.city, entry), cityAlone, entry.city);
+  }
+});
 
-  test("Pistons and Bulls swap guards; Celtics next? is not about Boston", () => {
-    const headline = "Pistons and Bulls swap guards; Celtics next?";
-    assert.equal(headlineIsAboutTeam(headline, team("BOS")), false);
-    assert.equal(headlineIsAboutTeam(headline, team("DET")), true);
-    assert.equal(headlineIsAboutTeam(headline, team("CHI")), true);
-  });
+test("a record, a clock time or a date does not name a team", () => {
+  // Nothing in teams.ts replaced the removed score regex. A figure matches only when the name is also there.
+  assert.equal(headlineIsAboutTeam("The record is 3-1", team("BOS")), false);
+  assert.equal(headlineIsAboutTeam("Tip is 8:30", team("BOS")), false);
+  assert.equal(headlineIsAboutTeam("Notes: visit on 10-26", team("BOS")), false);
+  assert.equal(headlineIsAboutTeam("Notes: visit on 10/26", team("BOS")), false);
+  assert.equal(headlineIsAboutTeam("Notes: visit on 10-26-2026", team("BOS")), false);
+  assert.equal(headlineIsAboutTeam("Why the Celtics are 3-1", team("BOS")), true);
+  assert.equal(headlineIsAboutTeam("Celtics 12-3", team("BOS")), true);
+});
 
-  test("Heat wave and Celtics fans is not about Miami", () => {
-    assert.equal(headlineIsAboutTeam("Heat wave and Celtics fans", team("MIA")), false);
-  });
-
-  test("Magic Johnson and Celtics legends is not about Orlando", () => {
-    assert.equal(headlineIsAboutTeam("Magic Johnson and Celtics legends", team("ORL")), false);
-  });
-
-  test("a score in another clause is not a Celtics spoiler", () => {
-    // headlineIsAboutTeam decides this. It runs SPOILER_FIGURE on each clause
-    // (clausesOf is private). The raw title still contains 101-98.
-    const headline = "Knicks beat Heat 101-98; Celtics rest Tatum";
-    assert.equal(SPOILER_FIGURE.test(headline), true);
-    assert.equal(SPOILER_FIGURE.test("101-98"), true);
-    assert.equal(SPOILER_FIGURE.test("Celtics rest Tatum"), false);
-    assert.equal(headlineIsAboutTeam(headline, team("BOS")), false);
-    assert.equal(headlineIsAboutTeam(headline, team("NYK")), true);
-    assert.equal(headlineIsAboutTeam(headline, team("MIA")), true);
-  });
+test("the removed pair rule still names every club that is written out", () => {
+  // The pair rule was removed on purpose. A named Celtics side is enough.
+  assert.equal(headlineIsAboutTeam("Warriors and Lakers talk trade as Celtics watch", team("BOS")), true);
+  assert.equal(headlineIsAboutTeam("Warriors and Lakers talk trade as Celtics watch", team("GSW")), true);
+  assert.equal(headlineIsAboutTeam("Warriors and Lakers talk trade as Celtics watch", team("LAL")), true);
+  assert.equal(headlineIsAboutTeam("Pistons and Bulls swap guards; Celtics next?", team("BOS")), true);
+  assert.equal(headlineIsAboutTeam("Pistons and Bulls swap guards; Celtics next?", team("DET")), true);
+  assert.equal(headlineIsAboutTeam("Pistons and Bulls swap guards; Celtics next?", team("CHI")), true);
+  assert.equal(headlineIsAboutTeam("Knicks beat Heat 101-98; Celtics rest Tatum", team("BOS")), true);
+  assert.equal(headlineIsAboutTeam("Knicks beat Heat 101-98; Celtics rest Tatum", team("NYK")), true);
+  assert.equal(headlineIsAboutTeam("Knicks beat Heat 101-98; Celtics rest Tatum", team("MIA")), true);
 });
 
 describe("known-gap", () => {
@@ -167,51 +170,6 @@ describe("known-gap", () => {
     assert.equal(headlineIsAboutTeam("BOS beats BKN 110-104", team("BKN")), false);
     assert.equal(headlineIsAboutTeam("Jayson Tatum drops 40 in overtime win", team("BOS")), false);
   });
-});
-
-describe("known-gap observação", () => {
-  test("another sport in Boston currently matches the Celtics", () => {
-    // known-gap: observação — falso positivo atual, sem decidir se é bug.
-    assert.equal(headlineIsAboutTeam("Boston Marathon organizers announce 2027 route", team("BOS")), true);
-    assert.equal(headlineIsAboutTeam("Boston College stuns Duke 78-70", team("BOS")), true);
-  });
-
-  test("a named team off the start, without a figure or an adjacent pair, stays false", () => {
-    // known-gap: observação — falso negativo atual.
-    assert.equal(headlineIsAboutTeam("Nets trade Cam Thomas to Celtics in three-team deal", team("BOS")), false);
-    assert.equal(headlineIsAboutTeam("Takeaways: How the Celtics held off the Nets in OT", team("BOS")), false);
-    assert.equal(headlineIsAboutTeam("Takeaways: How the Celtics held off the Nets in OT", team("BKN")), false);
-    assert.equal(headlineIsAboutTeam("Red Sox, Celtics share Boston spotlight", team("BOS")), false);
-    assert.equal(headlineIsAboutTeam("CELTICS ROUT NETS AT TD GARDEN", team("BKN")), false);
-  });
-
-  test("a bare month-day currently counts as a record", () => {
-    // known-gap: observação — "10-26" cai em \\d{1,2}-\\d{1,2}. "10-26-2026" não.
-    assert.equal(SPOILER_FIGURE.test("10-26"), true);
-    assert.equal(SPOILER_FIGURE.test("10-26-26"), true);
-    assert.equal(headlineIsAboutTeam("Notes: Celtics visit on 10-26", team("BOS")), true);
-  });
-
-  test("an ampersand pair does not keep the team on the right", () => {
-    // suspicious: c6159a8 returned true for BKN. textTokens strips "&" before the pair check.
-    assert.equal(headlineIsAboutTeam("Knicks & Nets", team("NYK")), true);
-    assert.equal(headlineIsAboutTeam("Knicks & Nets", team("BKN")), false);
-  });
-
-  test("Celtics named beside a non-club and-side stay false", () => {
-    // suspicious: c6159a8 returned true for BOS. 4399b6c requires a club on the other side.
-    assert.equal(headlineIsAboutTeam("Heat wave and Celtics fans", team("BOS")), false);
-    assert.equal(headlineIsAboutTeam("Magic Johnson and Celtics legends", team("BOS")), false);
-  });
-});
-
-test("SPOILER_FIGURE matches records and scores and rejects dates and clock times", () => {
-  for (const sample of ["3-1", "29-15", "12-3", "121-115", "121\u2013115", "99\u2014101", "0-1"]) {
-    assert.equal(SPOILER_FIGURE.test(sample), true, sample);
-  }
-  for (const sample of ["10/26", "10-26-2026", "8:30", "8:30 pm"]) {
-    assert.equal(SPOILER_FIGURE.test(sample), false, sample);
-  }
 });
 
 test("teamByAbbreviation accepts canonical and ESPN codes and rejects case changes and blanks", () => {
@@ -286,7 +244,62 @@ const dates = load("lib/nbaDate.ts");
 const digestLib = load("lib/digest.ts");
 const teamsLib = load("lib/teams.ts");
 const api = load("lib/api.ts");
+const newsLib = load("lib/news.ts", { "./api": api, "./teams": teamsLib });
 const presentation = load("lib/digestPresentation.ts", { "@/lib/nbaDate": dates, "@/lib/digest": digestLib });
+
+const LEAGUE_TITLES = [
+  "Celtics open practice in the garden",
+  "Celtics film session stays private",
+  "Boston Celtics walkthrough notes",
+  "Knicks rest starters on Tuesday",
+  "Heat prepare for a road trip",
+  "Lakers discuss lineup changes",
+  "Bulls schedule a morning shootaround",
+  "Nets review film from Friday",
+  "Warriors add a practice session",
+];
+let shownLeagueTitles = [];
+const homePage = load("app/page.tsx", {
+  "@/components/TeamHeader": { default: () => null },
+  "@/components/GameDayHero": { default: () => null },
+  "@/components/GameSection": { HomeDigestCard: () => null, LastGameCard: () => null, NextGameCard: () => null },
+  "@/components/NewsFeed": { default: () => null },
+  "@/components/GameDataProvider": { default: ({ children }) => children },
+  "@/components/TopPlaysCard": { default: () => null },
+  "@/components/MorningBriefingCard": { default: () => null },
+  "@/components/PersonalizedFeed": {
+    default: () => null,
+    LeagueNewsSection: ({ news }) => {
+      shownLeagueTitles = news.map((item) => item.title);
+      return null;
+    },
+  },
+  "@/hooks/useFavoriteTeams": { useFavoriteTeamObjects: () => [team("BOS")] },
+  "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: team("BOS") }) },
+  "@/hooks/useRemoteData": { useRemoteData: () => ({
+    data: { feeds: { NBA: { items: LEAGUE_TITLES.map((title, index) => ({
+      title, safeTitle: title, link: `https://example.com/league-${index}`,
+      pubDate: new Date(Date.now() - (index + 1) * 3600000).toISOString(),
+      source: "Wire", isSpoiler: false, category: "general",
+    })), error: false } } },
+    loading: false, error: false, retry() {},
+  }) },
+  "@/lib/news": newsLib,
+  "@/lib/teams": teamsLib,
+}).default;
+
+test("the league list filters the focus team before it keeps six", () => {
+  // Nine stories, the first three about Boston. Filter, then slice(0, 6), keeps six,
+  // including original items 7 and 8. Cutting to six first would leave only three.
+  shownLeagueTitles = [];
+  renderToStaticMarkup(createElement(homePage));
+  const actual = Array.from(shownLeagueTitles, (title) => String(title));
+  assert.deepEqual(actual, LEAGUE_TITLES.slice(3));
+  assert.equal(actual.length, 6);
+  assert.equal(actual.includes(LEAGUE_TITLES[6]), true);
+  assert.equal(actual.includes(LEAGUE_TITLES[7]), true);
+  for (const title of actual) assert.equal(headlineIsAboutTeam(title, team("BOS")), false, title);
+});
 
 test("the full edition keeps Around the league lines about the focus team", () => {
   assert.equal(presentation.omitTeamFromLeagueSection, undefined);
