@@ -5,9 +5,10 @@ import MarkdownContent from "@/components/MarkdownContent";
 import DataError from "@/components/DataError";
 import { useSpoilerContext } from "@/components/SpoilerModeProvider";
 import { useRemoteData } from "@/hooks/useRemoteData";
+import { useTeam } from "@/hooks/useTeam";
 import { formatGameDate } from "@/lib/nbaDate";
 import type { DigestEntry, FeedbackAgg } from "@/lib/digest";
-import { getDigestPresentation } from "@/lib/digestPresentation";
+import { getDigestPresentation, omitTeamFromLeagueSection } from "@/lib/digestPresentation";
 
 const STYLE_META = {
   hype: { label: "Hype", color: "text-orange-300", bg: "bg-orange-500/15 border-orange-500/30", icon: Zap },
@@ -34,9 +35,13 @@ function DigestCard({ digest, feedback, reaction, pending, reactionError, onReac
   const [revealed, setRevealed] = useState(false);
   useEffect(() => setRevealed(false), [digest.date, hideScores, hideHeadlines]);
   const hidden = protectedContent && !revealed;
+  const { selectedTeam } = useTeam();
   const meta = STYLE_META[digest.style] ?? STYLE_META.casual;
   const StyleIcon = meta.icon;
-  const presentation = getDigestPresentation(digest);
+  const presentation = getDigestPresentation({
+    ...digest,
+    content: omitTeamFromLeagueSection(digest.content, selectedTeam),
+  });
   return (
     <div className="p-5 sm:p-6">
       <div className="flex flex-wrap items-center gap-2 mb-2">

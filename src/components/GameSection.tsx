@@ -1,13 +1,15 @@
 "use client";
+import { useEffect, useState } from "react";
 import { formatGameDate, formatTipoff, gameDaysAgo } from "@/lib/nbaDate";
 import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
-import { getHighlightUrl, getOpponent, getTeamScore, getOpponentScore } from "@/lib/api";
+import { getHighlightUrl, getOpponent, getTeamScore, getOpponentScore, type GameInfo } from "@/lib/api";
 import ScoreReveal from "./ScoreReveal";
 import Link from "next/link";
 import { Play, ArrowUpRight } from "lucide-react";
-import { getTeamById } from "@/lib/teams";
+import { getTeamById, teamByAbbreviation, type Team } from "@/lib/teams";
+import { isDigestDate, parseCoveredGames, readDigestLeagueDate, type CoveredGame, type DigestEntry } from "@/lib/digest";
 import styles from "./Home.module.css";
 
 function Card({ children }: { children: React.ReactNode }) {
@@ -145,4 +147,170 @@ export function NextGameCard() {
       </div>
     </Card>
   );
+}
+
+function summaryTeams(focus: Team, favorites: Team[]): Team[] {
+  const rest = favorites.filter((team, index) => team.id !== focus.id && favorites.findIndex((item) => item.id === team.id) === index);
+  return [focus, ...rest];
+}
+
+function teamSide(game: CoveredGame, team: Team): "home" | "away" | null {
+  if (teamByAbbreviation(game.homeAbbr)?.id === team.id) return "home";
+  if (teamByAbbreviation(game.awayAbbr)?.id === team.id) return "away";
+  return null;
+}
+
+function teamLabel(team: Team): string {
+  return `${team.city} ${team.name}`;
+}
+
+function opponentLabel(abbreviation: string): string {
+  const team = teamByAbbreviation(abbreviation);
+  return team ? teamLabel(team) : abbreviation;
+}
+
+function resultLine(team: Team, game: CoveredGame, side: "home" | "away"): string {
+  const teamScore = side === "home" ? game.homeScore : game.awayScore;
+  const opponentScore = side === "home" ? game.awayScore : game.homeScore;
+  const opponent = opponentLabel(side === "home" ? game.awayAbbr : game.homeAbbr);
+  const label = teamLabel(team);
+  return teamScore > opponentScore
+    ? `${label} venceu ${opponent} por ${teamScore} a ${opponentScore}.`
+    : `${label} perdeu para ${opponent} por ${opponentScore} a ${teamScore}.`;
+}
+
+function leagueLine(game: CoveredGame): string {
+  const homeWon = game.homeScore > game.awayScore;
+  const winner = opponentLabel(homeWon ? game.homeAbbr : game.awayAbbr);
+  const loser = opponentLabel(homeWon ? game.awayAbbr : game.homeAbbr);
+  const winnerScore = homeWon ? game.homeScore : game.awayScore;
+  const loserScore = homeWon ? game.awayScore : game.homeScore;
+  return `${winner} venceu ${loser} por ${winnerScore} a ${loserScore}.`;
+}
+
+function coverageLabel(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString("pt-BR", {
+    day: "numeric", month: "short", timeZone: "UTC",
+  }).replaceAll(".", "");
+}
+
+function nextGameLine(team: Team, game: GameInfo): string {
+  const place = game.isHome ? "em casa" : "fora de casa";
+  const when = game.startTime
+    ? `${formatGameDate(game.startTime, { weekday: "short", month: "short", day: "numeric" })} · ${formatTipoff(game.startTime)}`
+    : formatGameDate(game.date, { weekday: "short", month: "short", day: "numeric" });
+  return `Próximo jogo de ${teamLabel(team)}: ${place}, contra ${getOpponent(game).name}, ${when}.`;
+}
+
+function readDigest(value: unknown): { digest: DigestEntry; isToday: boolean } | "empty" | null {
+  if (!value || typeof value !== "object") return null;
+  const body = value as { digest?: unknown; isToday?: unknown; error?: unknown };
+  if (body.error) return null;
+  if (!body.digest) return "empty";
+  if (typeof body.digest !== "object") return null;
+  const digest = body.digest as Partial<DigestEntry>;
+  if (!isDigestDate(digest.date) || typeof digest.content !== "string" || !Array.isArray(digest.games_covered)) return null;
+  if (digest.games_covered.some((item) => typeof item !== "string")) return null;
+  return { digest: digest as DigestEntry, isToday: body.isToday !== false };
+}
+
+export function HomeDigestCard({ favoriteTeams }: { favoriteTeams: Team[] }) {
+  const { selectedTeam } = useTeam();
+  const { nextGame, record, loading: gamesLoading, error: gamesError } = useGameData();
+  const [attempt, setAttempt] = useState(0);
+  const [phase, setPhase] = useState<"loading" | "ready" | "empty" | "error">("loading");
+  const [edition, setEdition] = useState<{ digest: DigestEntry; isToday: boolean } | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setPhase("loading");
+    fetch("/api/digest", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("unavailable");
+        const parsed = readDigest(await response.json());
+        if (!parsed) throw new Error("unavailable");
+        if (parsed === "empty") {
+          setEdition(null);
+          setPhase("empty");
+          return;
+        }
+        setEdition(parsed);
+        setPhase("ready");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setPhase("error");
+      });
+    return () => controller.abort();
+  }, [attempt]);
+
+  if (phase === "loading") {
+    return <section aria-label="Digest" className={styles.digest}>
+      <h2 className={styles.sectionHeading}>Digest</h2>
+      <div role="status" aria-label="Carregando digest" className="space-y-3 animate-pulse">
+        <div className="h-4 w-40 rounded bg-white/10" />
+        <div className="h-4 w-64 rounded bg-white/10" />
+      </div>
+    </section>;
+  }
+
+  if (phase === "error") {
+    return <section aria-label="Digest" className={styles.digest}>
+      <h2 className={styles.sectionHeading}>Digest</h2>
+      <p role="alert" className="text-sm text-white/80">Não foi possível carregar o digest.</p>
+      <button type="button" onClick={() => setAttempt((value) => value + 1)} className="mt-4 min-h-11 rounded-lg bg-white/10 px-4 text-sm font-medium hover:bg-white/20">Tentar de novo</button>
+    </section>;
+  }
+
+  if (!edition) {
+    return <section aria-label="Digest" className={styles.digest}>
+      <h2 className={styles.sectionHeading}>Digest</h2>
+      <p className="text-sm text-white/70">Nenhum digest publicado ainda.</p>
+      <Link href="/digest" className="mt-2 inline-flex min-h-11 items-center text-sm text-white/70 underline decoration-white/20 underline-offset-4 hover:text-white">Edição completa, em inglês</Link>
+    </section>;
+  }
+
+  const games = parseCoveredGames(edition.digest.games_covered);
+  const subjects = summaryTeams(selectedTeam, favoriteTeams);
+  const subjectIds = new Set(subjects.map((team) => team.id));
+  const openers = subjects.map((team) => {
+    const game = games.find((item) => teamSide(item, team));
+    const side = game ? teamSide(game, team) : null;
+    if (!game || !side) return { text: `${teamLabel(team)} não jogou nesta rodada.`, spoiler: false };
+    return { text: resultLine(team, game, side), spoiler: true };
+  });
+  const league = games.filter((game) => ![game.awayAbbr, game.homeAbbr].some((abbr) => {
+    const team = teamByAbbreviation(abbr);
+    return team ? subjectIds.has(team.id) : false;
+  })).map(leagueLine);
+  const coveredOn = readDigestLeagueDate(edition.digest.content);
+  const results = openers.filter((line) => line.spoiler);
+  const quiet = openers.filter((line) => !line.spoiler);
+  const showRecord = !gamesLoading && !gamesError;
+  const hasScores = results.length > 0 || showRecord || league.length > 0;
+
+  return <section aria-label="Digest" className={styles.digest}>
+    <h2 className={styles.sectionHeading}>Digest</h2>
+    <p className="mb-3 text-sm text-white/70">{coveredOn ? `Jogos de ${coverageLabel(coveredOn)}.` : `Edição de ${coverageLabel(edition.digest.date)}.`}</p>
+    {!edition.isToday && <p className="mb-3 text-sm text-white/70">Não há digest de hoje. Esta é a edição mais recente.</p>}
+    {quiet.length > 0 && <ul className="space-y-1 text-sm leading-6">
+      {quiet.map((line) => <li key={line.text}>{line.text}</li>)}
+    </ul>}
+    {hasScores && <div className="mt-3">
+      <ScoreReveal scope={`digest:${edition.digest.date}:${selectedTeam.id}`} label="digest results">
+        {results.length > 0 && <ul className="space-y-1 text-sm leading-6">
+          {results.map((line) => <li key={line.text}>{line.text}</li>)}
+        </ul>}
+        {showRecord && <p className="mt-2 text-sm">Campanha atual: {record.wins}–{record.losses}.</p>}
+        {league.length > 0 && <>
+          <h3 className="mb-1 mt-3 text-sm font-semibold">Pelo resto da liga</h3>
+          <ul className="space-y-1 text-sm leading-6">
+            {league.map((line) => <li key={line}>{line}</li>)}
+          </ul>
+        </>}
+      </ScoreReveal>
+    </div>}
+    {!gamesLoading && !gamesError && nextGame && <p className="mt-3 text-sm text-white/80">{nextGameLine(selectedTeam, nextGame)}</p>}
+    <Link href="/digest" className="mt-2 inline-flex min-h-11 items-center text-sm text-white/70 underline decoration-white/20 underline-offset-4 hover:text-white">Edição completa, em inglês</Link>
+  </section>;
 }
