@@ -18,8 +18,6 @@ Personal NBA dashboard — today's game, last game recap, top plays, standings, 
 - `/schedule` — Season schedule
 - `/standings` — League standings
 - `/players` — Player stats
-- `/social` — Social feed
-- `/compare` — Player comparison tool
 - `/digest` — Phantom Digest (autonomous AI digest POC)
 - `app/api/` — NBA data endpoints (scores, news, standings, players)
 

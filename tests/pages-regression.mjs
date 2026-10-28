@@ -35,11 +35,6 @@ export default async function runPagesRegression(page) {
     else if (key === "highlights") body = { videos: { "2026-10-26": { id: "DTNqMLNVBC8", thumbnail: "https://i.ytimg.com/vi/DTNqMLNVBC8/hqdefault.jpg", url: "https://www.youtube.com/watch?v=DTNqMLNVBC8", duration: 600 } }, failedDates: [] };
     else if (key === "players") body = { players: [{ id: 1, firstName: "Current", lastName: "Player", jerseyNumber: "7", position: "G", height: "6-4", weight: "200" }], source: "ESPN" };
     else if (key === "standings") body = { standings: Array.from({ length: 10 }, (_, i) => ({ id: i + 1, name: "Team " + i, abbreviation: i === 0 ? "BOS" : "BKN", conference: "East", wins: 10 - i, losses: i })) };
-    else if (key === "compare") body = { team1: { wins: 2, losses: 1, ppg: "110", oppg: "105", gamesPlayed: 3 }, team2: { wins: 3, losses: 1, ppg: "120", oppg: "105", gamesPlayed: 4 }, headToHead: { team1Wins: 0, team2Wins: 0 } };
-    else if (key === "social") body = { source: "news-index", posts: [
-      { id: "1", title: "Boston wins 118-107", score: null, comments: null, created: Date.now() / 1000, url: "https://reddit.com/r/bostonceltics/1", subreddit: "bostonceltics", author: "fan", thumbnail: null, category: "postgame" },
-      { id: "2", title: "League discussion", score: null, comments: null, created: Date.now() / 1000, url: "https://reddit.com/r/nba/2", subreddit: "nba", author: "fan", thumbnail: null, category: "discussion" },
-    ] };
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
   const go = (path) => p.goto("http://localhost:3000" + path);
@@ -102,16 +97,9 @@ export default async function runPagesRegression(page) {
     await p.getByRole("button", { name: "Close player", exact: true }).click();
     check(await p.locator("main iframe").count() === 0, "Closing the player stops and removes its iframe");
     check((await p.getByRole("link", { name: "Search more highlights" }).boundingBox()).height >= 44, "Highlights footer has a 44px target");
-    await go("/compare"); await p.getByText("120", { exact: true }).waitFor();
-    check(await p.locator("main .rounded-r").first().evaluate((el) => getComputedStyle(el).backgroundColor !== "rgb(0, 0, 0)"), "Nets chart uses a visible color");
-    check((await p.getByLabel("Team 1", { exact: true }).boundingBox()).height >= 44, "Comparison selects have 44px targets");
-    await go("/social"); await p.getByRole("button", { name: "r/nba", exact: true }).click();
-    check(await p.getByRole("button", { name: "r/nba", exact: true }).getAttribute("aria-pressed") === "true", "Social filters expose their selected state");
-    check(await p.getByText(/news index/).count() === 1, "Community fallback source is explained");
-    check(!(await p.locator("main").innerText()).includes("↑ 0"), "Unavailable post metrics are not fabricated as zero");
     await go("/standings"); await p.getByText("Playoff position", { exact: true }).first().waitFor();
     check(await p.getByText("Play-In position", { exact: true }).count() === 4, "Standings expose playoff and play-in meaning as text");
-    for (const path of ["/digest", "/players", "/standings", "/schedule", "/highlights", "/compare", "/social"]) {
+    for (const path of ["/digest", "/players", "/standings", "/schedule", "/highlights"]) {
       await go(path); await p.waitForFunction(() => !document.querySelector("main .animate-pulse"));
       check((await p.title()).includes("| NBA Feed") && (await p.title()) !== "NBA Feed", path + ": document title identifies the route");
       for (const width of [320, 390, 768, 1440]) {

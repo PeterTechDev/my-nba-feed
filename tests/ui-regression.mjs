@@ -25,9 +25,7 @@ export default async function runUiRegression(page) {
     highlights: { videos: {}, failedDates: [] },
     players: { players: [{ id: 1, firstName: "Test", lastName: "Player", position: "F", jerseyNumber: "0", height: "6-8", weight: "210" }] },
     standings: { standings: [{ ...team, ...stats, conference: "East", division: "Atlantic" }] },
-    compare: { team1: stats, team2: { ...stats, wins: 18 }, headToHead: { team1Wins: 2, team2Wins: 1 } },
     news: [{ title: "Celtics win 118-107", safeTitle: "Spoiler-protected headline", isSpoiler: true, category: "recap", source: "Test", pubDate: new Date().toISOString(), link: "https://example.com/news" }, { title: "Older team update", safeTitle: "Older team update", isSpoiler: false, category: "analysis", source: "Test", pubDate: new Date(Date.now() - 9 * 3600000).toISOString(), link: "https://example.com/older" }],
-    social: { posts: [{ id: "post-1", title: "Celtics win 118-107", score: 100, comments: 20, created: Date.now() / 1000, url: "https://example.com/post", subreddit: "bostonceltics", author: "fan", thumbnail: "https://example.com/spoiler.jpg", category: "postgame" }] },
   };
   await p.route("http://localhost:3000/api/**", async (route) => {
     const requestUrl = new URL(route.request().url());
@@ -42,14 +40,14 @@ export default async function runUiRegression(page) {
     }
     const fail = failures.has(key);
     let data = fixtures[key];
-    if (empty.has(key)) data = key === "news" ? [] : { [key === "schedule" ? "games" : key === "social" ? "posts" : key]: [] };
+    if (empty.has(key)) data = key === "news" ? [] : { [key === "schedule" ? "games" : key]: [] };
     await route.fulfill({ status: fail ? 503 : 200, contentType: "application/json", body: JSON.stringify(fail ? { error: "upstream failure" } : data) });
   });
   const errors = p.getByRole("alert").filter({ hasText: "Unable to load" });
   const go = (path) => p.goto(`http://localhost:3000${path}`);
   try {
     await p.setViewportSize({ width: 1440, height: 1000 });
-    for (const [path, key, subject] of [["/", "games", "game data"], ["/compare", "compare", "team comparison"], ["/players", "players", "players"], ["/standings", "standings", "standings"], ["/highlights", "schedule", "recent games"], ["/schedule", "schedule", "the schedule"], ["/social", "social", "social posts"]]) {
+    for (const [path, key, subject] of [["/", "games", "game data"], ["/players", "players", "players"], ["/standings", "standings", "standings"], ["/highlights", "schedule", "recent games"], ["/schedule", "schedule", "the schedule"]]) {
       failures.add(key);
       await go(path);
       await p.getByRole("alert").filter({ hasText: `Unable to load ${subject}` }).waitFor();
@@ -59,18 +57,6 @@ export default async function runUiRegression(page) {
       await errors.waitFor({ state: "detached" });
       check(true, `${path}: retry recovers`);
     }
-
-    await go("/compare");
-    await p.getByText("27", { exact: true }).first().waitFor();
-    check(await p.getByLabel("Team 1", { exact: true }).count() === 1, "Comparison selects have accessible labels");
-    failures.add("compare");
-    await p.getByLabel("Team 1", { exact: true }).selectOption("4");
-    await errors.waitFor();
-    check(await p.getByText("27", { exact: true }).count() === 0, "Changing teams cannot retain previous comparison results on failure");
-    failures.delete("compare");
-    await p.getByLabel("Team 2", { exact: true }).selectOption("4");
-    await p.getByText("Select two different teams to compare").waitFor();
-    check(await errors.count() === 0, "Same-team comparison remains guarded");
 
     empty.add("schedule");
     await go("/highlights");
@@ -105,19 +91,6 @@ export default async function runUiRegression(page) {
     await p.getByRole("button", { name: /^Spoilers visible/ }).click();
     await p.setViewportSize({ width: 1440, height: 1000 });
 
-    await go("/social");
-    await p.getByText("Spoiler-protected post from r/bostonceltics").waitFor();
-    check(await p.getByText("Celtics win 118-107", { exact: true }).count() === 0, "Social result title is absent until reveal");
-    check(await p.locator('img[src="https://example.com/spoiler.jpg"]').count() === 0, "Social thumbnail is absent until reveal");
-    await p.getByRole("button", { name: "Reveal post and image" }).click();
-    await p.getByText("Celtics win 118-107", { exact: true }).waitFor();
-    check(await p.locator('img[src="https://example.com/spoiler.jpg"]').count() === 1, "Explicit reveal shows title and image");
-    await p.getByRole("button", { name: "Hide spoilers", exact: true }).click();
-    check(await p.getByText("Celtics win 118-107", { exact: true }).count() === 0, "Post can be hidden again");
-    await p.reload();
-    await p.getByText("Spoiler-protected post from r/bostonceltics").waitFor();
-    check(true, "Spoiler preferences survive reload");
-
     for (const width of [320, 390, 768, 1440]) {
       await p.setViewportSize({ width, height: 844 });
       const nav = p.getByRole("navigation", { name: "Main navigation" });
@@ -129,7 +102,7 @@ export default async function runUiRegression(page) {
       check(favoriteRect.x >= 0 && favoriteRect.x + favoriteRect.width <= width && favoriteRect.width >= 44 && favoriteRect.height >= 44, `${width}px: My Teams has a visible 44px target`);
       if (width < 1280) {
         await p.getByRole("button", { name: "Open navigation" }).click();
-        check(await nav.getByRole("link").count() === 10, `${width}px: all destinations available in menu`);
+        check(await nav.getByRole("link").count() === 6, `${width}px: all destinations available in menu`);
         await nav.getByRole("link", { name: "Schedule", exact: true }).click();
         await p.waitForURL("**/schedule");
         check(await p.getByRole("button", { name: "Open navigation" }).count() === 1, `${width}px: navigation closes after route change`);
