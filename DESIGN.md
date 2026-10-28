@@ -98,22 +98,29 @@ The logo's intended colors are amber `#FBBF24`, off-white `#FAFAFA` and near-bla
 - **Canvas** is the page and navigation ground; **panel** and **dialog** distinguish content and overlays; **field** supports native selectors.
 - **Text** is the effective root foreground. **Text muted** carries supporting information; **divider** is also the common subdued-control fill. **Panel border** outlines dashboard cards.
 - Emerald and red communicate existing followed-team, upcoming-game and live-game states. Digest style badges have local category colors; these do not replace the neutral shell.
+- The homepage arena uses local black scrims (`#0009`/`#0002` on desktop, `#000a`/`#0005` on mobile) and an opaque-black-to-transparent mask (`#000`) to keep the white identity legible. A 65% team-primary color blend is masked above the court so its wood remains natural. The roster action's pale hover (`#e5e5e5`) is also local. These image and control treatments do not extend the global palette.
 
 ## Typography
 
-Inter is loaded through `next/font/google` and exposed by `--font-inter`; Tailwind's sans family uses it throughout. Headlines commonly use the frontmatter headline role, reaching 30px on the team header at small screens and above. Panel titles use 16px semibold; body copy and navigation use 14px; compact labels use 12px. Larger editorial type on About is a surface-specific extension, not a new global display scale. Scores use tabular numerals.
+Inter is loaded through `next/font/google` and exposed by `--font-inter`; Tailwind's sans family uses it throughout. Compact headlines use the frontmatter headline role. Panel titles use 16px semibold; body copy and navigation use 14px; compact labels use 12px. Scores use tabular numerals.
+
+The homepage arena is a scoped display extension: white uppercase Inter team names (weight 850, line height 0.95, tracking -0.035em) use `clamp(88px, 11vw, 158px)`, with `clamp(64px, 7.5vw, 108px)` for names longer than ten characters. The city is a separate large line (weight 500, `clamp(30px, 3.5vw, 48px)`). Below 768px, the team ramps become 64–100px and 48–76px respectively, each capped by the available width divided by the longest word's letter count and a 0.74 width allowance; the city uses `clamp(25px, 6vw, 36px)`. These bounds permit long names to shrink below the nominal ramp rather than overflow. Neither this display scale nor About's editorial type changes the global roles.
 
 ## Layout
 
 Page containers are centered at a maximum width of 1152px, generally with 16px padding that becomes 32px at the 640px breakpoint. Dashboard gaps are commonly 16px, with 24px/32px between sections. Cards use 16px–24px internal padding. Dashboard columns expand at 768px and 1024px; roster cards collapse to divided disclosure rows on mobile. Navigation uses a menu below 1280px and a single row above it. Main controls generally provide a minimum 44px height.
 
+The approved homepage opening is a full-width photographic arena hero with content aligned to the existing container. Its height uses `clamp(440px, 39vw, 560px)` on desktop and a 480px minimum below 768px. City and team name lead on the left; the 176px official crest is centered over the basket support, with its center anchored at 89.3% of the hero width and `calc(60% + 1vw)` from the top to follow the image crop. Below 1024px it returns to the upper right at 96px, becoming 88px below 768px to keep the name and controls clear. Wrapping roster, focus-team and protected-record controls sit beneath the identity. The record reserves 184px and reveals inline beside Hide record, preserving control alignment and hero height. Below the hero, Games introduces one panel using the existing panel ground, border and 12px radius. Two divided columns become one below 768px; each game groups its matchup, result or time and an aligned action footer. Highlights and closed news form a quieter two-column secondary area, stacking on mobile and expanding to full reading width when news opens. A restrained shared footer closes the page. The home uses its content height rather than a forced 100vh tail. This composition is specific to the homepage; other pages retain their existing layouts.
+
 ## Elevation & Depth
 
 The sampled system uses tonal surfaces and thin borders without box shadows. Native dialogs sit over a black 75% backdrop, use a 16px radius and cap their height at 85dvh. Global focus is a 2px amber outline offset by 4px. Interaction transitions use the existing motion variables; entrance and reveal animations honor reduced motion.
 
+The homepage's depth comes from the generated photographic arena, black scrims and masked team-color lighting. One entrance opens the arena image over 950ms while the identity arrives over 800ms, both using the shared easing; the identity entrance also runs when the focus team changes. They settle completely without an ambient loop. Reduced motion starts in the final static state immediately.
+
 ## Shapes
 
-Controls have 8px corners, cards and selectable team tiles 12px, dialogs and team headers 16px. Fully rounded forms are reserved for compact status marks, counts, category badges and the current calendar date. Borders are ordinarily 1px; selected team tiles use a 2px contrast-adjusted team-colored border and an amber checkmark.
+Controls have 8px corners, cards and selectable team tiles 12px, and dialogs 16px. The full-width homepage arena is square-edged; its Games panel uses the existing 12px card radius without separately enclosing each game. Fully rounded forms are reserved for compact status marks, counts, category badges and the current calendar date. Borders are ordinarily 1px; selected team tiles use a 2px contrast-adjusted team-colored border and an amber checkmark.
 
 ## Components
 
@@ -124,7 +131,8 @@ Controls have 8px corners, cards and selectable team tiles 12px, dialogs and tea
 - **Reading and scrolling:** digest lists use hanging indents and spaced items. Scrollbars use neutral gray on panel gray, and page anchor scrolling leaves room for the sticky navigation. Highlight previews retain their 16:9 proportions at every breakpoint.
 - **Navigation:** sticky canvas-colored shell, 64px minimum row and the approved stacked logo in a 112px × 44px frame that hides its canvas margins. The home link's image has the accessible name My NBA Feed. Desktop uses 14px text links and a separate utility group with a thin divider. Active links use a white-tint fill and `aria-current`. Protection uses amber text; followed teams use an emerald heart with an inline neutral count. Below 640px, compact utilities keep accessible names and tooltips while their text labels are hidden. The small-screen menu uses a two-column link grid with 16px icons.
 - **Badges:** compact fully rounded digest category labels; selected-team counts and live dots remain small status treatments.
-- **Team header:** a team-colored band with a contrast-selected foreground, real team logo and a neutral inset for controls.
+- **Footer:** shared across all routes through the root layout, with a full-width dark ground and top border to mark the application's end. The container-aligned upper row groups NBA Feed home with About, GitHub and LinkedIn. A quieter lower row carries the year, Peter Souza attribution, independent-project note and Back to top. Professional links reuse the documented author profiles, use Lucide icons and name their new-tab behavior. Links retain 44px targets and rows stack on narrow screens. The homepage has no duplicate footer inside its content.
+- **Team header:** the homepage's photographic arena composition, white city and display team name, official crest and familiar native controls. The white roster link, bordered focus-team selector and protected-record reveal wrap together with 44px minimum targets. Preserve explicit record and score protection. The arena is generic generated atmosphere, not an image of the selected team's actual venue; provenance is in [docs/arena-atmosphere.md](docs/arena-atmosphere.md).
 
 ## Do's and Don'ts
 

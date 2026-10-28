@@ -14,7 +14,7 @@ function load(file, globals = {}, imports = {}) {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX,
   } }).outputText;
   const exports = {};
-  const scope = { exports, require: (id) => imports[id] ?? require(id), Date, URL, AbortSignal, Response, Buffer, setTimeout, ...globals };
+  const scope = { exports, require: (id) => imports[id] ?? (id.endsWith(".module.css") ? { default: new Proxy({}, { get: (_target, key) => key }) } : require(id)), Date, URL, AbortSignal, Response, Buffer, setTimeout, ...globals };
   vm.runInNewContext(code, scope);
   return { exports, code, scope };
 }
@@ -189,7 +189,26 @@ test("spoiler labels name hidden content in both complete and mixed states", () 
     assert.ok(html.includes(label));
     assert.ok(html.includes(`aria-label="${label} by default.`));
     assert.ok(html.includes(`aria-pressed="${pressed}"`));
+    assert.match(html, /aria-label="My NBA Feed home" aria-current="page"/);
+    assert.doesNotMatch(html, /href="\/players"|>Home<|>Players</);
     assert.doesNotMatch(html, /Default on|Default off|Custom protection/);
+  }
+});
+
+test("the roster is reachable beside the selected team", () => {
+  let team = teams.getCeltics();
+  const TeamHeader = load("components/TeamHeader.tsx", {}, {
+    "next/link": { default: "a" },
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: team }) },
+    "@/lib/teams": teams,
+    "./TeamSelector": { default: () => null },
+    "./RecordBadge": { default: () => null },
+  }).exports.default;
+  for (const selected of [team, teams.teams.find((item) => item.name === "Lakers")]) {
+    team = selected;
+    const html = renderToStaticMarkup(createElement(TeamHeader));
+    assert.match(html, new RegExp(`href="/players" aria-label="${team.name} players"`));
+    assert.ok(html.includes(team.city) && html.includes(team.name));
   }
 });
 
@@ -264,7 +283,7 @@ test("news labels remove only publisher suffixes and report honest publication a
   }
 });
 
-test("homepage puts games and highlights before news and shows the focus-team lead only once", () => {
+test("homepage keeps news optional after games and shows the focus-team lead only once", () => {
   const focus = teams.getCeltics();
   const other = teams.teams.find((team) => team.name === "Lakers");
   let favorites = [focus.id];
@@ -297,6 +316,8 @@ test("homepage puts games and highlights before news and shows the focus-team le
   mocked["@/components/GameDataProvider"] = { default: ({ children }) => children };
   const Home = load("app/page.tsx", {}, mocked).exports.default;
   let html = renderToStaticMarkup(createElement(Home));
+  assert.match(html, /Your teams, latest news/);
+  assert.doesNotMatch(html, /<details[^>]*\bopen(?:[=\s>])/);
   assert.equal(html.split("Celtics lead").length - 1, 1);
   assert.ok(html.indexOf("vs Nets") < html.indexOf("Celtics lead"));
   assert.ok(html.indexOf("Browse game highlights") < html.indexOf("Celtics lead"));
@@ -316,6 +337,7 @@ test("homepage puts games and highlights before news and shows the focus-team le
   assert.match(html, /Morning Briefing/);
   favorites = [];
   html = renderToStaticMarkup(createElement(Home));
+  assert.match(html, /Celtics, latest news/);
   assert.equal(html.split("Celtics lead").length - 1, 1);
   assert.match(html, /Celtics second/);
   assert.match(html, /Celtics third/);
@@ -466,6 +488,24 @@ test("all team identities and legacy preferences remain one-to-one", () => {
     return .2126 * c[0] + .7152 * c[1] + .0722 * c[2];
   };
   for (const color of colors) assert.ok((luminance(color) + .05) / (luminance("#161616") + .05) >= 3);
+});
+
+test("saved focus teams migrate to bundled logos without changing team identity", () => {
+  const { persist, createJSONStorage } = require("zustand/middleware");
+  for (const version of [0, 1]) {
+    const heat = teams.teams.find((team) => team.abbreviation === "MIA");
+    const saved = new Map([["nba-feed-team", JSON.stringify({ version, state: {
+      selectedTeam: { ...heat, id: version === 0 ? 15 : heat.id, logo: `https://cdn.nba.com/logos/nba/${heat.nbaComId}/primary/L/logo.svg` },
+    } })]]);
+    const storage = { getItem: (key) => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value), removeItem: (key) => saved.delete(key) };
+    const { useTeam } = load("hooks/useTeam.ts", {}, {
+      "@/lib/teams": teams,
+      "zustand/middleware": { persist: (config, options) => persist(config, { ...options, storage: createJSONStorage(() => storage) }) },
+    }).exports;
+    assert.equal(useTeam.getState().selectedTeam, heat);
+    assert.equal(useTeam.getState().selectedTeam.logo, `/teams/${heat.nbaComId}.svg`);
+    assert.equal(JSON.parse(saved.get("nba-feed-team")).version, 2);
+  }
 });
 
 test("Blob updates use origin ETags and retry conflicts without losing concurrent writes", async () => {

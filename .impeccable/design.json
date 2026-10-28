@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-27T23:58:39.074Z",
+  "generatedAt": "2026-10-28T00:40:08.203Z",
   "title": "Design System: NBA Feed",
   "extensions": {
     "colorMeta": {
@@ -162,7 +162,7 @@
     "typographyMeta": {
       "headline": {
         "displayName": "Page headline",
-        "purpose": "Compact dashboard and roster headings; not the About display treatment."
+        "purpose": "Compact dashboard and roster headings; homepage arena and About display treatments remain surface-specific extensions."
       },
       "title": {
         "displayName": "Panel title",
@@ -193,6 +193,16 @@
         "name": "--motion-ease",
         "value": "cubic-bezier(0.16, 1, 0.3, 1)",
         "purpose": "Shared transform and entrance easing; reduced motion disables animation."
+      },
+      {
+        "name": "homepage-arena-open",
+        "value": "950ms var(--motion-ease)",
+        "purpose": "Homepage-only arena image entrance: scale 1.045 to 1 and bottom clip 9% to 0, once on mount. Reduced motion renders the final static state immediately."
+      },
+      {
+        "name": "homepage-team-arrive",
+        "value": "800ms var(--motion-ease)",
+        "purpose": "Homepage-only identity entrance: translateY 18px to 0 and opacity 0.65 to 1, on mount and focus-team change. No ambient loop; reduced motion renders the final static state immediately."
       }
     ],
     "breakpoints": [

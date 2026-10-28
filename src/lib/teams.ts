@@ -18,7 +18,7 @@ function t(
   return {
     id, nbaComId, name, abbreviation, city, conference, division,
     primaryColor, secondaryColor,
-    logo: `https://cdn.nba.com/logos/nba/${nbaComId}/primary/L/logo.svg`,
+    logo: `/teams/${nbaComId}.svg`,
   };
 }
 

@@ -15,7 +15,7 @@ export const useTeam = create<TeamStore>()(
       setTeam: (team) => set({ selectedTeam: team }),
     }),
     {
-      name: "nba-feed-team", version: 1,
+      name: "nba-feed-team", version: 2,
       migrate: (persisted) => {
         const saved = persisted as Partial<TeamStore>;
         return { selectedTeam: teams.find((team) => team.abbreviation === saved?.selectedTeam?.abbreviation) ?? getCeltics() };

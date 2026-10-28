@@ -126,7 +126,7 @@ export default async function runPagesRegression(page) {
     });
     await p.reload(); await p.getByRole("heading", { name: "Heat", exact: true }).waitFor();
     const saved = await p.evaluate(() => ({ team: JSON.parse(localStorage.getItem("nba-feed-team")), favorites: JSON.parse(localStorage.getItem("nba-feed-favorite-teams")) }));
-    check(saved.team.version === 1 && saved.team.state.selectedTeam.id === 16, "Saved Heat selection migrates by identity to provider ID 16");
+    check(saved.team.version === 2 && saved.team.state.selectedTeam.id === 16 && saved.team.state.selectedTeam.logo === "/teams/1610612748.svg", "Saved Heat selection migrates by identity to provider ID 16 and its bundled logo");
     check(JSON.stringify(saved.favorites.state.favoriteTeamIds) === JSON.stringify([16, 15, 13, 12, 25, 24, 27, 26, 2]), "All eight corrected favorite IDs migrate without dropping or swapping teams");
     await p.reload();
     const again = await p.evaluate(() => JSON.parse(localStorage.getItem("nba-feed-favorite-teams")));

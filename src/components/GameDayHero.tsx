@@ -9,6 +9,7 @@ import { useGameData } from "@/hooks/useGameData";
 import { useTeam } from "@/hooks/useTeam";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 import { getOpponent, getOpponentScore, getTeamScore } from "@/lib/api";
+import styles from "./Home.module.css";
 
 function getCountdown(dateStr?: string | null): string {
   if (!dateStr) return "Tipoff time TBD";
@@ -44,28 +45,33 @@ export default function GameDayHero() {
   const searchContext = `${selectedTeam.city} ${selectedTeam.name} vs ${opponent.name}`;
 
   return (
-    <section className="flex min-w-0 flex-col rounded-xl border border-[#2a2a2a] bg-[#161616] p-5 sm:p-6">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-base font-semibold">{isLive ? "Live Now" : "Next Game"}</h2>
+    <section className={styles.game}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-base font-semibold">{isLive ? "Live Now" : "Next Game"}</h3>
         <span className={`text-xs font-semibold ${isLive ? "text-red-300" : "text-emerald-300"}`}>{isLive ? statusLabel : "Today"}</span>
       </div>
-      <div className="mb-3 flex items-center gap-3">
+      <div className={styles.gamePair}>
+      <div>
+      <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        {opponentTeam && <img src={opponentTeam.logo} alt="" width={48} height={48} className="h-12 w-12 shrink-0 object-contain" />}
+        {opponentTeam && <img src={opponentTeam.logo} alt="" width={40} height={40} className="h-10 w-10 shrink-0 object-contain" />}
         <p className="text-2xl font-bold [text-wrap:balance]">{matchupLabel}</p>
       </div>
-      <p className="text-sm text-white/70">{formatGameDate(heroGame.startTime || heroGame.date, { month: "short", day: "numeric" })} · {heroGame.isHome ? "Home" : "Away"}</p>
+      <p className="mt-2 text-sm text-white/70">{formatGameDate(heroGame.startTime || heroGame.date, { month: "short", day: "numeric" })} · {heroGame.isHome ? "Home" : "Away"}</p>
+      </div>
       {isLive ? (
-        <div className="my-3">
+        <div>
           <ScoreReveal scope={`live:${selectedTeam.id}:${heroGame.id}`} label={`${selectedTeam.name} live score`}>
             <p className="text-xl font-bold tabular-nums">{selectedTeam.abbreviation} {teamScore} – {opponent.abbreviation} {opponentScore}</p>
           </ScoreReveal>
         </div>
-      ) : <>
-        <p className="mt-2 text-2xl font-bold tabular-nums">{statusLabel}</p>
-        <p className="mt-2 mb-5 text-sm text-white/70">{getCountdown(heroGame.startTime)}</p>
-      </>}
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-white/10 pt-2">
+      ) : <div>
+        <p className="text-xl font-bold tabular-nums">{statusLabel}</p>
+        <p className="mt-1 text-sm text-white/70">{getCountdown(heroGame.startTime)}</p>
+      </div>}
+      </div>
+      <div className={styles.gameFooter}>
+      <div className="flex items-center justify-between gap-3">
         <Link href="/schedule" className="inline-flex min-h-11 flex-1 items-center text-sm font-medium text-white/80 hover:text-white">Full schedule</Link>
         <a href={`https://www.google.com/search?q=${encodeURIComponent(searchContext)}`} target="_blank" rel="noopener noreferrer"
           aria-label="Search matchup on Google (opens in a new tab)" title="Search matchup on Google"
@@ -74,6 +80,7 @@ export default function GameDayHero() {
         </a>
       </div>
       {(hideScores || hideHeadlines) && <p className="text-xs text-white/70">Google results may contain spoilers.</p>}
+      </div>
     </section>
   );
 }

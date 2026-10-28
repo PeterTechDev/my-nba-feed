@@ -3,15 +3,13 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Home, Users, BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
+import { BarChart3, Calendar, Play, ArrowLeftRight, MessageCircle, Eye, EyeOff, Menu, X, Settings, BookOpen, Heart, Info } from "lucide-react";
 import Modal from "./Modal";
 import FavoriteTeamsModal from "./FavoriteTeamsModal";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 
 const links = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/players", label: "Players", icon: Users },
   { href: "/standings", label: "Standings", icon: BarChart3 },
   { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/highlights", label: "Highlights", icon: Play },
@@ -47,7 +45,7 @@ export default function NavBar() {
     <nav aria-label="Main navigation" className="sticky top-0 z-40 border-b border-white/10 bg-[#0a0a0a]">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
         <div className="flex min-h-16 items-center gap-1 sm:gap-2">
-          <Link href="/" className="relative mr-auto block h-11 w-28 shrink-0 overflow-hidden xl:mr-0">
+          <Link href="/" aria-label="My NBA Feed home" aria-current={pathname === "/" ? "page" : undefined} onClick={() => setMenuOpen(false)} className="relative mr-auto block h-11 w-28 shrink-0 overflow-hidden xl:mr-0">
             <Image src="/branding/my-nba-feed-logo-stacked-dark.png" alt="My NBA Feed" fill sizes="192px" preload className="scale-[1.65] object-cover" />
           </Link>
           <div className="hidden xl:flex xl:items-center">{navigationLinks}</div>

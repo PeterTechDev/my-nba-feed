@@ -1,4 +1,5 @@
 "use client";
+import { ChevronDown } from "lucide-react";
 import TeamHeader from "@/components/TeamHeader";
 import GameDayHero from "@/components/GameDayHero";
 import { LastGameCard, NextGameCard } from "@/components/GameSection";
@@ -12,6 +13,7 @@ import { useTeam } from "@/hooks/useTeam";
 import { useRemoteData } from "@/hooks/useRemoteData";
 import { selectHomepageNews } from "@/lib/news";
 import type { NewsFeeds } from "@/lib/api";
+import styles from "@/components/Home.module.css";
 
 function FeedContent() {
   const favoriteTeams = useFavoriteTeamObjects();
@@ -27,26 +29,41 @@ function FeedContent() {
   return (
     <>
       <TeamHeader />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[1.1fr_1.1fr_0.9fr]">
-        <LastGameCard />
-        <GameDayHero />
-        <NextGameCard />
-        <TopPlaysCard />
+      <div className={styles.content}>
+      <section aria-label={`${selectedTeam.name} games`} className={styles.games}>
+        <h2 className={styles.sectionHeading}>Games</h2>
+        <div className={styles.gameGrid}>
+          <LastGameCard />
+          <GameDayHero />
+          <NextGameCard />
+        </div>
+      </section>
+      <section aria-label="Highlights and news" className={styles.catchUp}>
+      <TopPlaysCard />
+      <details className={`group ${styles.newsDetails}`}>
+        <summary className={styles.newsSummary}>
+          <span><span className="block text-base font-semibold">{hasPersonalized ? "Your teams, latest news" : `${selectedTeam.name}, latest news`}</span><span className="mt-1 block text-sm text-white/70">A few stories, when you’re ready.</span></span>
+          <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 group-open:rotate-180" />
+        </summary>
+        <div className="space-y-6 pt-5">
+          {hasPersonalized && <PersonalizedFeed feeds={feeds} loading={loading} error={error} retry={retry} />}
+          {!followedFocus && <MorningBriefingCard {...focus} news={focus.news.slice(0, 1)} />}
+          {!hasPersonalized && <NewsFeed {...focus} news={focus.news.slice(1)} />}
+          {hasPersonalized && <details className="border-t border-white/10 pt-2">
+            <summary className="min-h-11 cursor-pointer py-3 font-medium text-white/70 hover:text-white">Around the League</summary>
+            <LeagueNewsSection {...newsState("NBA")} />
+          </details>}
+        </div>
+      </details>
+      </section>
       </div>
-      {hasPersonalized && <PersonalizedFeed feeds={feeds} loading={loading} error={error} retry={retry} />}
-      {!followedFocus && <MorningBriefingCard {...focus} news={focus.news.slice(0, 1)} />}
-      {!hasPersonalized && <NewsFeed {...focus} news={focus.news.slice(1)} />}
-      {hasPersonalized && <details className="border-t border-white/10 pt-2">
-        <summary className="min-h-11 cursor-pointer py-3 font-medium text-white/70 hover:text-white">Around the League</summary>
-        <LeagueNewsSection {...newsState("NBA")} />
-      </details>}
     </>
   );
 }
 
 export default function Home() {
   return (
-    <main className="min-h-screen p-4 sm:p-8 max-w-6xl mx-auto space-y-6 sm:space-y-8">
+    <main className={styles.home}>
       <GameDataProvider>
         <FeedContent />
       </GameDataProvider>

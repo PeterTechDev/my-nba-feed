@@ -17,6 +17,17 @@ const status = load("lib/gameStatus.ts");
 const dates = load("lib/nbaDate.ts");
 const { teams, getContrastColor } = load("lib/teams.ts");
 
+test("all 30 team logos are bundled SVGs rather than runtime CDN requests", () => {
+  assert.equal(teams.length, 30);
+  for (const team of teams) {
+    assert.equal(team.logo, `/teams/${team.nbaComId}.svg`, team.name);
+    const svg = readFileSync(new URL(`../public${team.logo}`, import.meta.url), "utf8");
+    assert.match(svg, /<svg\b/);
+    assert.match(svg, /viewBox=/);
+    assert.doesNotMatch(svg, /<script\b|<foreignObject\b|\bon\w+\s*=|(?:href|url)\s*[=(]\s*["']?https?:/i);
+  }
+});
+
 test("only explicit in-progress statuses are live", () => {
   for (const value of ["2026-10-27T23:30:00Z", "7:30 pm ET", "Scheduled", "Final", "Final/OT", "Postponed", "", "Cancelled"]) {
     assert.equal(status.isLiveStatus(value), false, value);

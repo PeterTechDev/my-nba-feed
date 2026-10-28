@@ -16,7 +16,7 @@ function TeamNewsSection({ team, ...newsState }: NewsState & { team: Team }) {
     <div className="px-4 py-4 flex items-center gap-3" style={{ background: team.primaryColor, color: getContrastColor(team.primaryColor) }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={team.logo} alt="" width={40} height={40} className="w-10 h-10 object-contain shrink-0" />
-      <h3 className="text-lg font-semibold">{team.city} {team.name}</h3>
+      <h2 className="text-lg font-semibold">{team.city} {team.name}</h2>
     </div>
     <div className="p-4 space-y-3">
       <NewsList {...newsState} subject={`${team.name} stories`} showWarning={false} />
@@ -43,8 +43,7 @@ export function LeagueNewsSection(props: NewsState) {
 export default function PersonalizedFeed({ feeds, loading, error, retry }: { feeds: NewsFeeds; loading: boolean; error: boolean; retry: () => void }) {
   const favoriteTeams = useFavoriteTeamObjects();
   if (!favoriteTeams.length) return null;
-  return <section aria-labelledby="my-teams-heading">
-    <div className="flex items-center gap-3 mb-3 sm:mb-4"><h2 id="my-teams-heading" className="text-xl font-bold tracking-tight">Your teams, latest news</h2><span className="text-sm text-white/70">{favoriteTeams.length}</span></div>
+  return <section aria-label="News from your followed teams">
     <NewsLinkWarning />
     <div className="grid grid-cols-1 md:grid-cols-2 items-start gap-4">{favoriteTeams.map((team) => <TeamNewsSection key={team.id} team={team}
       news={feeds[team.name]?.items ?? []} loading={loading} error={error || Boolean(feeds[team.name]?.error)} retry={retry} />)}</div>
