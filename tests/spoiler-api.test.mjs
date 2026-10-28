@@ -468,32 +468,25 @@ test("every client fetch of news, digest and games sends the spoiler header for 
   const delegated = calls.filter((call) => call.kind === "useRemoteData");
   const guards = calls.filter((call) => call.kind === "guard");
   const mentions = calls.filter((call) => call.kind === "mention");
-  assert.deepEqual(fetches.map(({ file, line }) => `${file}:${line}`), [
-    "src/app/digest/page.tsx:29",
-    "src/components/GameSection.tsx:274",
-    "src/lib/api.ts:161",
-    "src/lib/api.ts:255",
-    "src/lib/api.ts:267",
-    "src/lib/api.ts:279",
-    "src/lib/api.ts:300",
-  ]);
-  assert.deepEqual(delegated.map(({ file, line }) => `${file}:${line}`), [
-    "src/app/digest/page.tsx:145",
-    "src/app/digest/page.tsx:146",
-    "src/app/page.tsx:25",
-    "src/components/PersonalizedFeed.tsx:20",
-    "src/hooks/useGameData.ts:47",
-  ]);
-  assert.deepEqual(guards.map(({ file, line }) => `${file}:${line}`), [
-    "src/lib/api.ts:147",
-    "src/lib/api.ts:147",
-    "src/lib/api.ts:147",
-  ]);
-  assert.deepEqual(mentions.map(({ file, line }) => `${file}:${line}`), [
-    "src/lib/digestPresentation.ts:29",
-  ]);
+  const tally = (list) => Object.fromEntries(Object.entries(list.reduce((counts, call) => {
+    counts[call.file] = (counts[call.file] ?? 0) + 1;
+    return counts;
+  }, {})).sort(([a], [b]) => a.localeCompare(b)));
+  assert.deepEqual(tally(fetches), {
+    "src/app/digest/page.tsx": 1,
+    "src/components/GameSection.tsx": 1,
+    "src/lib/api.ts": 5,
+  });
+  assert.deepEqual(tally(delegated), {
+    "src/app/digest/page.tsx": 2,
+    "src/app/page.tsx": 1,
+    "src/components/PersonalizedFeed.tsx": 1,
+    "src/hooks/useGameData.ts": 1,
+  });
+  assert.deepEqual(tally(guards), { "src/lib/api.ts": 3 });
+  assert.deepEqual(tally(mentions), { "src/lib/digestPresentation.ts": 1 });
   for (const call of fetches) {
-    assert.match(call.around, /spoilerHeaders\s*\(|x-nba-spoilers/, `${call.file}:${call.line}`);
+    assert.match(call.around, /spoilerHeaders\s*\(|x-nba-spoilers/, call.file);
   }
   const remoteSource = readFileSync(new URL("../src/hooks/useRemoteData.ts", import.meta.url), "utf8");
   assert.match(remoteSource, /fetch\(url,\s*\{ signal: controller\.signal, headers \}/);
@@ -753,6 +746,231 @@ test("a revealed live score refetches when the game status changes", async () =>
   assert.equal(seen.length, before + 1);
   assert.equal(seen.at(-1).url.startsWith("/api/games?"), true);
   assert.equal(seen.at(-1).value, "scores,headlines");
+});
+
+test("a revealed live score replaces 98-95 with the next 101-97", async () => {
+  let live = { homeScore: 98, awayScore: 95 };
+  const fetch = () => Promise.resolve({
+    ok: true,
+    json: async () => ({
+      lastGame: { id: 9, status: "2nd Qtr", scoresRedacted: false, homeScore: live.homeScore, awayScore: live.awayScore },
+      currentGame: null, nextGame: null,
+      record: { wins: 0, losses: 0, redacted: true }, error: null,
+    }),
+  });
+  const api = load("lib/api.ts", { fetch }).exports;
+  const redacted = {
+    lastGame: { id: 9, status: "2nd Qtr", scoresRedacted: true, homeScore: null, awayScore: null },
+    currentGame: null, nextGame: null,
+    record: { wins: 0, losses: 0, redacted: true }, error: null,
+  };
+  const shown = () => api.mergeGameReveal(redacted, api.revealedGameOverlay("2"));
+  api.noteGames("2", redacted);
+  await api.requestScoreReveal("2:9");
+  assert.equal(shown().lastGame.homeScore, 98);
+  assert.equal(shown().lastGame.awayScore, 95);
+  live = { homeScore: 101, awayScore: 97 };
+  api.noteGames("2", redacted);
+  for (let step = 0; step < 6; step += 1) await Promise.resolve();
+  assert.equal(shown().lastGame.homeScore, 101);
+  assert.equal(shown().lastGame.awayScore, 97);
+});
+
+test("revealing a non-spoiler in a spoiler group keeps hide, the live region, and focus", async () => {
+  const slots = [];
+  let cursor = 0;
+  const document = { activeElement: null };
+  const react = {
+    Fragment: Symbol.for("react.fragment"),
+    useState(init) {
+      const index = cursor++;
+      if (slots[index] === undefined) slots[index] = typeof init === "function" ? init() : init;
+      const slot = index;
+      return [slots[slot], (value) => { slots[slot] = typeof value === "function" ? value(slots[slot]) : value; }];
+    },
+    useReducer(reducer, init) {
+      const index = cursor++;
+      if (slots[index] === undefined) slots[index] = init;
+      const slot = index;
+      return [slots[slot], (action) => { slots[slot] = reducer(slots[slot], action); }];
+    },
+    useRef(init) {
+      const index = cursor++;
+      if (slots[index] === undefined) slots[index] = { current: init };
+      return slots[index];
+    },
+    useEffect(fn, deps) {
+      const index = cursor++;
+      const previous = slots[index];
+      const changed = !previous || !deps || deps.some((dep, i) => !Object.is(dep, previous.deps[i]));
+      if (!previous) slots[index] = { deps, fn: changed ? fn : null };
+      else { previous.deps = deps; previous.fn = changed ? fn : null; }
+    },
+  };
+  const published = new Date().toISOString();
+  const real = {
+    title: "Celtics highlights against the Nets", safeTitle: "Celtics highlights against the Nets",
+    link: "https://upstream.example/celtics/highlights", source: "ESPN", isSpoiler: false,
+    pubDate: published, category: "general", identity: "hl", feed: "Celtics",
+  };
+  const Story = load("components/NewsList.tsx", {}, {
+    react,
+    "lucide-react": { ExternalLink: () => null },
+    "@/lib/api": { ...load("lib/api.ts").exports, revealNewsItem: async () => real },
+    "@/lib/news": { newsVisitBoundary: () => null },
+    "@/hooks/useLastVisit": { useLastVisit: () => ({ ready: true, lastVisitAt: null }) },
+    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideHeadlines: true, hideScores: true }) },
+    "./DataError": { default: () => null },
+  }, "\nexports.NewsStory = NewsStory;\n").exports.NewsStory;
+  const render = () => { cursor = 0; return Story({ item: {
+    title: "Spoiler-protected headline from ESPN", safeTitle: "Spoiler-protected headline from ESPN",
+    link: null, source: "ESPN", isSpoiler: true, redacted: true, pubDate: published,
+    category: "general", identity: "hl", feed: "Celtics",
+  } }); };
+  const buttons = (tree) => {
+    const found = [];
+    const walk = (node) => {
+      if (node == null || typeof node !== "object") return;
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (node.type === "button") found.push(node);
+      walk(node.props?.children);
+    };
+    walk(tree);
+    return found;
+  };
+  const statusText = (tree) => {
+    let text = "";
+    const walk = (node) => {
+      if (node == null || typeof node !== "object") return;
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (node.props?.role === "status") text = node.props.children;
+      walk(node.props?.children);
+    };
+    walk(tree);
+    return text;
+  };
+  const reveal = buttons(render()).find((button) => button.props.children === "Reveal headline");
+  assert.ok(reveal);
+  document.activeElement = reveal;
+  await reveal.props.onClick();
+  const shown = render();
+  const hide = buttons(shown).find((button) => button.props.children === "Hide headline");
+  assert.ok(hide, "the hide control stays mounted");
+  assert.equal(statusText(shown), "Headline revealed");
+  assert.equal(document.activeElement, reveal);
+  document.activeElement = hide;
+  await hide.props.onClick();
+  assert.equal(document.activeElement, hide);
+  assert.ok(buttons(render()).some((button) => button.props.children === "Reveal headline"));
+});
+
+test("Reveal record uses the :record key and leaves scores and headlines hidden", async () => {
+  const seen = [];
+  const fetch = (url, options = {}) => {
+    seen.push({ url: String(url), value: headerValue(options.headers) });
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        lastGame: { id: 9, status: "Final", scoresRedacted: true, homeScore: null, awayScore: null },
+        currentGame: null, nextGame: null,
+        record: { wins: 41, losses: 20 }, error: null,
+      }),
+    });
+  };
+  const api = load("lib/api.ts", { fetch }).exports;
+  api.setSpoilerPrefs({ hideScores: true, hideHeadlines: true });
+  api.noteGames("2", {
+    lastGame: { id: 9, status: "Final", scoresRedacted: true, homeScore: null, awayScore: null },
+    currentGame: null, nextGame: null,
+    record: { wins: 0, losses: 0, redacted: true }, error: null,
+  });
+  await api.requestScoreReveal("2:record");
+  assert.equal(seen.at(-1).url.includes("teamId=2"), true);
+  assert.equal(seen.at(-1).url.includes("reveal=record"), true);
+  const shown = api.mergeGameReveal(api.revealedGameOverlay("2") ? {
+    lastGame: { id: 9, status: "Final", scoresRedacted: true, homeScore: null, awayScore: null },
+    currentGame: null, nextGame: null,
+    record: { wins: 0, losses: 0, redacted: true }, error: null,
+  } : null, api.revealedGameOverlay("2"));
+  assert.equal(shown.record.wins, 41);
+  assert.equal(shown.record.losses, 20);
+  assert.equal(shown.lastGame.scoresRedacted, true);
+  assert.equal(shown.lastGame.homeScore, null);
+  assert.equal(api.spoilerHeaders()["x-nba-spoilers"], "scores,headlines");
+});
+
+test("Record hidden offers Reveal record without showing scores or headlines", () => {
+  const react = require("react");
+  const { renderToStaticMarkup } = require("react-dom/server");
+  const Badge = load("components/RecordBadge.tsx", {}, {
+    react,
+    "@/hooks/useGameData": { useGameData: () => ({ record: { wins: 41, losses: 20, redacted: true }, loading: false, error: null, lastGame: { homeScore: 101, awayScore: 97, scoresRedacted: true } }) },
+    "@/hooks/useTeam": { useTeam: () => ({ selectedTeam: { id: 2, name: "Celtics" } }) },
+    "./ScoreReveal": load("components/ScoreReveal.tsx", {}, {
+      react,
+      "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideScores: true, hideHeadlines: true }), digestContentIsProtected: () => true },
+    }).exports,
+  }).exports.default;
+  const html = renderToStaticMarkup(react.createElement(Badge));
+  assert.match(html, /Reveal record/);
+  assert.match(html, /Record hidden/);
+  assert.doesNotMatch(html, /41-20|101|97/);
+});
+
+test("a redacted headline ignores a present link and a revealed one uses the real link", () => {
+  const slots = [];
+  let cursor = 0;
+  const react = {
+    Fragment: Symbol.for("react.fragment"),
+    useState(init) {
+      const index = cursor++;
+      if (slots[index] === undefined) slots[index] = typeof init === "function" ? init() : init;
+      return [slots[index], (value) => { slots[index] = typeof value === "function" ? value(slots[index]) : value; }];
+    },
+    useReducer(reducer, init) {
+      const index = cursor++;
+      if (slots[index] === undefined) slots[index] = init;
+      return [slots[index], (action) => { slots[index] = reducer(slots[index], action); }];
+    },
+    useRef(init) {
+      const index = cursor++;
+      if (slots[index] === undefined) slots[index] = { current: init };
+      return slots[index];
+    },
+    useEffect() {},
+  };
+  const published = new Date().toISOString();
+  const leaked = "https://upstream.example/celtics/leaked";
+  const real = "https://upstream.example/celtics/real";
+  const Story = load("components/NewsList.tsx", {}, {
+    react,
+    "lucide-react": { ExternalLink: () => null },
+    "@/lib/api": load("lib/api.ts").exports,
+    "@/lib/news": { newsVisitBoundary: () => null },
+    "@/hooks/useLastVisit": { useLastVisit: () => ({ ready: true, lastVisitAt: null }) },
+    "./SpoilerModeProvider": { useSpoilerContext: () => ({ hideHeadlines: true, hideScores: true }) },
+    "./DataError": { default: () => null },
+  }, "\nexports.NewsStory = NewsStory;\n").exports.NewsStory;
+  const hrefs = (tree) => {
+    const found = [];
+    const walk = (node) => {
+      if (node == null || typeof node !== "object") return;
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (node.type === "a" && node.props?.href) found.push(node.props.href);
+      walk(node.props?.children);
+    };
+    walk(tree);
+    return found;
+  };
+  const render = (item) => { cursor = 0; slots.length = 0; return Story({ item }); };
+  assert.deepEqual(hrefs(render({
+    title: "Spoiler-protected headline from ESPN", safeTitle: "Spoiler-protected headline from ESPN",
+    link: leaked, source: "ESPN", isSpoiler: true, redacted: true, pubDate: published, category: "general",
+  })), []);
+  assert.deepEqual(hrefs(render({
+    title: "Celtics highlights against the Nets", safeTitle: "Celtics highlights against the Nets",
+    link: real, source: "ESPN", isSpoiler: false, redacted: false, pubDate: published, category: "general",
+  })), [real]);
 });
 
 test("the client spoiler state defaults to hidden scores and headlines", () => {
