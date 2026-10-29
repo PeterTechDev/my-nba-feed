@@ -67,7 +67,7 @@ as its short name.
 | UI | React 18, Tailwind CSS 3, Lucide React |
 | State | Zustand for persisted team choices; React context for games and spoiler settings |
 | Data | BALLDONTLIE, Google News RSS, ESPN roster fallback, official NBA YouTube uploads |
-| Storage | Private Vercel Blob documents and Next.js Data Cache |
+| Storage | Upstash Redis Free documents and Next.js Data Cache |
 | Deployment | Vercel |
 
 ---
@@ -78,7 +78,7 @@ as its short name.
 src/app/                     # Pages, metadata and API route handlers
 src/components/              # Arena header, games, news, media and shared controls
 src/hooks/                   # Team preferences, spoiler state and shared fetching
-src/lib/                     # Data contracts, sources, dates, quota and Blob helpers
+src/lib/                     # Data contracts, sources, dates, quota and Redis helpers
 scripts/                     # YouTube publisher
 tests/                       # Node tests, local Playwright specs and regressions
 tests/preview/               # Playwright checks for deployed previews
@@ -130,16 +130,16 @@ server after changing environment variables.
 
 | Variable | Where and why |
 |---|---|
-| `BALLDONTLIE_KEY` | App server: games, schedule, active rosters |
-| `BLOB_STORE_ID` / `BLOB_READ_WRITE_TOKEN` | App server: private Blob storage for the shared API budget and highlights. For local access, add `BLOB_READ_WRITE_TOKEN` for the connected store to `.env.local`; a store ID alone is not a local credential. |
-| `DIGEST_PUBLISH_TOKEN` | App server and GitHub Actions: matching secret used as a Bearer token by the highlights publisher |
+| `BALLDONTLIE_KEY` | App server: scheduled catalog sync and league-wide live refresh |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | App server: Upstash Redis snapshots, highlights and shared API budget. Use the connected database credentials for local development. |
+| `DIGEST_PUBLISH_TOKEN` | App server and GitHub Actions: matching secret used as a Bearer token by the highlights and game publishers |
 | `YOUTUBE_API_KEY` | YouTube sync runner only: GitHub Actions or local `highlights:sync`. Not required by the app server. |
 | `NEXT_PUBLIC_SITE_URL` | Optional canonical HTTPS origin for metadata, sitemap and robots; defaults to `VERCEL_PROJECT_PRODUCTION_URL`, then the production site |
 
 API and publisher keys are server secrets; never prefix them with `NEXT_PUBLIC_`.
 The environment template lists the core variables; add the optional values you
-need. Without a BALLDONTLIE key or working Blob access, game requests cannot
-refresh. News does not require an API key; rosters can fall back to ESPN.
+need. Without a BALLDONTLIE key or working Redis access, game requests cannot
+refresh. News does not require an API key; rosters use ESPN directly.
 
 ### Commands
 
@@ -188,8 +188,8 @@ results. Spoiler protection is a viewing preference, not an authorization bounda
 
 ### Shared storage
 
-Connect a private Vercel Blob store for highlights and API quota storage.
-The existing `DIGEST_PUBLISH_TOKEN` name is retained for the highlights publisher.
+Connect an Upstash Redis Free store for game snapshots, highlights and API quota storage.
+The existing `DIGEST_PUBLISH_TOKEN` name is retained for the highlights and game publishers.
 Digest and standings pages, APIs and publication jobs have been removed; stored
 historical documents are untouched.
 

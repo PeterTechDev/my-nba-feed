@@ -24,7 +24,9 @@ jobs:
       - name: Renew workflow activation before GitHub's inactivity limit
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/youtube-highlights.yml/enable"
+        run: |
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/youtube-highlights.yml/enable"
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/sync-games.yml/enable"
   sync:
     if: github.ref == 'refs/heads/main'
     environment: YOUTUBE_API_KEY
