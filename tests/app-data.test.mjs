@@ -72,7 +72,7 @@ function loadHighlightsRoute(at, storage) {
     fetch: () => { throw new Error("A page read must never call YouTube"); } }, { ...imports,
     "@/lib/nbaDate": load("lib/nbaDate.ts", { Date: FixedDate }).exports,
     "@/lib/youtubeHighlights": load("lib/youtubeHighlights.ts", { Date: FixedDate }).exports,
-    "@/lib/blobStorage": storage,
+    "@/lib/documentStorage": storage,
   }).exports;
   return { now, route };
 }
@@ -81,8 +81,8 @@ test("highlights read saved YouTube videos without calling YouTube, and authenti
   const at = "2026-10-27T14:00:00Z";
   let state, unavailable = false, reads = 0;
   const { now, route } = loadHighlightsRoute(at, {
-    readBlobDocument: async () => { reads++; if (unavailable) throw new Error("offline"); return state; },
-    updateBlobDocument: async (_name, _empty, update) => { state = update(state); return state; },
+    readDocument: async () => { reads++; if (unavailable) throw new Error("offline"); return state; },
+    updateDocument: async (_name, _empty, update) => { state = update(state); return state; },
   });
   const clip = { id: "DTNqMLNVBC8", date: "2026-10-26", awayTeamId: 5, homeTeamId: 2,
     title: "BULLS at CELTICS | FULL GAME HIGHLIGHTS | October 26, 2026", thumbnail: "https://i.ytimg.com/vi/DTNqMLNVBC8/hqdefault.jpg", duration: 600, retrievedAt: now.toISOString() };
@@ -128,7 +128,7 @@ test("highlights read saved YouTube videos without calling YouTube, and authenti
 });
 
 test("highlight dates follow America/New_York across midnight, including the DST offset", async () => {
-  const storage = { readBlobDocument: async () => ({ syncedAt: null, videos: [] }), updateBlobDocument: async () => { throw new Error("not used"); } };
+  const storage = { readDocument: async () => ({ syncedAt: null, videos: [] }), updateDocument: async () => { throw new Error("not used"); } };
   const edges = [
     ["2026-10-28T03:59:59.999Z", "2026-10-27", "2026-09-27"],
     ["2026-10-28T04:00:00.000Z", "2026-10-28", "2026-09-28"],
@@ -592,52 +592,41 @@ test("saved focus teams migrate to bundled logos without changing team identity"
   }
 });
 
-test("Blob updates use origin ETags and retry conflicts without losing concurrent writes", async () => {
-  const blobs = new Map();
-  let version = 0;
-  class Conflict extends Error {}
-  const sdk = {
-    BlobPreconditionFailedError: Conflict,
-    BlobNotFoundError: class extends Error {},
-    head: async (name) => blobs.has(name) ? { etag: blobs.get(name).etag } : null,
-    get: async (name) => {
-      const value = blobs.get(name);
-      return value ? { statusCode: 200, stream: new Response(JSON.stringify(value.data)).body, blob: { etag: "delivery-" + value.etag } } : null;
-    },
-    put: async (name, body, options) => {
-      const previous = blobs.get(name);
-      if (options.ifMatch && previous?.etag !== options.ifMatch) throw new Conflict();
-      if (options.allowOverwrite === false && previous) throw new Error("Already exists");
-      blobs.set(name, { data: JSON.parse(body), etag: String(++version) });
-    },
+test("Redis updates retry conflicts without losing concurrent writes and fail closed", async () => {
+  const documents = new Map();
+  let offline = false;
+  const fetch = async (_url, options) => {
+    if (offline) throw new Error("Storage offline");
+    const [command, ...args] = JSON.parse(options.body);
+    if (command === "GET") return Response.json({ result: documents.get(args[0]) ?? null });
+    const [, , key, exists, previous, value] = args;
+    const current = documents.get(key);
+    const matches = exists === "0" ? current === undefined : current === previous;
+    if (matches) documents.set(key, value);
+    return Response.json({ result: matches ? 1 : 0 });
   };
-  const store = load("lib/blobStorage.ts", { process: { env: { BLOB_STORE_ID: "fixture" } } }, { "@vercel/blob": sdk }).exports;
-  await Promise.all([1, 2, 3].map(() => store.updateBlobDocument("votes.json", 0, (count) => count + 1)));
-  assert.equal(await store.readBlobDocument("votes.json", 0), 3);
-  sdk.put = async () => { throw new Error("Storage offline"); };
-  await assert.rejects(store.updateBlobDocument("votes.json", 0, (count) => count + 1), /offline/);
-  const missing = load("lib/blobStorage.ts", { process: { env: {} } }, { "@vercel/blob": sdk }).exports;
-  await assert.rejects(missing.readBlobDocument("votes.json", []), /not configured/);
+  const store = load("lib/documentStorage.ts", { fetch, process: { env: { KV_REST_API_URL: "https://fixture.upstash.io", KV_REST_API_TOKEN: "fixture" } } }).exports;
+  await Promise.all([1, 2, 3].map(() => store.updateDocument("votes.json", 0, count => count + 1)));
+  assert.equal(await store.readDocument("votes.json", 0), 3);
+  offline = true;
+  await assert.rejects(store.updateDocument("votes.json", 0, count => count + 1), /offline/);
+  const missing = load("lib/documentStorage.ts", { process: { env: {} } }).exports;
+  await assert.rejects(missing.readDocument("votes.json", []), /not configured/);
 });
 
-test("active roster uses the active endpoint, and ESPN fallback never returns historical search results", async () => {
+test("roster reads ESPN directly with a daily cache and never spends BallDontLie quota", async () => {
   const urls = [];
-  let failActive = false;
-  const fetch = async (url) => {
+  const fetch = async (url, options) => {
     urls.push(url);
-    if (url.includes("balldontlie")) return { ok: !failActive, json: async () => ({ data: [{ id: 1, first_name: "Active", last_name: "Player" }] }) };
+    assert.equal(options.next.revalidate, 86400);
     return { ok: true, json: async () => ({ athletes: [{ id: "4", firstName: "Current", lastName: "Player", jersey: "7", position: { abbreviation: "G" } }] }) };
   };
-  const route = load("app/api/players/route.ts", { process: { env: { BALLDONTLIE_KEY: "fixture", DIGEST_PUBLISH_TOKEN: "fixture-publisher" } }, fetch }, imports).exports;
-  const request = { nextUrl: new URL("http://localhost/api/players?teamId=16") };
-  let result = await route.GET(request);
-  assert.match(urls[0], /\/players\/active\?team_ids\[\]=16/);
-  assert.equal(result.body.source, "BALLDONTLIE");
-  failActive = true;
-  result = await route.GET(request);
+  const route = load("app/api/players/route.ts", { fetch }, imports).exports;
+  const result = await route.GET({ nextUrl: new URL("http://localhost/api/players?teamId=16") });
   assert.equal(result.body.source, "ESPN");
   assert.equal(result.body.players[0].firstName, "Current");
-  assert.ok(urls.at(-1).includes("/teams/mia/roster"));
+  assert.equal(urls.length, 1);
+  assert.ok(urls[0].includes("/teams/mia/roster"));
 });
 
 test("schedule preserves tipoff and postponement", async () => {

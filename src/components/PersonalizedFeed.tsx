@@ -17,7 +17,7 @@ function useGameOverlay(teamId: string) {
 
 function TeamNewsSection({ team, ...newsState }: NewsState & { team: Team }) {
   const teamId = String(team.id);
-  const { data: gameData, error: gameError, retry: retryGame } = useRemoteData<GamesResponse>(`/api/games?teamId=${team.id}`, 30000);
+  const { data: gameData, error: gameError, retry: retryGame } = useRemoteData<GamesResponse>(`/api/games?teamId=${team.id}`, 60000);
   const overlay = useGameOverlay(teamId);
   useEffect(() => { if (gameData) noteGames(teamId, gameData); }, [gameData, teamId]);
   const games = gameData ? mergeGameReveal(gameData, overlay) : gameData;

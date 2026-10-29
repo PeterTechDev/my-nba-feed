@@ -18,7 +18,7 @@ function getCategory(title: string): NewsItem["category"] {
 
 async function fetchNews(team: string): Promise<NewsItem[]> {
   const res = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(team + " NBA when:7d")}&hl=en-US&gl=US&ceid=US:en`, {
-    next: { revalidate: 600 }, signal: AbortSignal.timeout(10000),
+    next: { revalidate: 3600 }, signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new Error("News source unavailable");
   const xml = await res.text();

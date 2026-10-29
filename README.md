@@ -259,3 +259,24 @@ SDET · AI Developer · Building in public
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-blue?style=flat&logo=linkedin)](https://linkedin.com/in/peter-souza)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-black?style=flat&logo=vercel)](https://my-nba-feed.vercel.app)
+
+## Shared game data and the free API budget
+
+Public game and schedule routes filter one saved league catalog. Visits, team
+changes and score reveals do not fetch separate team seasons from BallDontLie.
+`NBA Games Sync` runs at 06:35, 14:35 and 22:35 America/Bahia. GitHub may delay runs.
+It retrieves all pages 16 seconds apart and publishes only a complete, validated
+catalog. Failures preserve the previous version. It uses DIGEST_PUBLISH_TOKEN.
+
+During a scheduled game's 12-hour window, requests refresh relevant league dates
+once per minute through a shared Redis lease. Final results remain saved until
+the next catalog update. No visitors means no live polling. The five-call rolling
+budget still protects sync and live updates. APIs expose catalog syncedAt.
+Redis holds snapshots; Next caches shared reads for 60 seconds. Highlights use a
+five-minute public CDN cache. Spoiler responses remain private. ESPN rosters use a
+daily cache, news an hourly cache. Browsers poll once per minute and honor Retry-After.
+External calls log balldontlie_request and status without credentials.
+
+Before rollout, populate the production Redis catalog through the authenticated
+POST /api/sync/games endpoint. Then enable .github/workflows/sync-games.yml on main.
+Keep Upstash Free and auto-upgrade disabled. Free infrastructure quotas still apply.

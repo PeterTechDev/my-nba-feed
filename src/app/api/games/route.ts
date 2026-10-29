@@ -1,4 +1,4 @@
-import { fetchBallDontLie } from "@/lib/ballDontLie";
+import { fetchSavedGames as fetchBallDontLie } from "@/lib/leagueSnapshot";
 import { NextRequest, NextResponse } from "next/server";
 import { formatNBADate, getNBASeason } from "@/lib/nbaDate";
 import { getGameStartTime, isFinalStatus, isLiveStatus } from "@/lib/gameStatus";
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
   const url = `${BDL_BASE}/games?team_ids[]=${teamId}&seasons[]=${season}&per_page=100`;
 
   try {
-    const res = await fetchBallDontLie(url, 30);
+    const res = await fetchBallDontLie(url);
 
     if (!res.ok) {
       const status = res.status;
@@ -144,7 +144,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       lastGame: conceal(lastGame), currentGame: conceal(currentGame), nextGame: conceal(nextGame),
       record: hideScores && reveal !== "record" ? { wins: 0, losses: 0, redacted: true } : { wins, losses },
-      error: null,
+      syncedAt: json.syncedAt, error: null,
     }, responseInit());
   } catch {
     return NextResponse.json(

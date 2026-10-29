@@ -1,4 +1,4 @@
-import { fetchBallDontLie } from "@/lib/ballDontLie";
+import { fetchSavedGames as fetchBallDontLie } from "@/lib/leagueSnapshot";
 import { NextResponse } from "next/server";
 import { formatNBADate } from "@/lib/nbaDate";
 
@@ -29,7 +29,7 @@ export async function GET() {
   const today = formatNBADate();
 
   try {
-    const res = await fetchBallDontLie(`${BDL_BASE}/games?dates[]=${today}&per_page=100`, 30);
+    const res = await fetchBallDontLie(`${BDL_BASE}/games?dates[]=${today}&per_page=100`);
 
     if (!res.ok) return NextResponse.json({ games: [], error: `API ${res.status}` }, { status: res.status === 429 ? 503 : 502, headers: { "Retry-After": res.headers?.get("retry-after") ?? "60" } });
 
@@ -46,7 +46,7 @@ export async function GET() {
       awayScore: g.visitor_team_score,
     }));
 
-    return NextResponse.json({ games, error: null });
+    return NextResponse.json({ games, syncedAt: json.syncedAt, error: null });
   } catch {
     return NextResponse.json({ games: [], error: "Failed to fetch" }, { status: 500 });
   }

@@ -7,6 +7,7 @@ interface Entry {
   snapshot: Snapshot;
   listeners: Set<() => void>;
   updatedAt: number;
+  retryAt?: number;
   mode?: string;
   pending?: Promise<unknown>;
   controller?: AbortController;
@@ -27,6 +28,14 @@ function getEntry(url: string): Entry {
 export function fetchRemoteData<T>(url: string, force = false): Promise<T> {
   const entry = getEntry(url);
   const mode = protectedSpoilerUrl(url) ? spoilerHeaders()["x-nba-spoilers"] : "";
+  if (entry.mode !== undefined && entry.mode !== mode) {
+    entry.snapshot = initial;
+    entry.updatedAt = 0;
+    entry.retryAt = undefined;
+  }
+  if (entry.retryAt && Date.now() < entry.retryAt && entry.mode === mode) {
+    return entry.snapshot.data !== null ? Promise.resolve(entry.snapshot.data as T) : Promise.reject(new Error("Retry pending"));
+  }
   if (entry.pending && entry.mode === mode) return entry.pending as Promise<T>;
   if (!force && entry.mode === mode && !entry.snapshot.error && entry.snapshot.data !== null && Date.now() - entry.updatedAt < 30000) {
     return Promise.resolve(entry.snapshot.data as T);
@@ -44,7 +53,13 @@ export function fetchRemoteData<T>(url: string, force = false): Promise<T> {
   const headers = mode ? spoilerHeaders() : undefined;
   const promise = fetch(url, { signal: controller.signal, headers })
     .then(async (response) => {
-      if (!response.ok) throw new Error("Request failed");
+      if (!response.ok) {
+        const retry = response.headers.get("retry-after");
+        const seconds = retry && /^\d+$/.test(retry) ? Number(retry) : retry ? (Date.parse(retry) - Date.now()) / 1000 : 60;
+        entry.retryAt = Date.now() + Math.max(1, Number.isFinite(seconds) ? seconds : 60) * 1000;
+        throw new Error("Request failed");
+      }
+      entry.retryAt = undefined;
       const data = await response.json();
       if (!data || data.error) throw new Error("Data unavailable");
       entry.updatedAt = Date.now();
@@ -75,7 +90,7 @@ export function useRemoteData<T>(url: string | null, refreshMs = 0) {
     sync();
     void fetchRemoteData(url).catch(() => {});
     const refresh = () => {
-      if (document.visibilityState === "visible") void fetchRemoteData(url, true).catch(() => {});
+      if (document.visibilityState === "visible") void fetchRemoteData(url).catch(() => {});
     };
     if (refreshMs && !entry.timer) entry.timer = setInterval(refresh, refreshMs);
     const stopPrefs = protectedSpoilerUrl(url) ? subscribeSpoilerPrefs(refresh) : undefined;
@@ -94,7 +109,7 @@ export function useRemoteData<T>(url: string | null, refreshMs = 0) {
       queueMicrotask(() => {
         if (!entry.listeners.size) {
           entry.controller?.abort();
-          entries.delete(url);
+          if (Date.now() - entry.updatedAt > 300000) entries.delete(url);
         }
       });
     };
@@ -106,7 +121,7 @@ export function useRemoteData<T>(url: string | null, refreshMs = 0) {
   return {
     data: current ? state.data as T | null : null,
     loading: Boolean(url) && (!current || state.loading),
-    error: current && state.error,
+    error: current && state.error && state.data === null,
     retry,
   };
 }
@@ -130,7 +145,7 @@ export function useRemoteDataAll<T>(urls: readonly string[]) {
         queueMicrotask(() => {
           if (!entry.listeners.size) {
             entry.controller?.abort();
-            entries.delete(url);
+            if (Date.now() - entry.updatedAt > 300000) entries.delete(url);
           }
         });
       };

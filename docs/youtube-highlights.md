@@ -8,7 +8,7 @@
   YouTube Data API v3. Aceita apenas títulos de **FULL GAME HIGHLIGHTS**, identifica
   os dois times e a data do jogo e verifica se o vídeo é público e incorporável.
 - Salva ID, título, URL da thumbnail, duração, times e data no documento privado
-  `youtube-highlights.json` do Blob já conectado ao projeto. Não baixa os vídeos.
+  `youtube-highlights.json` do Redis já conectado ao projeto. Não baixa os vídeos.
 - Um vídeo salvo atende aos dois times. Os jogos já encontrados não são
   pesquisados novamente. Visitar `/highlights`, trocar de time ou atualizar a
   página **não faz chamadas à YouTube Data API**.
@@ -58,8 +58,8 @@ A chave do Google fica apenas no passo de sincronização do GitHub Actions.
 O job usa o ambiente GitHub `YOUTUBE_API_KEY`, onde a chave foi cadastrada;
 o secret de publicação continua disponível no nível do repositório.
 Não precisa ser cadastrada na Vercel e nunca usa o prefixo `NEXT_PUBLIC_`.
-O armazenamento usa a conexão Blob existente e o controle de concorrência de
-`src/lib/blobStorage.ts`, em um documento separado. O nome legado
+O armazenamento usa a conexão Redis existente e o controle de concorrência de
+`src/lib/documentStorage.ts`, em um documento separado. O nome legado
 `DIGEST_PUBLISH_TOKEN` continua sendo usado pelo publicador de highlights;
 as rotas do Digest e a publicação diária foram removidas.
 
@@ -109,7 +109,7 @@ npm run build
   em **APIs e serviços → YouTube Data API v3 → Cotas e limites do sistema**.
 - **401 na publicação:** o `DIGEST_PUBLISH_TOKEN` do GitHub difere do configurado
   na Vercel, ou está ausente.
-- **503 na leitura/publicação:** confira a conexão do Blob. A rotina não troca
+- **503 na leitura/publicação:** confira a conexão do Redis. A rotina não troca
   os dados salvos por uma lista vazia quando a fonte ou o armazenamento falha.
 - **Vídeo não disponível:** pode ainda não ter sido publicado, não seguir o
   formato reconhecido ou não permitir incorporação. A busca no YouTube continua

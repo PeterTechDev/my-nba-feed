@@ -44,7 +44,7 @@ function useGameOverlay(teamId: string) {
 export function useGameDataFetcher(): GameDataState {
   const { selectedTeam } = useTeam();
   const teamId = String(selectedTeam.id);
-  const { data, loading, error, retry } = useRemoteData<GamesResponse>(`/api/games?teamId=${selectedTeam.id}`, 30000);
+  const { data, loading, error, retry } = useRemoteData<GamesResponse>(`/api/games?teamId=${selectedTeam.id}`, 60000);
   const overlay = useGameOverlay(teamId);
   useEffect(() => { if (data) noteGames(teamId, data); }, [data, teamId]);
   return {

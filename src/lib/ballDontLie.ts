@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { unstable_cache } from "next/cache";
-import { updateBlobDocument } from "./blobStorage";
+import { updateDocument } from "./documentStorage";
 
 interface Budget { key: string; calls: number[]; blockedUntil: number; rosterDeniedUntil: number }
 const EMPTY: Budget = { key: "", calls: [], blockedUntil: 0, rosterDeniedUntil: 0 };
@@ -8,7 +8,7 @@ class UpstreamError extends Error {
   constructor(public status: number, public retryAfter = 60) { super(`BallDontLie API ${status}`); }
 }
 
-export async function fetchBallDontLie(url: string, revalidate: number): Promise<Response> {
+export async function fetchBallDontLieSource(url: string, revalidate: number): Promise<Response> {
   const target = new URL(url);
   if (target.origin !== "https://api.balldontlie.io" || !["/v1/games", "/v1/players/active"].includes(target.pathname)) throw new Error("Invalid BallDontLie URL");
   const key = process.env.BALLDONTLIE_KEY;
@@ -16,9 +16,9 @@ export async function fetchBallDontLie(url: string, revalidate: number): Promise
   const identity = createHash("sha256").update(key).digest("hex");
   const roster = target.pathname === "/v1/players/active";
   try {
-    // Keep the existing Data Cache; reserve quota only when a cached response needs refreshing.
-    const read = unstable_cache(async () => {
-      await updateBlobDocument<Budget>("bdl-budget.json", EMPTY, (stored) => {
+    // Scheduled and live refreshes bypass stale-while-revalidate data.
+    const fresh = async () => {
+      await updateDocument<Budget>("bdl-budget.json", EMPTY, (stored) => {
         const now = Date.now();
         const state = stored.key === identity ? stored : { ...EMPTY, key: identity };
         if (roster && state.rosterDeniedUntil > now) throw new UpstreamError(403);
@@ -28,6 +28,7 @@ export async function fetchBallDontLie(url: string, revalidate: number): Promise
         return { ...state, calls: [...calls, now] };
       });
       const response = await fetch(target, { headers: { Authorization: key }, cache: "no-store", signal: AbortSignal.timeout(10000) });
+      console.info(JSON.stringify({ event: "balldontlie_request", path: target.pathname, status: response.status }));
       if (!response.ok) {
         let retryAfter = 60;
         if (response.status === 429) {
@@ -36,7 +37,7 @@ export async function fetchBallDontLie(url: string, revalidate: number): Promise
           retryAfter = Math.max(60, Number.isFinite(seconds) ? seconds : Math.ceil((Date.parse(value ?? "") - Date.now()) / 1000) || 60);
         }
         if (response.status === 429 || roster && [401, 403].includes(response.status)) {
-          await updateBlobDocument<Budget>("bdl-budget.json", EMPTY, (state) => ({
+          await updateDocument<Budget>("bdl-budget.json", EMPTY, (state) => ({
             ...state,
             blockedUntil: response.status === 429 ? Math.max(state.blockedUntil, Date.now() + retryAfter * 1000) : state.blockedUntil,
             rosterDeniedUntil: roster && [401, 403].includes(response.status) ? Date.now() + 3600000 : state.rosterDeniedUntil,
@@ -45,7 +46,8 @@ export async function fetchBallDontLie(url: string, revalidate: number): Promise
         throw new UpstreamError(response.status, retryAfter);
       }
       return response.json();
-    }, ["bdl-v1", identity, target.href], { revalidate });
+    };
+    const read = revalidate === 0 ? fresh : unstable_cache(fresh, ["bdl-v1", identity, target.href], { revalidate });
     return Response.json(await read());
   } catch (error) {
     if (!(error instanceof UpstreamError)) throw error;

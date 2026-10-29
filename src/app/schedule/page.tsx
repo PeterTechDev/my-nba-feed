@@ -51,7 +51,7 @@ export default function SchedulePage() {
   const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
   const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
   const { data, loading, error, retry } = useRemoteData<{ games: ScheduleGame[] }>(
-    `/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`, 30000
+    `/api/schedule?teamId=${selectedTeam.id}&start=${start}&end=${end}`, 60000
   );
   const games = data?.games || [];
   const oldest = formatNBADate(new Date(Date.now() - 30 * 86400000));
