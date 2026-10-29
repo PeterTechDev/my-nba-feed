@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { timingSafeEqual } from "node:crypto";
 import { fetchBallDontLieSource } from "@/lib/ballDontLie";
 import { LEAGUE_DOCUMENT, validateGames, type LeagueSnapshot } from "@/lib/leagueSnapshot";
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
       if (current && current.syncedAt > body.syncedAt) throw new Error("Newer catalog already published");
       return { syncedAt: body.syncedAt, games };
     });
+    revalidateTag("league-catalog", "max");
     return Response.json({ success: true, syncedAt: saved!.syncedAt, count: saved!.games.length });
   } catch {
     return Response.json({ error: "Game synchronization failed; previous catalog preserved" }, { status: 502 });

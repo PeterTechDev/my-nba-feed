@@ -272,7 +272,9 @@ During a scheduled game's 12-hour window, requests refresh relevant league dates
 once per minute through a shared Redis lease. Final results remain saved until
 the next catalog update. No visitors means no live polling. The five-call rolling
 budget still protects sync and live updates. APIs expose catalog syncedAt.
-Redis holds snapshots; Next caches shared reads for 60 seconds. Highlights use a
+Redis holds snapshots; Next caches the full catalog for one hour, invalidated after
+a successful publication. Live reads use 60 seconds; shared highlights reads use
+five minutes. Highlights use a
 five-minute public CDN cache. Spoiler responses remain private. ESPN rosters use a
 daily cache, news an hourly cache. Browsers poll once per minute and honor Retry-After.
 External calls log balldontlie_request and status without credentials.

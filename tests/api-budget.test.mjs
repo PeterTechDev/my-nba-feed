@@ -88,8 +88,9 @@ test("explicit refresh bypasses cached provider responses", async () => {
 });
 
 test("sync route authenticates before fetching and validates before replacing a catalog", async () => {
-  let fetches = 0, writes = 0;
+  let fetches = 0, writes = 0, invalidations = 0;
   const route = load("app/api/sync/games/route.ts", {
+    "next/cache": { revalidateTag: (tag, profile) => { assert.equal(tag, "league-catalog"); assert.equal(profile, "max"); invalidations++; } },
     "@/lib/ballDontLie": { fetchBallDontLieSource: async (_url, ttl) => { assert.equal(ttl, 0); fetches++; return Response.json({ data: [{ id: 1, season: 2026, extra: true }], meta: { next_cursor: 2 } }); } },
     "@/lib/leagueSnapshot": { LEAGUE_DOCUMENT: "league-games.json", validateGames: data => { if (!Array.isArray(data)) throw Error("Invalid games"); return data.map(({ id, season }) => ({ id, season })); } },
     "@/lib/documentStorage": { updateDocument: async (_key, empty, update) => { writes++; return update(empty); } },
@@ -105,4 +106,5 @@ test("sync route authenticates before fetching and validates before replacing a 
   const result = await route.POST(request({ action: "publish", syncedAt: new Date().toISOString(), games: page.data }));
   assert.equal(result.status, 200);
   assert.equal(writes, 1);
+  assert.equal(invalidations, 1);
 });

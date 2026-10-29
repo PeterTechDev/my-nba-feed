@@ -27,6 +27,7 @@ const api = load("lib/api.ts").exports;
 const youtubeHighlights = load("lib/youtubeHighlights.ts").exports;
 const newsTools = load("lib/news.ts", { Date: class extends Date { static now() { return Date.parse("2026-10-27T14:00:00Z"); } } }, { "./api": api, "./teams": teams }).exports;
 const imports = {
+  "next/cache": { unstable_cache: fn => fn },
   "next/server": { NextResponse: { json: (body, options) => ({ status: options?.status ?? 200, body }) } },
   "@/lib/nbaDate": dates, "@/lib/gameStatus": status, "@/lib/teams": teams, "@/lib/api": api,
   "@/lib/news": newsTools,

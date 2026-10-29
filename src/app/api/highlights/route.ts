@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getTeamById, teams } from "@/lib/teams";
@@ -5,6 +6,8 @@ import { formatNBADate } from "@/lib/nbaDate";
 import { readDocument, updateDocument } from "@/lib/documentStorage";
 import { EMPTY_HIGHLIGHTS, HIGHLIGHTS_DOCUMENT, parseHighlightPublication, highlightKey, recentHighlights, type YouTubeHighlights } from "@/lib/youtubeHighlights";
 import type { HighlightVideo } from "@/lib/api";
+
+const readHighlights = unstable_cache(() => readDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS), ["youtube-highlights-v1"], { revalidate: 300 });
 
 function authorized(req: NextRequest) {
   const expected = process.env.DIGEST_PUBLISH_TOKEN;
@@ -24,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
   if (req.nextUrl.searchParams.get("kind") === "top-plays") {
     try {
-      const state = await readDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS);
+      const state = await readHighlights();
       return NextResponse.json({ videos: recentHighlights(state).filter((video) => video.topCount)
         .sort((a, b) => b.date.localeCompare(a.date) || (b.topCount ?? 0) - (a.topCount ?? 0)), syncedAt: state.syncedAt }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } });
     } catch {
@@ -39,7 +42,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Valid teamId and up to 15 recent game dates required" }, { status: 400 });
   }
   try {
-    const state = await readDocument<YouTubeHighlights>(HIGHLIGHTS_DOCUMENT, EMPTY_HIGHLIGHTS);
+    const state = await readHighlights();
     const videos: Record<string, HighlightVideo> = {};
     for (const video of recentHighlights(state)) {
       if (dates.includes(video.date) && [video.awayTeamId, video.homeTeamId].includes(team.id)) {

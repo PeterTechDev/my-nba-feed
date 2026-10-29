@@ -39,7 +39,7 @@ const readSnapshot = unstable_cache(async () => {
   const snapshot = await readDocument<LeagueSnapshot | null>(LEAGUE_DOCUMENT, null);
   if (!snapshot) throw new Error("Games have not been synchronized");
   return snapshot;
-}, ["league-snapshot-v1"], { revalidate: 60 });
+}, ["league-snapshot-v2"], { revalidate: 3600, tags: ["league-catalog"] });
 
 class RefreshBusy extends Error {}
 interface LiveSnapshot extends LeagueSnapshot { attemptedAt: number }
