@@ -37,7 +37,7 @@ export default async function runArenaHomeRegression(page) {
     assert.ok(entrance.some(animation => animation.name?.includes("arena-open")), "arena has its authored entrance");
     assert.ok(entrance.every(animation => animation.iterations === 1), "entrance does not loop");
     await p.waitForTimeout(4600);
-    const crest = p.getByRole("button", { name: /Change focus team from/ });
+    const crest = p.getByRole("button", { name: /Your teams\. Focus team/ });
     const crestBefore = await crest.boundingBox();
     await p.mouse.move(crestBefore.x + crestBefore.width / 2, crestBefore.y + crestBefore.height / 2);
     await p.mouse.down();
@@ -90,8 +90,10 @@ export default async function runArenaHomeRegression(page) {
     assert.equal(await seat.locator("svg").first().evaluate(el => getComputedStyle(el).transform), "none", "reduced motion keeps the basketball still on focus");
     await p.setViewportSize({ width: 320, height: 844 });
     for (const team of teams) {
-      await p.getByRole("button", { name: "Change focus team", exact: true }).click();
-      await p.getByRole("button", { name: `${team.city} ${team.name}`, exact: true }).click();
+      await p.getByRole("button", { name: "Your teams", exact: true }).click();
+      await p.getByRole("button", { name: "Change", exact: true }).click();
+      await p.getByRole("radio", { name: `${team.city} ${team.name}`, exact: true }).click();
+      await p.getByRole("button", { name: "Done", exact: true }).click();
       await p.getByRole("heading", { name: `${team.city} ${team.name}`, exact: true }).waitFor();
       assert.ok((await seat.textContent()).includes(team.name), "courtside welcome follows the focus team");
       const title = await p.locator("h1 span").last().evaluate(el => ({ text: el.textContent, height: el.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(el).lineHeight), width: el.scrollWidth, available: el.clientWidth }));

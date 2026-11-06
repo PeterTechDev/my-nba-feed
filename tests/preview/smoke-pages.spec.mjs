@@ -56,7 +56,7 @@ test("the team header names the Celtics and opens their roster", async ({ page }
   await games;
   await expect(page.getByRole("heading", { name: "Boston Celtics", exact: true })).toBeVisible();
   await expect(page.getByText("Eastern Conference", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Change focus team", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Your teams", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Celtics players", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Celtics Roster", exact: true })).toBeVisible();
   assertQuiet(record);

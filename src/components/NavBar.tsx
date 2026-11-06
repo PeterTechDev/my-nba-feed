@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Calendar, Play, Trophy, Eye, EyeOff, Menu, X, Settings, Heart, Info } from "lucide-react";
 import Modal from "./Modal";
-import FavoriteTeamsModal from "./FavoriteTeamsModal";
+import YourTeamsDialog from "./YourTeamsDialog";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { useSpoilerContext } from "./SpoilerModeProvider";
 
@@ -114,7 +114,7 @@ export default function NavBar() {
   const pathname = usePathname();
   const { spoilerFree, hideScores, hideHeadlines, toggleSpoiler, setHideScores, setHideHeadlines, showScoresAndHeadlines } = useSpoilerContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [myTeamsOpen, setMyTeamsOpen] = useState(false);
+  const [yourTeamsOpen, setYourTeamsOpen] = useState(false);
   const { favoriteTeamIds } = useFavoriteTeams();
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmReveal, setConfirmReveal] = useState(false);
@@ -191,11 +191,11 @@ export default function NavBar() {
             {hideScores || hideHeadlines ? <EyeOff aria-hidden="true" className="h-4 w-4" /> : <Eye aria-hidden="true" className="h-4 w-4" />}
             <span className="hidden whitespace-nowrap sm:inline">{mobileProtection}</span>
           </button>
-          <button type="button" onClick={() => setMyTeamsOpen(true)} aria-label={`My Teams (${favoriteTeamIds.length} selected)`}
-            title={`My Teams (${favoriteTeamIds.length} selected)`}
+          <button type="button" onClick={() => setYourTeamsOpen(true)} aria-haspopup="dialog" aria-label={`Your teams, ${favoriteTeamIds.length} followed for news`}
+            title={`Your teams, ${favoriteTeamIds.length} followed for news`}
             className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm text-white/70 hover:bg-white/5 hover:text-white">
             <Heart aria-hidden="true" className={`h-4 w-4 ${favoriteTeamIds.length ? "text-emerald-300" : ""}`} />
-            <span className="hidden whitespace-nowrap sm:inline">My Teams</span>
+            <span className="hidden whitespace-nowrap sm:inline">Your teams</span>
             {favoriteTeamIds.length > 0 && <span aria-hidden="true" className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white/10 px-1 text-xs tabular-nums text-white/70">{favoriteTeamIds.length}</span>}
           </button>
           <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Spoiler settings"
@@ -261,7 +261,7 @@ export default function NavBar() {
           <p className="mt-4 text-xs text-white/70">Protection applies inside NBA Feed. External sites and search results may contain spoilers.</p>
       </Modal>
     )}
-    {myTeamsOpen && <FavoriteTeamsModal onClose={() => setMyTeamsOpen(false)} />}
+    {yourTeamsOpen && <YourTeamsDialog onClose={() => setYourTeamsOpen(false)} />}
     {confirmReveal && (
       <RevealSpoilersDialog
         hideScores={hideScores}

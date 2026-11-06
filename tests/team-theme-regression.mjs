@@ -11,8 +11,10 @@ export default async function runTeamThemeRegression(page) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("http://localhost:3000");
   for (const team of exports.teams) {
-    await page.getByRole("button", { name: "Change focus team", exact: true }).click();
-    await page.getByRole("button", { name: `${team.city} ${team.name}`, exact: true }).click();
+    await page.getByRole("button", { name: "Your teams", exact: true }).click();
+    await page.getByRole("button", { name: "Change", exact: true }).click();
+    await page.getByRole("radio", { name: `${team.city} ${team.name}`, exact: true }).click();
+    await page.getByRole("button", { name: "Done", exact: true }).click();
     await page.waitForFunction(color => document.documentElement.style.getPropertyValue("--team-primary") === color, team.primaryColor);
     const ratios = await page.evaluate(() => {
       const canvas = document.createElement("canvas");
