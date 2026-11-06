@@ -1,8 +1,8 @@
 "use client";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { teams, getChartColor, getTeamById, getCeltics } from "@/lib/teams";
-import { yourTeamsCopy, normalizeFollowing, sameIds, isStoreReady, yourTeamsSaveEvents, assertPreferenceStorage } from "@/lib/yourTeams";
-import { recordProductEvent, type ProductEvent } from "@/lib/productEvents";
+import { yourTeamsCopy, normalizeFollowing, sameIds, isStoreReady, yourTeamsSaveEvents, commitYourTeamsPreferences } from "@/lib/yourTeams";
+import { recordProductEvent } from "@/lib/productEvents";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { useTeam } from "@/hooks/useTeam";
 import Modal from "./Modal";
@@ -186,9 +186,7 @@ const hydrationFallbackMs = 1000;
 
 export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   const selectedTeam = useTeam((state) => state.selectedTeam);
-  const setTeam = useTeam((state) => state.setTeam);
   const favoriteTeamIds = useFavoriteTeams((state) => state.favoriteTeamIds);
-  const setFavorites = useFavoriteTeams((state) => state.setFavorites);
   const [ready, setReady] = useState(false);
   const [picking, setPicking] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -256,26 +254,20 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   function save() {
     const focus = getTeamById(focusId) ?? getCeltics();
     const following = normalizeFollowing(followingIds);
-    const previousFocus = useTeam.getState().selectedTeam;
-    const previousFollowing = useFavoriteTeams.getState().favoriteTeamIds;
-    let events: ProductEvent[];
-    try {
-      assertPreferenceStorage(window.localStorage);
-      events = yourTeamsSaveEvents(
-        { focusId: previousFocus.id, followingIds: previousFollowing },
-        { focusId: focus.id, followingIds: following },
-      );
-      setFavorites(following);
-      setTeam(focus);
-    } catch {
-      // Keep the save all-or-nothing. zustand updates memory before it writes
-      // storage, so restore both stores even if their writes fail again.
-      try { setFavorites(previousFollowing); } catch { /* memory already restored */ }
-      try { setTeam(previousFocus); } catch { /* memory already restored */ }
+    const previous = {
+      focusId: useTeam.getState().selectedTeam.id,
+      followingIds: useFavoriteTeams.getState().favoriteTeamIds,
+    };
+    const outcome = commitYourTeamsPreferences(window.localStorage, { focus, followingIds: following });
+    useTeam.persist?.rehydrate();
+    useFavoriteTeams.persist?.rehydrate();
+    if (!outcome.committed) {
       setSaveError(true);
       return;
     }
-    for (const event of events) recordProductEvent(event);
+    for (const event of yourTeamsSaveEvents(previous, { focusId: focus.id, followingIds: following })) {
+      recordProductEvent(event);
+    }
     onClose();
   }
 
