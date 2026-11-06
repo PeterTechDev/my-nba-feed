@@ -1,14 +1,39 @@
 "use client";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { teams, getChartColor, getTeamById, getCeltics } from "@/lib/teams";
-import { yourTeamsCopy, normalizeFollowing, yourTeamsSaveEvents, assertPreferenceStorage } from "@/lib/yourTeams";
-import { recordProductEvent } from "@/lib/productEvents";
+import { yourTeamsCopy, normalizeFollowing, sameIds, isStoreReady, yourTeamsSaveEvents, assertPreferenceStorage } from "@/lib/yourTeams";
+import { recordProductEvent, type ProductEvent } from "@/lib/productEvents";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { useTeam } from "@/hooks/useTeam";
 import Modal from "./Modal";
 
 const east = teams.filter((team) => team.conference === "East");
 const west = teams.filter((team) => team.conference === "West");
+/** Visual order of the picker grid, used for arrow-key navigation. */
+const pickerOrder = [...east, ...west].map((team) => team.id);
+
+/**
+ * Radio-group keyboard pattern: arrows and Home/End move the selection
+ * without leaving the picker; Enter, Space or a click confirms it.
+ */
+function nextPickerId(currentId: number, key: string): number | null {
+  const index = pickerOrder.indexOf(currentId);
+  const last = pickerOrder.length - 1;
+  switch (key) {
+    case "ArrowRight":
+    case "ArrowDown":
+      return pickerOrder[index >= last ? 0 : index + 1];
+    case "ArrowLeft":
+    case "ArrowUp":
+      return pickerOrder[index <= 0 ? last : index - 1];
+    case "Home":
+      return pickerOrder[0];
+    case "End":
+      return pickerOrder[last];
+    default:
+      return null;
+  }
+}
 
 export function YourTeamsForm({
   ready,
@@ -18,6 +43,7 @@ export function YourTeamsForm({
   saveError,
   onOpenPicker,
   onBack,
+  onMove,
   onPick,
   onToggle,
   onDone,
@@ -29,6 +55,8 @@ export function YourTeamsForm({
   saveError: boolean;
   onOpenPicker: () => void;
   onBack: () => void;
+  /** Arrow-key movement inside the picker: selects without closing it. */
+  onMove?: (id: number) => void;
   onPick: (id: number) => void;
   onToggle: (id: number) => void;
   onDone: () => void;
@@ -53,12 +81,18 @@ export function YourTeamsForm({
   }
 
   if (picking) {
+    const handlePickerKey = (event: KeyboardEvent<HTMLDivElement>) => {
+      const nextId = nextPickerId(focus.id, event.key);
+      if (nextId === null) return;
+      event.preventDefault();
+      onMove?.(nextId);
+    };
     return (
       <div>
         <button type="button" onClick={onBack} className="mb-4 min-h-11 rounded-lg px-3 text-sm text-white/80 hover:bg-white/10">
           {yourTeamsCopy.back}
         </button>
-        <div role="radiogroup" aria-labelledby="your-teams-focus-label" className="space-y-6">
+        <div role="radiogroup" aria-labelledby="your-teams-focus-label" onKeyDown={handlePickerKey} className="space-y-6">
           <h3 id="your-teams-focus-label" className="text-base font-semibold">{yourTeamsCopy.focusLabel}</h3>
           {(["East", "West"] as const).map((conference) => (
             <div key={conference}>
@@ -72,6 +106,7 @@ export function YourTeamsForm({
                       type="button"
                       role="radio"
                       aria-checked={selected}
+                      tabIndex={selected ? 0 : -1}
                       aria-label={`${team.city} ${team.name}`}
                       onClick={() => onPick(team.id)}
                       className="relative flex min-h-11 flex-col items-center gap-1.5 rounded-xl p-3 hover:bg-white/10"
@@ -98,7 +133,7 @@ export function YourTeamsForm({
       <section aria-labelledby="your-teams-focus-label" aria-describedby="your-teams-focus-help">
         <h3 id="your-teams-focus-label" className="text-base font-semibold">{yourTeamsCopy.focusLabel}</h3>
         <p id="your-teams-focus-help" className="mt-1 text-sm text-white/70">{yourTeamsCopy.focusHelper}</p>
-        <div id="your-teams-current-focus" tabIndex={-1} autoFocus className="mt-3 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+        <div id="your-teams-current-focus" tabIndex={-1} className="mt-3 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={focus.logo} alt="" width={40} height={40} className="h-10 w-10 shrink-0 object-contain" />
           <p className="min-w-0 flex-1 text-sm font-medium">{focus.city} {focus.name}</p>
@@ -146,6 +181,9 @@ export function YourTeamsForm({
   );
 }
 
+/** If a store's hydration fails (corrupt saved JSON), it never reports finished. Do not leave the dialog on its skeleton. */
+const hydrationFallbackMs = 1000;
+
 export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   const selectedTeam = useTeam((state) => state.selectedTeam);
   const setTeam = useTeam((state) => state.setTeam);
@@ -154,79 +192,127 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   const [ready, setReady] = useState(false);
   const [picking, setPicking] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [focusId, setFocusId] = useState(selectedTeam.id);
   const [followingIds, setFollowingIds] = useState<number[]>(favoriteTeamIds);
+  const [initial, setInitial] = useState<{ focusId: number; followingIds: number[] } | null>(null);
   const applied = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const dirty = initial !== null
+    && (initial.focusId !== focusId || !sameIds(initial.followingIds, normalizeFollowing(followingIds)));
 
   useLayoutEffect(() => {
     if (!ready) return;
     const panel = panelRef.current;
-    const target = picking
-      ? panel?.querySelector<HTMLElement>("[role='radio'][aria-checked='true']")
-      : panel?.querySelector<HTMLElement>("#your-teams-current-focus");
+    const target = confirmDiscard
+      ? panel?.querySelector<HTMLElement>("#your-teams-keep-editing")
+      : picking
+        ? panel?.querySelector<HTMLElement>("[role='radio'][aria-checked='true']")
+        : panel?.querySelector<HTMLElement>("#your-teams-current-focus");
     target?.focus();
-  }, [ready, picking, focusId]);
+  }, [ready, picking, focusId, confirmDiscard]);
 
   useLayoutEffect(() => {
     let active = true;
-    const sync = () => {
-      if (!active || applied.current || !useTeam.persist.hasHydrated() || !useFavoriteTeams.persist.hasHydrated()) return;
+    const apply = () => {
+      if (!active || applied.current) return;
       applied.current = true;
-      setFocusId(useTeam.getState().selectedTeam.id);
-      setFollowingIds(normalizeFollowing(useFavoriteTeams.getState().favoriteTeamIds));
+      const start = {
+        focusId: useTeam.getState().selectedTeam.id,
+        followingIds: normalizeFollowing(useFavoriteTeams.getState().favoriteTeamIds),
+      };
+      setInitial(start);
+      setFocusId(start.focusId);
+      setFollowingIds(start.followingIds);
       setReady(true);
     };
+    const sync = () => {
+      if (isStoreReady(useTeam) && isStoreReady(useFavoriteTeams)) apply();
+    };
     sync();
-    const unsubscribeFocus = useTeam.persist.onFinishHydration(sync);
-    const unsubscribeFollowing = useFavoriteTeams.persist.onFinishHydration(sync);
+    const unsubscribers = [useTeam, useFavoriteTeams].map((store) => store.persist?.onFinishHydration(sync));
+    const fallback = window.setTimeout(apply, hydrationFallbackMs);
     return () => {
       active = false;
-      unsubscribeFocus();
-      unsubscribeFollowing();
+      window.clearTimeout(fallback);
+      for (const unsubscribe of unsubscribers) unsubscribe?.();
     };
   }, []);
 
-  function save() {
-    const focus = getTeamById(focusId) ?? getCeltics();
-    const following = normalizeFollowing(followingIds);
-    try {
-      assertPreferenceStorage(window.localStorage);
-      const events = yourTeamsSaveEvents(
-        {
-          focusId: useTeam.getState().selectedTeam.id,
-          followingIds: useFavoriteTeams.getState().favoriteTeamIds,
-        },
-        { focusId: focus.id, followingIds: following },
-      );
-      setTeam(focus);
-      setFavorites(following);
-      for (const event of events) recordProductEvent(event);
-    } catch {
-      setSaveError(true);
+  function requestClose() {
+    if (confirmDiscard) {
+      // Esc or Close while the prompt is showing means "keep editing".
+      setConfirmDiscard(false);
+      return;
+    }
+    if (dirty) {
+      setConfirmDiscard(true);
       return;
     }
     onClose();
   }
 
+  function save() {
+    const focus = getTeamById(focusId) ?? getCeltics();
+    const following = normalizeFollowing(followingIds);
+    const previousFocus = useTeam.getState().selectedTeam;
+    const previousFollowing = useFavoriteTeams.getState().favoriteTeamIds;
+    let events: ProductEvent[];
+    try {
+      assertPreferenceStorage(window.localStorage);
+      events = yourTeamsSaveEvents(
+        { focusId: previousFocus.id, followingIds: previousFollowing },
+        { focusId: focus.id, followingIds: following },
+      );
+      setFavorites(following);
+      setTeam(focus);
+    } catch {
+      // Keep the save all-or-nothing. zustand updates memory before it writes
+      // storage, so restore both stores even if their writes fail again.
+      try { setFavorites(previousFollowing); } catch { /* memory already restored */ }
+      try { setTeam(previousFocus); } catch { /* memory already restored */ }
+      setSaveError(true);
+      return;
+    }
+    for (const event of events) recordProductEvent(event);
+    onClose();
+  }
+
   return (
-    <Modal title={yourTeamsCopy.title} onClose={onClose} wide sheet>
+    <Modal title={yourTeamsCopy.title} onClose={requestClose} wide sheet closeOnBackdrop={!dirty}>
       <div ref={panelRef}>
-      <YourTeamsForm
-        ready={ready}
-        picking={picking}
-        focusId={focusId}
-        followingIds={followingIds}
-        saveError={saveError}
-        onOpenPicker={() => setPicking(true)}
-        onBack={() => setPicking(false)}
-        onPick={(id) => { setFocusId(id); setPicking(false); }}
-        onToggle={(id) => {
-          setSaveError(false);
-          setFollowingIds((current) => current.includes(id) ? current.filter((teamId) => teamId !== id) : [...current, id]);
-        }}
-        onDone={save}
-      />
+        {confirmDiscard && (
+          <div role="alert" aria-labelledby="your-teams-discard-prompt" className="mb-5 rounded-xl border border-amber-300/30 bg-amber-300/5 p-4">
+            <p id="your-teams-discard-prompt" className="text-sm font-medium">{yourTeamsCopy.discardPrompt}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button id="your-teams-keep-editing" type="button" onClick={() => setConfirmDiscard(false)}
+                className="min-h-11 rounded-lg bg-white/10 px-4 text-sm font-medium hover:bg-white/20">
+                {yourTeamsCopy.keepEditing}
+              </button>
+              <button type="button" onClick={onClose}
+                className="min-h-11 rounded-lg border border-white/15 px-4 text-sm font-medium hover:bg-white/10">
+                {yourTeamsCopy.discard}
+              </button>
+            </div>
+          </div>
+        )}
+        <YourTeamsForm
+          ready={ready}
+          picking={picking}
+          focusId={focusId}
+          followingIds={followingIds}
+          saveError={saveError}
+          onOpenPicker={() => setPicking(true)}
+          onBack={() => setPicking(false)}
+          onMove={(id) => { setSaveError(false); setFocusId(id); }}
+          onPick={(id) => { setSaveError(false); setFocusId(id); setPicking(false); }}
+          onToggle={(id) => {
+            setSaveError(false);
+            setFollowingIds((current) => current.includes(id) ? current.filter((teamId) => teamId !== id) : [...current, id]);
+          }}
+          onDone={save}
+        />
       </div>
     </Modal>
   );

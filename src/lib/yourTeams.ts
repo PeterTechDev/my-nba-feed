@@ -13,6 +13,9 @@ export const yourTeamsCopy = {
   emptyFollowing: "No other teams yet. Add teams to see their headlines.",
   saveError: "Couldn't save your teams. Try again.",
   loading: "Loading your teams",
+  discard: "Discard",
+  discardPrompt: "Discard your changes?",
+  keepEditing: "Keep editing",
 } as const;
 
 const knownTeamIds = new Set(teams.map((team) => team.id));
@@ -29,7 +32,7 @@ export function normalizeFollowing(ids: readonly number[]): number[] {
   return following;
 }
 
-function sameIds(left: readonly number[], right: readonly number[]) {
+export function sameIds(left: readonly number[], right: readonly number[]) {
   if (left.length !== right.length) return false;
   const rightIds = new Set(right);
   return left.every((id) => rightIds.has(id));
@@ -49,6 +52,17 @@ export function yourTeamsSaveEvents(
     events.push({ name: "teams_following_updated", count: next.length });
   }
   return events;
+}
+
+type PersistedStore = { persist?: { hasHydrated: () => boolean } };
+
+/**
+ * A persisted store is ready once it has hydrated. When browser storage is
+ * unavailable (blocked cookies, some privacy modes) zustand returns the store
+ * without a `persist` API at all, so the in-memory defaults are the final state.
+ */
+export function isStoreReady(store: PersistedStore) {
+  return !store.persist || store.persist.hasHydrated();
 }
 
 const storageProbe = "nba-feed-your-teams-probe";

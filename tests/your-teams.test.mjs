@@ -152,3 +152,24 @@ test("preference storage failure is visible to the save path", () => {
   };
   assert.throws(() => yourTeams.assertPreferenceStorage(broken), /storage blocked/);
 });
+
+test("stores without browser storage count as ready instead of leaving the dialog loading", () => {
+  // zustand omits the persist API entirely when storage is unavailable.
+  assert.equal(yourTeams.isStoreReady({}), true);
+  assert.equal(yourTeams.isStoreReady({ persist: { hasHydrated: () => true } }), true);
+  assert.equal(yourTeams.isStoreReady({ persist: { hasHydrated: () => false } }), false);
+});
+
+test("unsaved changes are detected regardless of follow order", () => {
+  assert.equal(yourTeams.sameIds([lakers.id, heat.id], [heat.id, lakers.id]), true);
+  assert.equal(yourTeams.sameIds([lakers.id], [lakers.id, heat.id]), false);
+  assert.equal(yourTeams.sameIds([], []), true);
+});
+
+test("the focus picker is a single tab stop on the selected team", () => {
+  const picker = renderForm({ picking: true, focusId: lakers.id });
+  const tabStops = picker.match(/role="radio"[^>]*tabindex="0"|tabindex="0"[^>]*role="radio"/g) ?? [];
+  assert.equal(tabStops.length, 1);
+  assert.match(picker, /aria-label="Los Angeles Lakers"[^>]*tabindex="0"|tabindex="0"[^>]*aria-label="Los Angeles Lakers"/);
+  assert.equal((picker.match(/role="radio"/g) ?? []).length, teams.teams.length);
+});
