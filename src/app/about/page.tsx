@@ -31,10 +31,10 @@ export default function AboutPage() {
             and highlights within reach, without an endless feed of recommendations.
           </p>
           <p className="mt-4 leading-7 text-white/70">
-            Follow your favorites in <span className="font-medium text-white">My Teams</span>.
-            Choose a focus team on the home page for its last game, next matchup
-            and news. Explore the schedule and player rosters when you
-            want the wider picture.
+            Open <span className="font-medium text-white">Your teams</span> to
+            choose a focus team and, if you want, other teams to follow. The focus
+            team drives scores, the schedule and the briefing. Followed teams add
+            headlines only, and the feed still works when you follow none.
           </p>
         </section>
         <section aria-labelledby="spoiler-protection">

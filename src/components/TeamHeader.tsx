@@ -16,7 +16,7 @@ export default function TeamHeader() {
     <section className={styles.hero}>
       <Image src="/images/arena-neutral.webp" alt="" fill sizes="100vw" preload className={styles.arenaImage} />
       <div key={`lights-${team.id}`} aria-hidden="true" className={styles.arenaLights}><span /><span /></div>
-      <TeamSelector className={styles.crest} label={`Change focus team from ${team.name}`}>
+      <TeamSelector className={styles.crest} label={`Your teams. Focus team ${team.city} ${team.name}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={team.logo} alt="" width={176} height={176} loading="eager" className="h-full w-full object-contain" />
       </TeamSelector>

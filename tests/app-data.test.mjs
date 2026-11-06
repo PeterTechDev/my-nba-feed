@@ -258,7 +258,7 @@ test("spoiler labels name hidden content in both complete and mixed states", () 
   let settings;
   const NavBar = load("components/NavBar.tsx", {}, {
     "next/link": { default: "a" }, "next/navigation": { usePathname: () => "/" },
-    "./Modal": { default: () => null }, "./FavoriteTeamsModal": { default: () => null },
+    "./Modal": { default: () => null }, "./YourTeamsDialog": { default: () => null },
     "@/hooks/useFavoriteTeams": { useFavoriteTeams: () => ({ favoriteTeamIds: [] }) },
     "./SpoilerModeProvider": { useSpoilerContext: () => settings },
   }).exports.default;
@@ -274,6 +274,8 @@ test("spoiler labels name hidden content in both complete and mixed states", () 
     assert.match(html, /aria-label="My NBA Feed home" aria-current="page"/);
     assert.doesNotMatch(html, /href="\/players"|>Home<|>Players</);
     assert.doesNotMatch(html, /Default on|Default off|Custom protection/);
+    assert.match(html, /Your teams, 0 followed for news/);
+    assert.doesNotMatch(html, /My Teams|Change focus team/);
   }
 });
 
