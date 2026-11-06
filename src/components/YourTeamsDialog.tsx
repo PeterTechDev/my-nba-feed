@@ -1,8 +1,8 @@
 "use client";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { teams, getChartColor, getTeamById, getCeltics } from "@/lib/teams";
-import { yourTeamsCopy, normalizeFollowing, sameIds, isStoreReady, yourTeamsSaveEvents, assertPreferenceStorage } from "@/lib/yourTeams";
-import { recordProductEvent, type ProductEvent } from "@/lib/productEvents";
+import { yourTeamsCopy, normalizeFollowing, sameIds, isStoreReady, yourTeamsSaveEvents, yourTeamsCloseAction, yourTeamsFocusTarget } from "@/lib/yourTeams";
+import { recordProductEvent } from "@/lib/productEvents";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { useTeam } from "@/hooks/useTeam";
 import Modal from "./Modal";
@@ -173,7 +173,7 @@ export function YourTeamsForm({
       </section>
       {saveError && <p role="alert" className="mt-4 text-sm text-amber-200">{yourTeamsCopy.saveError}</p>}
       <div className="sticky bottom-0 mt-6 border-t border-white/10 bg-[#141414] py-4">
-        <button type="submit" className="min-h-11 w-full rounded-lg bg-white/10 px-4 text-sm font-medium hover:bg-white/20">
+        <button id="your-teams-done" type="submit" className="min-h-11 w-full rounded-lg bg-white/10 px-4 text-sm font-medium hover:bg-white/20">
           {yourTeamsCopy.done}
         </button>
       </div>
@@ -186,9 +186,7 @@ const hydrationFallbackMs = 1000;
 
 export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   const selectedTeam = useTeam((state) => state.selectedTeam);
-  const setTeam = useTeam((state) => state.setTeam);
   const favoriteTeamIds = useFavoriteTeams((state) => state.favoriteTeamIds);
-  const setFavorites = useFavoriteTeams((state) => state.setFavorites);
   const [ready, setReady] = useState(false);
   const [picking, setPicking] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -198,6 +196,7 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   const [initial, setInitial] = useState<{ focusId: number; followingIds: number[] } | null>(null);
   const applied = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const saveErrorRef = useRef(false);
 
   const dirty = initial !== null
     && (initial.focusId !== focusId || !sameIds(initial.followingIds, normalizeFollowing(followingIds)));
@@ -205,13 +204,16 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   useLayoutEffect(() => {
     if (!ready) return;
     const panel = panelRef.current;
-    const target = confirmDiscard
+    const target = yourTeamsFocusTarget({ saveError, picking, confirmDiscard });
+    const element = target === "keep-editing"
       ? panel?.querySelector<HTMLElement>("#your-teams-keep-editing")
-      : picking
+      : target === "radio"
         ? panel?.querySelector<HTMLElement>("[role='radio'][aria-checked='true']")
-        : panel?.querySelector<HTMLElement>("#your-teams-current-focus");
-    target?.focus();
-  }, [ready, picking, focusId, confirmDiscard]);
+        : target === "done"
+          ? panel?.querySelector<HTMLElement>("#your-teams-done")
+          : panel?.querySelector<HTMLElement>("#your-teams-current-focus");
+    element?.focus();
+  }, [ready, picking, focusId, confirmDiscard, saveError]);
 
   useLayoutEffect(() => {
     let active = true;
@@ -241,12 +243,12 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   }, []);
 
   function requestClose() {
-    if (confirmDiscard) {
-      // Esc or Close while the prompt is showing means "keep editing".
+    const action = yourTeamsCloseAction({ saveError: saveErrorRef.current || saveError, confirmDiscard, dirty });
+    if (action === "keep-editing") {
       setConfirmDiscard(false);
       return;
     }
-    if (dirty) {
+    if (action === "confirm-discard") {
       setConfirmDiscard(true);
       return;
     }
@@ -256,26 +258,20 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   function save() {
     const focus = getTeamById(focusId) ?? getCeltics();
     const following = normalizeFollowing(followingIds);
-    const previousFocus = useTeam.getState().selectedTeam;
-    const previousFollowing = useFavoriteTeams.getState().favoriteTeamIds;
-    let events: ProductEvent[];
+    const previous = {
+      focusId: useTeam.getState().selectedTeam.id,
+      followingIds: useFavoriteTeams.getState().favoriteTeamIds,
+    };
     try {
-      assertPreferenceStorage(window.localStorage);
-      events = yourTeamsSaveEvents(
-        { focusId: previousFocus.id, followingIds: previousFollowing },
-        { focusId: focus.id, followingIds: following },
-      );
-      setFavorites(following);
-      setTeam(focus);
+      useTeam.getState().commit(focus, following);
     } catch {
-      // Keep the save all-or-nothing. zustand updates memory before it writes
-      // storage, so restore both stores even if their writes fail again.
-      try { setFavorites(previousFollowing); } catch { /* memory already restored */ }
-      try { setTeam(previousFocus); } catch { /* memory already restored */ }
+      saveErrorRef.current = true;
       setSaveError(true);
       return;
     }
-    for (const event of events) recordProductEvent(event);
+    for (const event of yourTeamsSaveEvents(previous, { focusId: focus.id, followingIds: following })) {
+      recordProductEvent(event);
+    }
     onClose();
   }
 
@@ -305,10 +301,9 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
           saveError={saveError}
           onOpenPicker={() => setPicking(true)}
           onBack={() => setPicking(false)}
-          onMove={(id) => { setSaveError(false); setFocusId(id); }}
-          onPick={(id) => { setSaveError(false); setFocusId(id); setPicking(false); }}
+          onMove={(id) => setFocusId(id)}
+          onPick={(id) => { setFocusId(id); setPicking(false); }}
           onToggle={(id) => {
-            setSaveError(false);
             setFollowingIds((current) => current.includes(id) ? current.filter((teamId) => teamId !== id) : [...current, id]);
           }}
           onDone={save}

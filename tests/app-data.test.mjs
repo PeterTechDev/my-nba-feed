@@ -585,13 +585,16 @@ test("saved focus teams migrate to bundled logos without changing team identity"
       selectedTeam: { ...heat, id: version === 0 ? 15 : heat.id, logo: `https://cdn.nba.com/logos/nba/${heat.nbaComId}/primary/L/logo.svg` },
     } })]]);
     const storage = { getItem: (key) => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value), removeItem: (key) => saved.delete(key) };
-    const { useTeam } = load("hooks/useTeam.ts", {}, {
+    const legacyLogo = `https://cdn.nba.com/logos/nba/${heat.nbaComId}/primary/L/logo.svg`;
+    const { useTeam } = load("hooks/useTeam.ts", { window: { localStorage: storage } }, {
       "@/lib/teams": teams,
-      "zustand/middleware": { persist: (config, options) => persist(config, { ...options, storage: createJSONStorage(() => storage) }) },
+      "@/lib/yourTeams": load("lib/yourTeams.ts", {}, { "./teams": teams, "./productEvents": load("lib/productEvents.ts").exports }).exports,
+      "zustand/middleware": { persist: (config, options) => persist(config, options), createJSONStorage },
     }).exports;
     assert.equal(useTeam.getState().selectedTeam, heat);
     assert.equal(useTeam.getState().selectedTeam.logo, `/teams/${heat.nbaComId}.svg`);
-    assert.equal(JSON.parse(saved.get("nba-feed-team")).version, 2);
+    assert.equal(JSON.parse(saved.get("nba-feed-team")).state.selectedTeam.logo, legacyLogo);
+    assert.equal(saved.has("nba-feed-your-teams"), false);
   }
 });
 

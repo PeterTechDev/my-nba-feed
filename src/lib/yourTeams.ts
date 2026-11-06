@@ -65,13 +65,18 @@ export function isStoreReady(store: PersistedStore) {
   return !store.persist || store.persist.hasHydrated();
 }
 
-const storageProbe = "nba-feed-your-teams-probe";
+/** Picker and discard controls win over the failed-save retry focus. The alert itself is never the target. */
+export function yourTeamsFocusTarget(input: { saveError: boolean; picking: boolean; confirmDiscard: boolean }) {
+  if (input.confirmDiscard) return "keep-editing" as const;
+  if (input.picking) return "radio" as const;
+  if (input.saveError) return "done" as const;
+  return "focus" as const;
+}
 
-export function assertPreferenceStorage(storage: Pick<Storage, "setItem" | "removeItem">) {
-  storage.setItem(storageProbe, "1");
-  try {
-    storage.removeItem(storageProbe);
-  } catch {
-    // The write succeeded. A failed cleanup does not block the save.
-  }
+/** After a failed Done, Esc and Close drop the draft instead of trapping the dialog. */
+export function yourTeamsCloseAction(input: { saveError: boolean; confirmDiscard: boolean; dirty: boolean }) {
+  if (input.saveError) return "close" as const;
+  if (input.confirmDiscard) return "keep-editing" as const;
+  if (input.dirty) return "confirm-discard" as const;
+  return "close" as const;
 }
