@@ -41,54 +41,74 @@ const lakers = teams.teams.find((team) => team.abbreviation === "LAL");
 const heat = teams.teams.find((team) => team.abbreviation === "MIA");
 const knicks = teams.teams.find((team) => team.abbreviation === "NYK");
 
-test("Done shows the save error when storage access or reading is denied", () => {
-  for (const deniedAt of ["access", "read"]) {
-    const state = [];
-    let closed = false;
-    let writes = 0;
-    let hydrations = 0;
-    const storage = {
-      getItem() { throw new Error("SecurityError: storage denied"); },
-      setItem() { writes += 1; },
-      removeItem() { writes += 1; },
-    };
-    const window = {
-      get localStorage() {
-        if (deniedAt === "access") throw new Error("SecurityError: storage denied");
-        return storage;
+function openRealStore(windowObject) {
+  const { persist, createJSONStorage } = require("zustand/middleware");
+  return load("hooks/useTeam.ts", {
+    "@/lib/teams": teams,
+    "@/lib/yourTeams": yourTeams,
+    "zustand/middleware": { persist, createJSONStorage },
+  }, { window: windowObject }).useTeam;
+}
+
+test("denied storage access fails the real commit instead of saving in memory", () => {
+  const reads = [];
+  const writes = [];
+  const useTeam = openRealStore({
+    get localStorage() {
+      reads.push("access");
+      throw new Error("SecurityError: storage denied");
+    },
+  });
+  const before = useTeam.getState().selectedTeam.abbreviation;
+  assert.throws(() => useTeam.getState().commit(knicks, [lakers.id]), /SecurityError/);
+  assert.equal(useTeam.getState().selectedTeam.abbreviation, before);
+  assert.deepEqual(JSON.parse(JSON.stringify(useTeam.getState().favoriteTeamIds)), []);
+  assert.equal(writes.length, 0);
+  assert.ok(reads.length >= 1);
+});
+
+test("Done shows the save error when the real store cannot persist", () => {
+  const events = [];
+  const useTeam = openRealStore({
+    get localStorage() { throw new Error("SecurityError: storage denied"); },
+  });
+  const before = {
+    focus: useTeam.getState().selectedTeam.abbreviation,
+    follows: JSON.parse(JSON.stringify(useTeam.getState().favoriteTeamIds)),
+  };
+  const state = [];
+  let closed = false;
+  const facade = Object.assign((selector) => selector(useTeam.getState()), {
+    getState: () => useTeam.getState(),
+    persist: useTeam.persist,
+  });
+  const { default: Dialog } = load("components/YourTeamsDialog.tsx", {
+    react: {
+      useState(initial) {
+        const index = state.length;
+        state.push(initial);
+        return [initial, (value) => { state[index] = value; }];
       },
-    };
-    const store = (value) => Object.assign((select) => select(value), {
-      getState: () => value,
-      persist: { rehydrate() { hydrations += 1; } },
-    });
-    const { default: Dialog } = load("components/YourTeamsDialog.tsx", {
-      react: {
-        useState(initial) {
-          const index = state.length;
-          state.push(initial);
-          return [initial, (value) => { state[index] = value; }];
-        },
-        useRef: () => ({ current: null }),
-        useLayoutEffect() {},
-      },
-      "@/lib/teams": teams,
-      "@/lib/yourTeams": yourTeams,
-      "@/lib/productEvents": { recordProductEvent() { assert.fail("failed saves must not emit events"); } },
-      "@/hooks/useTeam": { useTeam: store({ selectedTeam: heat }) },
-      "@/hooks/useFavoriteTeams": { useFavoriteTeams: store({ favoriteTeamIds: [lakers.id] }) },
-      "./Modal": { default: () => null },
-    }, { window });
-    const dialog = Dialog({ onClose() { closed = true; } });
-    const form = dialog.props.children.props.children[1];
-    assert.doesNotThrow(() => form.props.onDone(), deniedAt);
-    assert.equal(state[2], true, "save error is visible");
-    assert.equal(state[4], heat.id, "focus draft is preserved");
-    assert.deepEqual(state[5], [lakers.id], "following draft is preserved");
-    assert.equal(closed, false);
-    assert.equal(writes, 0);
-    assert.equal(hydrations, 0);
-  }
+      useRef: (initial) => ({ current: initial }),
+      useLayoutEffect() {},
+    },
+    "@/lib/teams": teams,
+    "@/lib/yourTeams": yourTeams,
+    "@/lib/productEvents": { recordProductEvent(event) { events.push(event); } },
+    "@/hooks/useTeam": { useTeam: facade },
+    "@/hooks/useFavoriteTeams": { useFavoriteTeams: facade },
+    "./Modal": { default: () => null },
+  });
+  const dialog = Dialog({ onClose() { closed = true; } });
+  const form = dialog.props.children.props.children[1];
+  form.props.onDone();
+  assert.equal(closed, false, "Done must not close when persistence did not happen");
+  assert.equal(state[2], true, "save error is visible");
+  assert.equal(events.length, 0, "failed persistence must not emit success analytics");
+  assert.equal(useTeam.getState().selectedTeam.abbreviation, before.focus);
+  assert.deepEqual(JSON.parse(JSON.stringify(useTeam.getState().favoriteTeamIds)), before.follows);
+  dialog.props.onClose();
+  assert.equal(closed, true, "Esc/Close after the failure discards the dialog");
 });
 
 function renderForm(props) {
@@ -248,6 +268,52 @@ test("a failed Done leaves the saved pair and feed memory unchanged", () => {
   const reloaded = openPreferences(saved);
   assert.equal(reloaded.store.getState().selectedTeam.abbreviation, "MIA");
   assert.deepEqual(JSON.parse(JSON.stringify(reloaded.store.getState().favoriteTeamIds)), [lakers.id]);
+});
+
+test("an unreadable canonical record falls back to legacy without rewriting either", () => {
+  for (const canonical of ["", "{not json", JSON.stringify({ version: 99, state: { selectedTeam: knicks, favoriteTeamIds: [lakers.id] } }), JSON.stringify({ version: 1, state: { selectedTeam: { abbreviation: "NOPE" }, favoriteTeamIds: [] } })]) {
+    const legacyFocus = JSON.stringify({ version: 2, state: { selectedTeam: heat } });
+    const legacyFollows = JSON.stringify({ version: 1, state: { favoriteTeamIds: [lakers.id] } });
+    const saved = new Map([
+      ["nba-feed-your-teams", canonical],
+      ["nba-feed-team", legacyFocus],
+      ["nba-feed-favorite-teams", legacyFollows],
+    ]);
+    const opened = openPreferences(saved);
+    assert.equal(opened.store.persist.hasHydrated(), true, canonical);
+    assert.equal(opened.store.getState().selectedTeam.abbreviation, "MIA", canonical);
+    assert.deepEqual(JSON.parse(JSON.stringify(opened.store.getState().favoriteTeamIds)), [lakers.id], canonical);
+    assert.equal(saved.get("nba-feed-your-teams"), canonical);
+    assert.equal(saved.get("nba-feed-team"), legacyFocus);
+    assert.equal(saved.get("nba-feed-favorite-teams"), legacyFollows);
+    assert.equal(opened.writes.length, 0, canonical);
+  }
+});
+
+test("a valid canonical record wins over legacy and a failed setter rolls memory back", () => {
+  const canonical = JSON.stringify({ version: 1, state: { selectedTeam: knicks, favoriteTeamIds: [] } });
+  const legacyFocus = JSON.stringify({ version: 2, state: { selectedTeam: heat } });
+  const legacyFollows = JSON.stringify({ version: 1, state: { favoriteTeamIds: [lakers.id] } });
+  const saved = new Map([
+    ["nba-feed-your-teams", canonical],
+    ["nba-feed-team", legacyFocus],
+    ["nba-feed-favorite-teams", legacyFollows],
+  ]);
+  const opened = openPreferences(saved);
+  assert.equal(opened.store.getState().selectedTeam.abbreviation, "NYK");
+  assert.deepEqual(JSON.parse(JSON.stringify(opened.store.getState().favoriteTeamIds)), []);
+  const blocked = openPreferences(saved, { failCommit: true });
+  assert.throws(() => blocked.store.getState().setTeam(heat), /quota/);
+  assert.equal(blocked.store.getState().selectedTeam.abbreviation, "NYK");
+  assert.equal(saved.get("nba-feed-your-teams"), canonical);
+  assert.equal(saved.get("nba-feed-team"), legacyFocus);
+});
+
+test("opening the picker keeps the save error and focuses the radio", () => {
+  assert.equal(yourTeams.yourTeamsFocusTarget({ saveError: true, picking: true, confirmDiscard: false }), "radio");
+  assert.equal(yourTeams.yourTeamsFocusTarget({ saveError: true, picking: false, confirmDiscard: false }), "done");
+  assert.equal(yourTeams.yourTeamsFocusTarget({ saveError: true, picking: true, confirmDiscard: true }), "keep-editing");
+  assert.equal(yourTeams.yourTeamsFocusTarget({ saveError: false, picking: false, confirmDiscard: false }), "focus");
 });
 
 test("a failed save lets Esc and Close discard the draft", () => {

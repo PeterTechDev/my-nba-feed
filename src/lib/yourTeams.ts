@@ -65,6 +65,14 @@ export function isStoreReady(store: PersistedStore) {
   return !store.persist || store.persist.hasHydrated();
 }
 
+/** Picker and discard controls win over the failed-save retry focus. The alert itself is never the target. */
+export function yourTeamsFocusTarget(input: { saveError: boolean; picking: boolean; confirmDiscard: boolean }) {
+  if (input.confirmDiscard) return "keep-editing" as const;
+  if (input.picking) return "radio" as const;
+  if (input.saveError) return "done" as const;
+  return "focus" as const;
+}
+
 /** After a failed Done, Esc and Close drop the draft instead of trapping the dialog. */
 export function yourTeamsCloseAction(input: { saveError: boolean; confirmDiscard: boolean; dirty: boolean }) {
   if (input.saveError) return "close" as const;

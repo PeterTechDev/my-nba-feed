@@ -1,7 +1,7 @@
 "use client";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { teams, getChartColor, getTeamById, getCeltics } from "@/lib/teams";
-import { yourTeamsCopy, normalizeFollowing, sameIds, isStoreReady, yourTeamsSaveEvents, yourTeamsCloseAction } from "@/lib/yourTeams";
+import { yourTeamsCopy, normalizeFollowing, sameIds, isStoreReady, yourTeamsSaveEvents, yourTeamsCloseAction, yourTeamsFocusTarget } from "@/lib/yourTeams";
 import { recordProductEvent } from "@/lib/productEvents";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { useTeam } from "@/hooks/useTeam";
@@ -204,22 +204,16 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   useLayoutEffect(() => {
     if (!ready) return;
     const panel = panelRef.current;
-    if (saveError) {
-      panel?.querySelector<HTMLElement>("#your-teams-done")?.focus();
-      return;
-    }
-    if (saveErrorRef.current) return;
-    const target = confirmDiscard
+    const target = yourTeamsFocusTarget({ saveError, picking, confirmDiscard });
+    const element = target === "keep-editing"
       ? panel?.querySelector<HTMLElement>("#your-teams-keep-editing")
-      : picking
+      : target === "radio"
         ? panel?.querySelector<HTMLElement>("[role='radio'][aria-checked='true']")
-        : panel?.querySelector<HTMLElement>("#your-teams-current-focus");
-    target?.focus();
+        : target === "done"
+          ? panel?.querySelector<HTMLElement>("#your-teams-done")
+          : panel?.querySelector<HTMLElement>("#your-teams-current-focus");
+    element?.focus();
   }, [ready, picking, focusId, confirmDiscard, saveError]);
-
-  useLayoutEffect(() => {
-    saveErrorRef.current = saveError;
-  }, [saveError]);
 
   useLayoutEffect(() => {
     let active = true;
@@ -271,6 +265,7 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
     try {
       useTeam.getState().commit(focus, following);
     } catch {
+      saveErrorRef.current = true;
       setSaveError(true);
       return;
     }
@@ -306,10 +301,9 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
           saveError={saveError}
           onOpenPicker={() => setPicking(true)}
           onBack={() => setPicking(false)}
-          onMove={(id) => { setSaveError(false); setFocusId(id); }}
-          onPick={(id) => { setSaveError(false); setFocusId(id); setPicking(false); }}
+          onMove={(id) => setFocusId(id)}
+          onPick={(id) => { setFocusId(id); setPicking(false); }}
           onToggle={(id) => {
-            setSaveError(false);
             setFollowingIds((current) => current.includes(id) ? current.filter((teamId) => teamId !== id) : [...current, id]);
           }}
           onDone={save}

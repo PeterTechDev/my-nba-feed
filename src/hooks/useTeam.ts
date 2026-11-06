@@ -48,61 +48,92 @@ export function followsFromLegacy(raw: string | null): number[] {
   return normalizeFollowing([...new Set(mapped)]);
 }
 
+/** A canonical record is only authoritative when it is the current version and names real teams. */
+export function usableCanonical(raw: string | null): string | null {
+  if (typeof raw !== "string" || raw.trim() === "") return null;
+  const stored = parseEnvelope(raw);
+  if (!stored || stored.version !== persistedVersion) return null;
+  const selected = stored.state.selectedTeam as { abbreviation?: unknown } | undefined;
+  const teamOk = typeof selected?.abbreviation === "string"
+    && teams.some((team) => team.abbreviation === selected.abbreviation);
+  const follows = stored.state.favoriteTeamIds;
+  const followsOk = Array.isArray(follows)
+    && follows.every((id) => typeof id === "number" && teams.some((team) => team.id === id));
+  if (!teamOk || !followsOk) return null;
+  return raw;
+}
+
+function legacyRecord(backend: StateStorage): string | null {
+  const focusRaw = backend.getItem(legacyFocusKey);
+  const followRaw = backend.getItem(legacyFollowingKey);
+  if (focusRaw instanceof Promise || followRaw instanceof Promise) return null;
+  if (focusRaw == null && followRaw == null) return null;
+  return JSON.stringify({
+    state: {
+      selectedTeam: focusFromLegacy(typeof focusRaw === "string" ? focusRaw : null),
+      favoriteTeamIds: followsFromLegacy(typeof followRaw === "string" ? followRaw : null),
+    },
+    version: persistedVersion,
+  });
+}
+
 /**
  * createJSONStorage owns JSON.parse/stringify of { state, version }.
- * The new key is authoritative. Legacy keys are read only when it is absent.
+ * getStorage() must not touch localStorage: createJSONStorage drops the store
+ * when that call throws, and later set() updates memory without throwing.
+ * A missing, empty, or unreadable canonical value falls back to legacy keys.
+ * Those keys are never written or removed here.
  */
 export function createYourTeamsStorage(getBackend: () => StateStorage) {
-  return createJSONStorage<PersistedPreferences>(() => {
-    const backend = getBackend();
-    return {
-      getItem(name) {
-        const current = backend.getItem(name);
-        if (current instanceof Promise || current != null) return current;
-        if (name !== yourTeamsStorageKey) return null;
-        const focusRaw = backend.getItem(legacyFocusKey);
-        const followRaw = backend.getItem(legacyFollowingKey);
-        if (focusRaw instanceof Promise || followRaw instanceof Promise) return null;
-        if (focusRaw == null && followRaw == null) return null;
-        return JSON.stringify({
-          state: {
-            selectedTeam: focusFromLegacy(focusRaw),
-            favoriteTeamIds: followsFromLegacy(followRaw),
-          },
-          version: persistedVersion,
-        });
-      },
-      setItem(name, value) {
-        return backend.setItem(name, value);
-      },
-      removeItem(name) {
-        return backend.removeItem(name);
-      },
-    };
-  });
+  return createJSONStorage<PersistedPreferences>(() => ({
+    getItem(name) {
+      const backend = getBackend();
+      const current = backend.getItem(name);
+      if (current instanceof Promise) return current;
+      if (name !== yourTeamsStorageKey) return current;
+      const usable = usableCanonical(current);
+      if (usable != null) return usable;
+      return legacyRecord(backend);
+    },
+    setItem(name, value) {
+      return getBackend().setItem(name, value);
+    },
+    removeItem(name) {
+      return getBackend().removeItem(name);
+    },
+  }));
+}
+
+function writePreferences(
+  set: (partial: Partial<Pick<TeamPreferences, "selectedTeam" | "favoriteTeamIds">>) => void,
+  get: () => TeamPreferences,
+  partial: Partial<Pick<TeamPreferences, "selectedTeam" | "favoriteTeamIds">>,
+) {
+  const previous = { selectedTeam: get().selectedTeam, favoriteTeamIds: get().favoriteTeamIds };
+  try {
+    set(partial);
+  } catch (error) {
+    try { set(previous); } catch { /* the stored record was not replaced */ }
+    throw error;
+  }
 }
 
 export const useTeamPreferences = create<TeamPreferences>()(persist(
   (set, get) => ({
     selectedTeam: getCeltics(),
     favoriteTeamIds: [],
-    setTeam: (team) => set({ selectedTeam: team }),
-    setFavorites: (ids) => set({ favoriteTeamIds: normalizeFollowing(ids) }),
+    setTeam: (team) => writePreferences(set, get, { selectedTeam: team }),
+    setFavorites: (ids) => writePreferences(set, get, { favoriteTeamIds: normalizeFollowing(ids) }),
     toggleTeam: (id) => {
       const current = get().favoriteTeamIds;
       const next = current.includes(id) ? current.filter((teamId) => teamId !== id) : [...current, id];
-      set({ favoriteTeamIds: normalizeFollowing(next) });
+      writePreferences(set, get, { favoriteTeamIds: normalizeFollowing(next) });
     },
-    clearFavorites: () => set({ favoriteTeamIds: [] }),
-    commit: (focus, followingIds) => {
-      const previous = { selectedTeam: get().selectedTeam, favoriteTeamIds: get().favoriteTeamIds };
-      try {
-        set({ selectedTeam: focus, favoriteTeamIds: normalizeFollowing(followingIds) });
-      } catch (error) {
-        try { set(previous); } catch { /* memory is already the saved pair; storage rejected the replacement */ }
-        throw error;
-      }
-    },
+    clearFavorites: () => writePreferences(set, get, { favoriteTeamIds: [] }),
+    commit: (focus, followingIds) => writePreferences(set, get, {
+      selectedTeam: focus,
+      favoriteTeamIds: normalizeFollowing(followingIds),
+    }),
   }),
   {
     name: yourTeamsStorageKey,
