@@ -1,5 +1,5 @@
 import type { ProductEvent } from "./productEvents";
-import { teams, type Team } from "./teams";
+import { teams } from "./teams";
 
 export const yourTeamsCopy = {
   title: "Your teams",
@@ -65,45 +65,10 @@ export function isStoreReady(store: PersistedStore) {
   return !store.persist || store.persist.hasHydrated();
 }
 
-export const focusStorageKey = "nba-feed-team";
-export const followingStorageKey = "nba-feed-favorite-teams";
-const focusStorageVersion = 2;
-const followingStorageVersion = 1;
-
-export type YourTeamsSaveResult = { committed: boolean; restored: boolean };
-
-/**
- * localStorage applies each setItem on its own. QuotaExceededError aborts that
- * one write and there is no multi-key transaction (MDN Storage.setItem).
- * Zustand persist also updates memory before setItem, so a thrown write leaves
- * the feed ahead of storage. This writes the focus key, then the follow key,
- * and puts the previous focus string back if the follow write throws.
- * If that restore also throws, the stored pair can be the new focus with the
- * previous follows. Callers must re-read storage; this does not claim the two
- * keys commit atomically.
- */
-export function commitYourTeamsPreferences(
-  storage: Pick<Storage, "getItem" | "setItem" | "removeItem">,
-  next: { focus: Team; followingIds: readonly number[] },
-): YourTeamsSaveResult {
-  const followingIds = normalizeFollowing(next.followingIds);
-  const previousFocus = storage.getItem(focusStorageKey);
-  const focusValue = JSON.stringify({ state: { selectedTeam: next.focus }, version: focusStorageVersion });
-  const followingValue = JSON.stringify({ state: { favoriteTeamIds: followingIds }, version: followingStorageVersion });
-  let focusWritten = false;
-  try {
-    storage.setItem(focusStorageKey, focusValue);
-    focusWritten = true;
-    storage.setItem(followingStorageKey, followingValue);
-  } catch {
-    if (!focusWritten) return { committed: false, restored: true };
-    try {
-      if (previousFocus === null) storage.removeItem(focusStorageKey);
-      else storage.setItem(focusStorageKey, previousFocus);
-      return { committed: false, restored: true };
-    } catch {
-      return { committed: false, restored: false };
-    }
-  }
-  return { committed: true, restored: true };
+/** After a failed Done, Esc and Close drop the draft instead of trapping the dialog. */
+export function yourTeamsCloseAction(input: { saveError: boolean; confirmDiscard: boolean; dirty: boolean }) {
+  if (input.saveError) return "close" as const;
+  if (input.confirmDiscard) return "keep-editing" as const;
+  if (input.dirty) return "confirm-discard" as const;
+  return "close" as const;
 }

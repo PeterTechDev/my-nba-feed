@@ -169,6 +169,8 @@ test("the Your teams form states do not revive the parallel team concepts", () =
   const failed = renderForm({ saveError: true });
   assert.match(failed, /Couldn&#x27;t save your teams\. Try again\./);
   assert.match(failed, /role="alert"/);
+  assert.match(failed, /id="your-teams-done"/);
+  assert.doesNotMatch(failed, /id="your-teams-done"[^>]*disabled/);
 
   const picker = renderForm({ picking: true, focusId: lakers.id });
   assert.match(picker, /role="radiogroup"/);
@@ -177,102 +179,82 @@ test("the Your teams form states do not revive the parallel team concepts", () =
   assert.doesNotMatch(picker, />Done</);
 });
 
-test("saved focus and follow preferences reload without forcing the focus onto follows", () => {
-  const { persist, createJSONStorage } = require("zustand/middleware");
-  const saved = new Map([
-    ["nba-feed-team", JSON.stringify({ version: 2, state: { selectedTeam: heat } })],
-    ["nba-feed-favorite-teams", JSON.stringify({ version: 1, state: { favoriteTeamIds: [lakers.id] } })],
-  ]);
-  const storage = {
-    getItem: (key) => saved.get(key) ?? null,
-    setItem: (key, value) => saved.set(key, value),
-    removeItem: (key) => saved.delete(key),
-  };
-  const middleware = { persist: (config, options) => persist(config, { ...options, storage: createJSONStorage(() => storage) }) };
-  const useTeam = load("hooks/useTeam.ts", { "@/lib/teams": teams, "zustand/middleware": middleware }).useTeam;
-  const useFavoriteTeams = load("hooks/useFavoriteTeams.ts", { "@/lib/teams": teams, "zustand/middleware": middleware }).useFavoriteTeams;
-  assert.equal(useTeam.getState().selectedTeam.id, heat.id);
-  assert.equal(useTeam.getState().selectedTeam.logo, heat.logo);
-  assert.deepEqual(useFavoriteTeams.getState().favoriteTeamIds, [lakers.id]);
-  assert.equal(useFavoriteTeams.getState().favoriteTeamIds.includes(heat.id), false);
-});
-
-function preferenceBag(fail) {
-  const saved = new Map([
-    ["nba-feed-team", JSON.stringify({ version: 0, state: { selectedTeam: { ...heat, logo: "https://cdn.example/legacy.svg" } } })],
-    ["nba-feed-favorite-teams", JSON.stringify({ version: 1, state: { favoriteTeamIds: [lakers.id] } })],
-  ]);
-  let preferenceWrites = 0;
+function openPreferences(saved, { failCommit = false } = {}) {
+  const writes = [];
   const storage = {
     getItem: (key) => saved.get(key) ?? null,
     setItem: (key, value) => {
-      if (key === "nba-feed-team" || key === "nba-feed-favorite-teams") preferenceWrites += 1;
-      if (fail(preferenceWrites, key)) throw new Error(`quota ${key}`);
+      if (failCommit && key === "nba-feed-your-teams") throw new Error("quota");
+      writes.push(key);
       saved.set(key, value);
     },
     removeItem: (key) => saved.delete(key),
   };
-  return { saved, storage };
-}
-
-function readPair(saved) {
-  return {
-    focus: JSON.parse(saved.get("nba-feed-team")).state.selectedTeam.abbreviation,
-    follows: JSON.parse(saved.get("nba-feed-favorite-teams")).state.favoriteTeamIds,
-    focusRaw: saved.get("nba-feed-team"),
-  };
-}
-
-test("Done writes the focus and the follows together, or restores the previous pair", () => {
   const { persist, createJSONStorage } = require("zustand/middleware");
-  const both = preferenceBag(() => false);
-  const committed = yourTeams.commitYourTeamsPreferences(both.storage, { focus: knicks, followingIds: [] });
-  assert.equal(committed.committed, true);
-  assert.deepEqual(readPair(both.saved).follows, []);
-  assert.equal(readPair(both.saved).focus, "NYK");
-  assert.equal(JSON.parse(both.saved.get("nba-feed-team")).state.favoriteTeamIds, undefined);
-  assert.equal(readPair(both.saved).follows.includes(knicks.id), false);
+  const loaded = load("hooks/useTeam.ts", {
+    "@/lib/teams": teams,
+    "@/lib/yourTeams": yourTeams,
+    "zustand/middleware": { persist: (config, options) => persist(config, options), createJSONStorage },
+  }, { window: { localStorage: storage } });
+  return { store: loaded.useTeam, writes };
+}
 
-  const second = preferenceBag((count) => count === 2);
-  const previousFocus = second.saved.get("nba-feed-team");
-  const restored = yourTeams.commitYourTeamsPreferences(second.storage, { focus: knicks, followingIds: [] });
-  assert.equal(restored.committed, false);
-  assert.equal(restored.restored, true);
-  assert.equal(second.saved.get("nba-feed-team"), previousFocus);
-  assert.deepEqual(readPair(second.saved).follows, [lakers.id]);
+test("legacy keys hydrate once and never override the authoritative record", () => {
+  const legacyFocus = JSON.stringify({ version: 0, state: { selectedTeam: { ...heat, id: 15, logo: "https://cdn.example/legacy.svg" } } });
+  const legacyFollows = JSON.stringify({ version: 0, state: { favoriteTeamIds: [12] } });
+  const saved = new Map([
+    ["nba-feed-team", legacyFocus],
+    ["nba-feed-favorite-teams", legacyFollows],
+  ]);
+  const first = openPreferences(saved);
+  assert.equal(first.store.getState().selectedTeam, heat);
+  assert.equal(first.store.getState().selectedTeam.logo, heat.logo);
+  assert.deepEqual(JSON.parse(JSON.stringify(first.store.getState().favoriteTeamIds)), [13]);
+  assert.equal(first.store.getState().favoriteTeamIds.includes(heat.id), false);
+  assert.equal(saved.get("nba-feed-team"), legacyFocus);
+  assert.equal(saved.get("nba-feed-favorite-teams"), legacyFollows);
+  assert.equal(saved.has("nba-feed-your-teams"), false);
 
-  const torn = preferenceBag((count) => count >= 2);
-  const tornResult = yourTeams.commitYourTeamsPreferences(torn.storage, { focus: knicks, followingIds: [] });
-  assert.equal(tornResult.committed, false);
-  assert.equal(tornResult.restored, false);
-  assert.equal(readPair(torn.saved).focus, "NYK");
-  assert.deepEqual(readPair(torn.saved).follows, [lakers.id]);
+  assert.doesNotThrow(() => first.store.getState().commit(knicks, []));
+  assert.equal(first.writes.length, 1);
+  assert.equal(first.writes[0], "nba-feed-your-teams");
+  const record = JSON.parse(saved.get("nba-feed-your-teams"));
+  assert.equal(record.state.selectedTeam.abbreviation, "NYK");
+  assert.deepEqual(record.state.favoriteTeamIds, []);
+  assert.equal(saved.get("nba-feed-team"), legacyFocus);
+  assert.equal(saved.get("nba-feed-favorite-teams"), legacyFollows);
 
-  const first = preferenceBag((count) => count === 1);
-  const firstFocus = first.saved.get("nba-feed-team");
-  const firstFollows = first.saved.get("nba-feed-favorite-teams");
-  const blocked = yourTeams.commitYourTeamsPreferences(first.storage, { focus: knicks, followingIds: [heat.id] });
-  assert.equal(blocked.committed, false);
-  assert.equal(blocked.restored, true);
-  assert.equal(first.saved.get("nba-feed-team"), firstFocus);
-  assert.equal(first.saved.get("nba-feed-favorite-teams"), firstFollows);
+  saved.set("nba-feed-team", JSON.stringify({ version: 2, state: { selectedTeam: celtics } }));
+  saved.set("nba-feed-favorite-teams", JSON.stringify({ version: 1, state: { favoriteTeamIds: [lakers.id] } }));
+  const reloaded = openPreferences(saved);
+  assert.equal(reloaded.store.getState().selectedTeam.abbreviation, "NYK");
+  assert.deepEqual(JSON.parse(JSON.stringify(reloaded.store.getState().favoriteTeamIds)), []);
+});
 
-  const open = (storage) => {
-    const middleware = { persist: (config, options) => persist(config, { ...options, storage: createJSONStorage(() => storage) }) };
-    return {
-      useTeam: load("hooks/useTeam.ts", { "@/lib/teams": teams, "zustand/middleware": middleware }).useTeam,
-      useFavoriteTeams: load("hooks/useFavoriteTeams.ts", { "@/lib/teams": teams, "zustand/middleware": middleware }).useFavoriteTeams,
-    };
-  };
-  const kept = open(second.storage);
-  assert.equal(kept.useTeam.getState().selectedTeam.abbreviation, "MIA");
-  assert.deepEqual(JSON.parse(JSON.stringify(kept.useFavoriteTeams.getState().favoriteTeamIds)), [lakers.id]);
-  const partial = open(torn.storage);
-  assert.equal(partial.useTeam.getState().selectedTeam.abbreviation, "NYK");
-  assert.deepEqual(JSON.parse(JSON.stringify(partial.useFavoriteTeams.getState().favoriteTeamIds)), [lakers.id]);
-  const saved = open(both.storage);
-  assert.equal(saved.useTeam.getState().selectedTeam.abbreviation, "NYK");
-  assert.deepEqual(JSON.parse(JSON.stringify(saved.useFavoriteTeams.getState().favoriteTeamIds)), []);
+test("a failed Done leaves the saved pair and feed memory unchanged", () => {
+  const legacyFocus = JSON.stringify({ version: 2, state: { selectedTeam: heat } });
+  const legacyFollows = JSON.stringify({ version: 1, state: { favoriteTeamIds: [lakers.id] } });
+  const saved = new Map([
+    ["nba-feed-team", legacyFocus],
+    ["nba-feed-favorite-teams", legacyFollows],
+  ]);
+  const opened = openPreferences(saved, { failCommit: true });
+  assert.throws(() => opened.store.getState().commit(knicks, []), /quota/);
+  assert.equal(opened.store.getState().selectedTeam.abbreviation, "MIA");
+  assert.deepEqual(JSON.parse(JSON.stringify(opened.store.getState().favoriteTeamIds)), [lakers.id]);
+  assert.equal(saved.has("nba-feed-your-teams"), false);
+  assert.equal(saved.get("nba-feed-team"), legacyFocus);
+  assert.equal(saved.get("nba-feed-favorite-teams"), legacyFollows);
+  const reloaded = openPreferences(saved);
+  assert.equal(reloaded.store.getState().selectedTeam.abbreviation, "MIA");
+  assert.deepEqual(JSON.parse(JSON.stringify(reloaded.store.getState().favoriteTeamIds)), [lakers.id]);
+});
+
+test("a failed save lets Esc and Close discard the draft", () => {
+  assert.equal(yourTeams.yourTeamsCloseAction({ saveError: true, confirmDiscard: true, dirty: true }), "close");
+  assert.equal(yourTeams.yourTeamsCloseAction({ saveError: false, confirmDiscard: false, dirty: true }), "confirm-discard");
+  assert.equal(yourTeams.yourTeamsCloseAction({ saveError: false, confirmDiscard: true, dirty: true }), "keep-editing");
+  assert.equal(yourTeams.yourTeamsCloseAction({ saveError: false, confirmDiscard: false, dirty: false }), "close");
 });
 
 test("stores without browser storage count as ready instead of leaving the dialog loading", () => {

@@ -1,7 +1,7 @@
 "use client";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { teams, getChartColor, getTeamById, getCeltics } from "@/lib/teams";
-import { yourTeamsCopy, normalizeFollowing, sameIds, isStoreReady, yourTeamsSaveEvents, commitYourTeamsPreferences } from "@/lib/yourTeams";
+import { yourTeamsCopy, normalizeFollowing, sameIds, isStoreReady, yourTeamsSaveEvents, yourTeamsCloseAction } from "@/lib/yourTeams";
 import { recordProductEvent } from "@/lib/productEvents";
 import { useFavoriteTeams } from "@/hooks/useFavoriteTeams";
 import { useTeam } from "@/hooks/useTeam";
@@ -173,7 +173,7 @@ export function YourTeamsForm({
       </section>
       {saveError && <p role="alert" className="mt-4 text-sm text-amber-200">{yourTeamsCopy.saveError}</p>}
       <div className="sticky bottom-0 mt-6 border-t border-white/10 bg-[#141414] py-4">
-        <button type="submit" className="min-h-11 w-full rounded-lg bg-white/10 px-4 text-sm font-medium hover:bg-white/20">
+        <button id="your-teams-done" type="submit" className="min-h-11 w-full rounded-lg bg-white/10 px-4 text-sm font-medium hover:bg-white/20">
           {yourTeamsCopy.done}
         </button>
       </div>
@@ -196,6 +196,7 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   const [initial, setInitial] = useState<{ focusId: number; followingIds: number[] } | null>(null);
   const applied = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const saveErrorRef = useRef(false);
 
   const dirty = initial !== null
     && (initial.focusId !== focusId || !sameIds(initial.followingIds, normalizeFollowing(followingIds)));
@@ -203,13 +204,22 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   useLayoutEffect(() => {
     if (!ready) return;
     const panel = panelRef.current;
+    if (saveError) {
+      panel?.querySelector<HTMLElement>("#your-teams-done")?.focus();
+      return;
+    }
+    if (saveErrorRef.current) return;
     const target = confirmDiscard
       ? panel?.querySelector<HTMLElement>("#your-teams-keep-editing")
       : picking
         ? panel?.querySelector<HTMLElement>("[role='radio'][aria-checked='true']")
         : panel?.querySelector<HTMLElement>("#your-teams-current-focus");
     target?.focus();
-  }, [ready, picking, focusId, confirmDiscard]);
+  }, [ready, picking, focusId, confirmDiscard, saveError]);
+
+  useLayoutEffect(() => {
+    saveErrorRef.current = saveError;
+  }, [saveError]);
 
   useLayoutEffect(() => {
     let active = true;
@@ -239,12 +249,12 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
   }, []);
 
   function requestClose() {
-    if (confirmDiscard) {
-      // Esc or Close while the prompt is showing means "keep editing".
+    const action = yourTeamsCloseAction({ saveError: saveErrorRef.current || saveError, confirmDiscard, dirty });
+    if (action === "keep-editing") {
       setConfirmDiscard(false);
       return;
     }
-    if (dirty) {
+    if (action === "confirm-discard") {
       setConfirmDiscard(true);
       return;
     }
@@ -258,16 +268,9 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
       focusId: useTeam.getState().selectedTeam.id,
       followingIds: useFavoriteTeams.getState().favoriteTeamIds,
     };
-    let outcome;
     try {
-      outcome = commitYourTeamsPreferences(window.localStorage, { focus, followingIds: following });
+      useTeam.getState().commit(focus, following);
     } catch {
-      setSaveError(true);
-      return;
-    }
-    useTeam.persist?.rehydrate();
-    useFavoriteTeams.persist?.rehydrate();
-    if (!outcome.committed) {
       setSaveError(true);
       return;
     }
