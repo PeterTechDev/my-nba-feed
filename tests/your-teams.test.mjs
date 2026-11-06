@@ -9,13 +9,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const require = createRequire(import.meta.url);
 
-function load(file, imports = {}) {
+function load(file, imports = {}, globals = {}) {
   const source = readFileSync(new URL("../src/" + file, import.meta.url), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX,
   } }).outputText;
   const exports = {};
   const scope = {
+    ...globals,
     exports,
     require: (id) => imports[id] ?? require(id),
   };
@@ -39,6 +40,56 @@ const celtics = teams.getCeltics();
 const lakers = teams.teams.find((team) => team.abbreviation === "LAL");
 const heat = teams.teams.find((team) => team.abbreviation === "MIA");
 const knicks = teams.teams.find((team) => team.abbreviation === "NYK");
+
+test("Done shows the save error when storage access or reading is denied", () => {
+  for (const deniedAt of ["access", "read"]) {
+    const state = [];
+    let closed = false;
+    let writes = 0;
+    let hydrations = 0;
+    const storage = {
+      getItem() { throw new Error("SecurityError: storage denied"); },
+      setItem() { writes += 1; },
+      removeItem() { writes += 1; },
+    };
+    const window = {
+      get localStorage() {
+        if (deniedAt === "access") throw new Error("SecurityError: storage denied");
+        return storage;
+      },
+    };
+    const store = (value) => Object.assign((select) => select(value), {
+      getState: () => value,
+      persist: { rehydrate() { hydrations += 1; } },
+    });
+    const { default: Dialog } = load("components/YourTeamsDialog.tsx", {
+      react: {
+        useState(initial) {
+          const index = state.length;
+          state.push(initial);
+          return [initial, (value) => { state[index] = value; }];
+        },
+        useRef: () => ({ current: null }),
+        useLayoutEffect() {},
+      },
+      "@/lib/teams": teams,
+      "@/lib/yourTeams": yourTeams,
+      "@/lib/productEvents": { recordProductEvent() { assert.fail("failed saves must not emit events"); } },
+      "@/hooks/useTeam": { useTeam: store({ selectedTeam: heat }) },
+      "@/hooks/useFavoriteTeams": { useFavoriteTeams: store({ favoriteTeamIds: [lakers.id] }) },
+      "./Modal": { default: () => null },
+    }, { window });
+    const dialog = Dialog({ onClose() { closed = true; } });
+    const form = dialog.props.children.props.children[1];
+    assert.doesNotThrow(() => form.props.onDone(), deniedAt);
+    assert.equal(state[2], true, "save error is visible");
+    assert.equal(state[4], heat.id, "focus draft is preserved");
+    assert.deepEqual(state[5], [lakers.id], "following draft is preserved");
+    assert.equal(closed, false);
+    assert.equal(writes, 0);
+    assert.equal(hydrations, 0);
+  }
+});
 
 function renderForm(props) {
   return renderToStaticMarkup(createElement(YourTeamsForm, {

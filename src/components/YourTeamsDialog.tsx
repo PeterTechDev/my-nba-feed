@@ -258,7 +258,13 @@ export default function YourTeamsDialog({ onClose }: { onClose: () => void }) {
       focusId: useTeam.getState().selectedTeam.id,
       followingIds: useFavoriteTeams.getState().favoriteTeamIds,
     };
-    const outcome = commitYourTeamsPreferences(window.localStorage, { focus, followingIds: following });
+    let outcome;
+    try {
+      outcome = commitYourTeamsPreferences(window.localStorage, { focus, followingIds: following });
+    } catch {
+      setSaveError(true);
+      return;
+    }
     useTeam.persist?.rehydrate();
     useFavoriteTeams.persist?.rehydrate();
     if (!outcome.committed) {
