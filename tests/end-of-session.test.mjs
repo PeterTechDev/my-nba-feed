@@ -806,6 +806,7 @@ test("homepage places the end marker after the last story, names the selected te
   }
   mocked["@/components/TeamHeader"] = { default: () => null };
   mocked["@/components/GameDataProvider"] = { default: ({ children }) => children };
+  mocked["@/components/OnboardingGate"] = { OnboardingGate: ({ children }) => children };
   const view = render(createElement(load("app/page.tsx", {}, mocked).default));
   try {
     const order = [];

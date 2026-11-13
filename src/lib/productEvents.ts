@@ -1,6 +1,7 @@
 export type ProductEvent =
-  | { name: "team_selected"; team_id: number; source: "your_teams" }
-  | { name: "teams_following_updated"; count: number };
+  | { name: "team_selected"; team_id: number; source: "your_teams" | "onboarding" }
+  | { name: "teams_following_updated"; count: number }
+  | { name: "onboarding_skipped"; default_team_id: number };
 
 type ProductEventListener = (event: ProductEvent) => void;
 

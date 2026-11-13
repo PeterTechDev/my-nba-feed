@@ -16,6 +16,7 @@ import { selectHomepageNews } from "@/lib/news";
 import { headlineIsAboutTeam } from "@/lib/teams";
 import type { NewsFeeds } from "@/lib/api";
 import styles from "@/components/Home.module.css";
+import { OnboardingGate } from "@/components/OnboardingGate";
 
 function FeedContent() {
   const favoriteTeams = useFavoriteTeamObjects();
@@ -63,12 +64,20 @@ function FeedContent() {
   );
 }
 
-export default function Home() {
+export function HomeFeed() {
   return (
     <main className={styles.home}>
       <GameDataProvider>
         <FeedContent />
       </GameDataProvider>
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <OnboardingGate>
+      <HomeFeed />
+    </OnboardingGate>
   );
 }

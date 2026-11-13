@@ -48,6 +48,21 @@ export function followsFromLegacy(raw: string | null): number[] {
   return normalizeFollowing([...new Set(mapped)]);
 }
 
+/**
+ * True when this browser already has a team preference: the current Your teams
+ * record, or either legacy key that record is migrated from. A thrown read
+ * (storage denied) is not a saved preference.
+ */
+export function hasSavedTeamPreference(getItem: (key: string) => string | null): boolean {
+  try {
+    const canonical = getItem(yourTeamsStorageKey);
+    if (usableCanonical(typeof canonical === "string" ? canonical : null)) return true;
+    return getItem(legacyFocusKey) != null || getItem(legacyFollowingKey) != null;
+  } catch {
+    return false;
+  }
+}
+
 /** A canonical record is only authoritative when it is the current version and names real teams. */
 export function usableCanonical(raw: string | null): string | null {
   if (typeof raw !== "string" || raw.trim() === "") return null;
