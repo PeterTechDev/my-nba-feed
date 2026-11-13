@@ -2,13 +2,11 @@
 import type { KeyboardEvent } from "react";
 import { continueLabel, nextOnboardingTeamId, onboardingCopy } from "@/lib/onboarding";
 import type { Team } from "@/lib/teams";
-import { yourTeamsCopy } from "@/lib/yourTeams";
 
 export function OnboardingScreen({
   teams,
   loadError,
   selectedId,
-  saveError,
   onSelect,
   onContinue,
   onSkip,
@@ -17,7 +15,6 @@ export function OnboardingScreen({
   teams: readonly Team[];
   loadError: boolean;
   selectedId: number | null;
-  saveError: boolean;
   onSelect: (id: number) => void;
   onContinue: () => void;
   onSkip: () => void;
@@ -85,7 +82,6 @@ export function OnboardingScreen({
         </div>
       )}
       <div className={loadError ? "mt-6" : "sticky bottom-0 mt-auto bg-[#0a0a0a] pt-4"}>
-        {saveError && <p role="alert" className="mb-3 text-sm text-amber-200">{yourTeamsCopy.saveError}</p>}
         {!loadError && (
           <button
             id="onboarding-continue"

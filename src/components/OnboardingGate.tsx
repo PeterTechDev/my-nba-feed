@@ -4,10 +4,13 @@ import { useTeam } from "@/hooks/useTeam";
 import {
   completeOnboarding,
   decideOnboardingPhase,
+  focusOnboardingHeading,
   loadOnboardingTeams,
   onboardingEscapeAction,
+  onboardingRetryFocus,
   readTeamList,
 } from "@/lib/onboarding";
+import type { Team } from "@/lib/teams";
 import { OnboardingScreen } from "./OnboardingScreen";
 
 function trapDialogFocus(event: KeyboardEvent<HTMLDialogElement>) {
@@ -28,11 +31,25 @@ function trapDialogFocus(event: KeyboardEvent<HTMLDialogElement>) {
   }
 }
 
-export default function OnboardingDialog({ onFinished }: { onFinished: (notice: string | null) => void }) {
+function rememberVisit(focus: Team, followingIds: readonly number[]) {
+  try {
+    useTeam.setState({ selectedTeam: focus, favoriteTeamIds: [...followingIds] });
+  } catch {
+    // Persist updates memory before setItem. A denied write leaves this visit in memory.
+  }
+}
+
+export default function OnboardingDialog({
+  onFinished,
+  loadTeams = loadOnboardingTeams,
+}: {
+  onFinished: (notice: string | null) => void;
+  loadTeams?: () => readonly Team[];
+}) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [saveError, setSaveError] = useState(false);
-  const [loaded, setLoaded] = useState(() => readTeamList(loadOnboardingTeams));
+  const [loaded, setLoaded] = useState(() => readTeamList(loadTeams));
   const ref = useRef<HTMLDialogElement>(null);
+  const focusHeading = useRef(false);
 
   const finish = (choice: "continue" | "skip") => {
     const selected = loaded.teams.find((team) => team.id === selectedId) ?? null;
@@ -41,12 +58,16 @@ export default function OnboardingDialog({ onFinished }: { onFinished: (notice: 
       selected,
       useTeam.getState().favoriteTeamIds,
       useTeam.getState().commit,
+      rememberVisit,
     );
-    if (!result.ok) {
-      if (result.reason === "save-failed") setSaveError(true);
-      return;
-    }
+    if (!result.ok) return;
     onFinished(result.notice);
+  };
+
+  const retry = () => {
+    const next = readTeamList(loadTeams);
+    if (onboardingRetryFocus(loaded.error, next.error) === "heading") focusHeading.current = true;
+    setLoaded(next);
   };
 
   useEffect(() => {
@@ -63,11 +84,18 @@ export default function OnboardingDialog({ onFinished }: { onFinished: (notice: 
   }, []);
 
   useEffect(() => {
+    if (typeof document === "undefined") return;
     const dialog = ref.current;
     const active = document.activeElement;
     if (!dialog || !(active instanceof HTMLElement) || active.getAttribute("role") !== "radio") return;
     dialog.querySelector<HTMLElement>("[role='radio'][tabindex='0']")?.focus();
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!focusHeading.current || loaded.error) return;
+    focusHeading.current = false;
+    focusOnboardingHeading(ref.current);
+  }, [loaded]);
 
   return (
     <dialog
@@ -98,11 +126,10 @@ export default function OnboardingDialog({ onFinished }: { onFinished: (notice: 
         teams={loaded.teams}
         loadError={loaded.error}
         selectedId={selectedId}
-        saveError={saveError}
         onSelect={setSelectedId}
         onContinue={() => finish("continue")}
         onSkip={() => finish("skip")}
-        onRetry={() => setLoaded(readTeamList(loadOnboardingTeams))}
+        onRetry={retry}
       />
     </dialog>
   );

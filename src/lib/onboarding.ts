@@ -9,6 +9,7 @@ export const onboardingCopy = {
   subcopy: "We'll keep scores hidden until you ask.",
   skip: "Skip for now",
   skipped: "Following the Celtics for now. Change anytime in Your teams.",
+  unsaved: "Couldn't save your choice on this browser, so it applies to this visit only.",
   loadError: "We couldn't load teams. Retry.",
   retry: "Retry",
   continue: "Continue",
@@ -87,18 +88,29 @@ export function onboardingCommit(
   };
 }
 
+/** A recovered team list returns focus to the heading. The first team is the next tab stop. */
+export function onboardingRetryFocus(hadError: boolean, hasError: boolean): "heading" | null {
+  return hadError && !hasError ? "heading" : null;
+}
+
+export function focusOnboardingHeading(root: ParentNode | null) {
+  root?.querySelector<HTMLElement>("#onboarding-heading")?.focus();
+}
+
 export function completeOnboarding(
   choice: "continue" | "skip",
   selected: Team | null,
   followingIds: readonly number[],
   commit: (focus: Team, followingIds: readonly number[]) => void,
-): { ok: true; notice: string | null } | { ok: false; reason: "needs-selection" | "save-failed" } {
+  remember: (focus: Team, followingIds: readonly number[]) => void,
+): { ok: true; notice: string | null } | { ok: false; reason: "needs-selection" } {
   const next = onboardingCommit(choice, selected, followingIds);
   if (!next) return { ok: false, reason: "needs-selection" };
   try {
     commit(next.focus, next.followingIds);
   } catch {
-    return { ok: false, reason: "save-failed" };
+    try { remember(next.focus, next.followingIds); } catch { /* the visit is already in memory */ }
+    return { ok: true, notice: onboardingCopy.unsaved };
   }
   recordProductEvent(next.event);
   return { ok: true, notice: next.notice };

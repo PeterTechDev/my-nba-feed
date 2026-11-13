@@ -66,7 +66,6 @@ function screen(props) {
     teams: teams.teams,
     loadError: false,
     selectedId: null,
-    saveError: false,
     onSelect() {},
     onContinue() {},
     onSkip() {},
@@ -131,18 +130,42 @@ test("continue saves only the focus and skip always saves the Celtics", () => {
   assert.equal(onboarding.onboardingEscapeAction(), "skip");
 });
 
-test("a failed commit does not emit a success event or replace the saved pair", () => {
-  const seen = [];
-  const unsubscribe = events.subscribeProductEvents((event) => seen.push(event));
-  const saved = new Map();
-  const store = openPreferences(saved, { failCommit: true });
-  const failed = onboarding.completeOnboarding("continue", knicks, store.getState().favoriteTeamIds, store.getState().commit);
-  assert.deepEqual(json(failed), { ok: false, reason: "save-failed" });
-  assert.equal(seen.length, 0);
-  assert.equal(store.getState().selectedTeam.abbreviation, "BOS");
-  assert.deepEqual(JSON.parse(JSON.stringify(store.getState().favoriteTeamIds)), []);
-  assert.equal(saved.has("nba-feed-your-teams"), false);
-  unsubscribe();
+const unsavedNotice = "Couldn't save your choice on this browser, so it applies to this visit only.";
+
+function rememberVisit(store) {
+  return (focus, followingIds) => {
+    try {
+      store.setState({ selectedTeam: focus, favoriteTeamIds: followingIds });
+    } catch {
+      // setItem throws after the in-memory update.
+    }
+  };
+}
+
+test("a denied setItem keeps Continue and Skip in memory for this visit only", () => {
+  for (const choice of ["continue", "skip"]) {
+    const seen = [];
+    const unsubscribe = events.subscribeProductEvents((event) => seen.push(event));
+    const saved = new Map();
+    const store = openPreferences(saved, { failCommit: true });
+    const result = onboarding.completeOnboarding(
+      choice,
+      lakers,
+      store.getState().favoriteTeamIds,
+      store.getState().commit,
+      rememberVisit(store),
+    );
+    assert.equal(result.ok, true, choice);
+    assert.equal(result.notice, unsavedNotice, choice);
+    assert.equal(store.getState().selectedTeam.abbreviation, choice === "skip" ? "BOS" : "LAL", choice);
+    assert.deepEqual(JSON.parse(JSON.stringify(store.getState().favoriteTeamIds)), [], choice);
+    assert.equal(saved.has("nba-feed-your-teams"), false, choice);
+    assert.equal(seen.length, 0, choice);
+    assert.equal(onboarding.decideOnboardingPhase((key) => saved.get(key) ?? null), "choose", choice);
+    const reloaded = openPreferences(saved);
+    assert.equal(reloaded.getState().selectedTeam.abbreviation, "BOS", choice);
+    unsubscribe();
+  }
 });
 
 test("continue persists the focus through the Your teams record and leaves following untouched", () => {
@@ -222,7 +245,6 @@ test("the picker shows the promise, waits for a choice, and keeps a 48px logo bo
     teams: teams.teams,
     loadError: false,
     selectedId: null,
-    saveError: false,
     onSelect(id) { picked = id; },
     onContinue() { continued += 1; },
     onSkip() {},
@@ -244,13 +266,36 @@ test("a failed team list offers retry and skip without a team grid", () => {
   assert.doesNotMatch(html, /id="onboarding-continue"/);
 });
 
-test("a failed save stays on the picker with the Your teams error", () => {
-  const html = renderToStaticMarkup(screen({ selectedId: heat.id, saveError: true }));
-  assert.match(html, /role="alert"/);
-  assert.match(html, /Couldn(?:'|&#x27;)t save your teams\. Try again\./);
-  assert.match(html, /Continue with Miami Heat/);
-  assert.doesNotMatch(html, /id="onboarding-continue"[^>]*disabled=""/);
-  assert.match(html, /Skip for now/);
+test("an unsaved visit shows one notice on the feed and not the skip phrase", () => {
+  const html = renderToStaticMarkup(createElement(OnboardingFrame, {
+    phase: "ready",
+    notice: unsavedNotice,
+  }, "Games feed"));
+  assert.match(html, /role="status"/);
+  assert.match(html, /Couldn(?:'|&#x27;)t save your choice on this browser, so it applies to this visit only\./);
+  assert.match(html, /Games feed/);
+  assert.doesNotMatch(html, /Following the Celtics for now/);
+  assert.doesNotMatch(html, /Try again/);
+  assert.doesNotMatch(html, /Which team do you follow/);
+});
+
+test("a recovered team list focuses the heading, and the next tab stop is the first team", () => {
+  assert.equal(onboarding.onboardingRetryFocus(true, false), "heading");
+  assert.equal(onboarding.onboardingRetryFocus(true, true), null);
+  assert.equal(onboarding.onboardingRetryFocus(false, false), null);
+  const html = renderToStaticMarkup(screen());
+  assert.match(html, /id="onboarding-heading"[^>]*tabindex="-1"|tabindex="-1"[^>]*id="onboarding-heading"/);
+  assert.match(html, /aria-label="Boston Celtics"[^>]*tabindex="0"|tabindex="0"[^>]*aria-label="Boston Celtics"/);
+  assert.equal((html.match(/tabindex="0"/g) ?? []).length, 1);
+  const focused = [];
+  onboarding.focusOnboardingHeading({
+    querySelector(selector) {
+      focused.push(selector);
+      return { focus() { focused.push("focus"); } };
+    },
+  });
+  assert.deepEqual(focused, ["#onboarding-heading", "focus"]);
+  assert.equal(onboarding.focusOnboardingHeading(null), undefined);
 });
 
 test("keyboard movement changes the selection and Escape is skip", () => {
@@ -281,7 +326,7 @@ test("checking and choosing render no feed, and skip announces the Celtics defau
   assert.doesNotMatch(ready, /Which team do you follow/);
 });
 
-test("Escape skips without saving the highlighted team, and a failed skip stays open", () => {
+test("Escape follows Skip into this visit when setItem throws", () => {
   const state = [];
   let finished = null;
   const commits = [];
@@ -307,6 +352,7 @@ test("Escape skips without saving the highlighted team, and a failed skip stays 
         throw new Error("quota");
       },
     }),
+    setState() { throw new Error("quota"); },
   };
   const { default: Dialog } = load("components/OnboardingGate.tsx", {
     react,
@@ -320,9 +366,69 @@ test("Escape skips without saving the highlighted team, and a failed skip stays 
   let prevented = false;
   dialog.props.onCancel({ preventDefault() { prevented = true; } });
   assert.equal(prevented, true);
-  assert.equal(finished, null);
+  assert.equal(finished, unsavedNotice);
   assert.deepEqual(commits, [["BOS", [heat.id]]]);
   assert.equal(seen.length, 0);
-  assert.equal(state[1], true);
   unsubscribe();
+});
+
+test("a successful Retry moves focus to the picker heading", () => {
+  let attempt = 0;
+  const focused = [];
+  const hookState = [];
+  const refs = [];
+  let hookIndex = 0;
+  let refIndex = 0;
+  const effects = [];
+  const fakeDialog = {
+    querySelector(selector) {
+      focused.push(selector);
+      return { focus() { focused.push("focus"); } };
+    },
+  };
+  const react = {
+    useState(initial) {
+      const index = hookIndex++;
+      if (hookState[index] === undefined) {
+        hookState[index] = typeof initial === "function" ? initial() : initial;
+      }
+      return [hookState[index], (next) => {
+        hookState[index] = typeof next === "function" ? next(hookState[index]) : next;
+      }];
+    },
+    useRef(initial) {
+      const index = refIndex++;
+      if (!refs[index]) refs[index] = { current: initial == null ? fakeDialog : initial };
+      return refs[index];
+    },
+    useEffect(effect) { effects.push(effect); },
+  };
+  const { default: Dialog } = load("components/OnboardingGate.tsx", {
+    react,
+    "@/lib/onboarding": onboarding,
+    "@/lib/teams": teams,
+    "@/lib/yourTeams": yourTeams,
+    "@/hooks/useTeam": { useTeam: { getState: () => ({ favoriteTeamIds: [], commit() {} }), setState() {} } },
+    "./OnboardingScreen": { OnboardingScreen },
+  });
+  const props = {
+    onFinished() {},
+    loadTeams() {
+      attempt += 1;
+      if (attempt === 1) throw new Error("offline");
+      return teams.teams;
+    },
+  };
+  const render = () => {
+    hookIndex = 0;
+    refIndex = 0;
+    effects.length = 0;
+    return Dialog(props);
+  };
+  const first = render();
+  assert.equal(first.props.children.props.loadError, true);
+  first.props.children.props.onRetry();
+  render();
+  for (const effect of effects) effect();
+  assert.deepEqual(focused, ["#onboarding-heading", "focus"]);
 });
